@@ -31,6 +31,7 @@ export class IngestionService {
   ) {}
 
   async ingestBasin(basin: NhcBasin): Promise<IngestReport> {
+    const started = Date.now();
     const report: IngestReport = {
       basin,
       stormsSeen: 0,
@@ -47,7 +48,7 @@ export class IngestionService {
       const feed = parseRssFeed(xml);
       summaries = extractStormSummaries(feed);
     } catch (err) {
-      const msg = `Failed to fetch/parse ${basin}: ${(err as Error).message}`;
+      const msg = `basin=${basin} fetch/parse failed: ${(err as Error).message}`;
       this.logger.error(msg);
       report.errors.push(msg);
       return report;
@@ -55,11 +56,15 @@ export class IngestionService {
 
     report.stormsSeen = summaries.length;
     if (summaries.length === 0) {
-      this.logger.log(`Basin ${basin}: no active storms`);
+      this.logger.log(
+        `ingest basin=${basin} no active storms (${Date.now() - started}ms)`,
+      );
       return report;
     }
 
     for (const summary of summaries) {
+      const stormStarted = Date.now();
+      const ctx = `basin=${basin} atcfId=${summary.atcfId} wallet=${summary.wallet}`;
       try {
         const storm = await this.storms.upsertFromIngestion({
           atcfId: summary.atcfId,
@@ -73,7 +78,7 @@ export class IngestionService {
         try {
           tcmXml = await this.nhc.fetchForecastAdvisory(summary.wallet);
         } catch (err) {
-          const msg = `TCM fetch failed for wallet ${summary.wallet}: ${(err as Error).message}`;
+          const msg = `${ctx} TCM fetch failed: ${(err as Error).message}`;
           this.logger.warn(msg);
           report.errors.push(msg);
           continue;
@@ -85,7 +90,7 @@ export class IngestionService {
         // Advisory number: derive from the TCM title "… Forecast/Advisory Number 2"
         const advisoryNumber = extractAdvisoryNumber(tcmItem.title);
         if (advisoryNumber === null) {
-          const msg = `Could not parse advisory number from "${tcmItem.title}"`;
+          const msg = `${ctx} could not parse advisory number from "${tcmItem.title}"`;
           this.logger.warn(msg);
           report.errors.push(msg);
           continue;
@@ -101,8 +106,17 @@ export class IngestionService {
             issuedAt,
             rawText,
           });
-        if (inserted) report.advisoriesInserted++;
-        else report.advisoriesSkipped++;
+        if (inserted) {
+          report.advisoriesInserted++;
+          this.logger.log(
+            `${ctx} advisory#${advisoryNumber} inserted (${Date.now() - stormStarted}ms)`,
+          );
+        } else {
+          report.advisoriesSkipped++;
+          this.logger.log(
+            `${ctx} advisory#${advisoryNumber} already present, skipped`,
+          );
+        }
 
         // Parse forecast points from CDATA
         if (rawText) {
@@ -114,14 +128,14 @@ export class IngestionService {
           report.forecastPointsInserted += n;
         }
       } catch (err) {
-        const msg = `Storm ${summary.atcfId} failed: ${(err as Error).message}`;
+        const msg = `${ctx} storm processing failed: ${(err as Error).message}`;
         this.logger.error(msg);
         report.errors.push(msg);
       }
     }
 
     this.logger.log(
-      `Basin ${basin}: storms=${report.stormsUpserted}, advisories+${report.advisoriesInserted}/~${report.advisoriesSkipped}, points+${report.forecastPointsInserted}, errors=${report.errors.length}`,
+      `ingest basin=${basin} storms+${report.stormsUpserted} advisories+${report.advisoriesInserted}/~${report.advisoriesSkipped} points+${report.forecastPointsInserted} errors=${report.errors.length} took=${Date.now() - started}ms`,
     );
     return report;
   }
