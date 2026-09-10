@@ -113,10 +113,7 @@ export const riskioClient = {
     );
   },
 
-  getAdvisory(
-    baseUrl: string,
-    advisoryId: string,
-  ): Promise<AdvisoryDetail> {
+  getAdvisory(baseUrl: string, advisoryId: string): Promise<AdvisoryDetail> {
     return get(baseUrl, `/advisories/${encodeURIComponent(advisoryId)}`);
   },
 

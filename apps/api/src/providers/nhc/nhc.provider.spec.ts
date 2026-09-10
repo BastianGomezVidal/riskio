@@ -8,8 +8,7 @@ describe('NhcProvider', () => {
 
   function makeProvider(overrides: Record<string, unknown> = {}) {
     const config = {
-      get: (key: string, fallback?: unknown) =>
-        overrides[key] ?? fallback,
+      get: (key: string, fallback?: unknown) => overrides[key] ?? fallback,
     } as unknown as ConfigService;
     return new NhcProvider(config);
   }

@@ -18,9 +18,23 @@ export class AdvisoriesController {
 
   @Get('storms/:atcfId/advisories')
   @ApiOperation({ summary: 'List advisories for a storm (paginated)' })
-  @ApiParam({ name: 'atcfId', description: 'ATCF storm identifier', example: 'EP142026' })
-  @ApiQuery({ name: 'page', required: false, example: 1, description: 'Page number (1-indexed)' })
-  @ApiQuery({ name: 'limit', required: false, example: 20, description: 'Items per page (max 100)' })
+  @ApiParam({
+    name: 'atcfId',
+    description: 'ATCF storm identifier',
+    example: 'EP142026',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    example: 1,
+    description: 'Page number (1-indexed)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    example: 20,
+    description: 'Items per page (max 100)',
+  })
   @ApiOkResponse({ description: 'Paginated list of advisories' })
   findByStorm(
     @Param('atcfId') atcfId: string,

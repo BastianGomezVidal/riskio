@@ -11,45 +11,41 @@ describe('Advisories & forecast-points endpoints (integration)', () => {
   beforeAll(async () => {
     app = await createTestApp();
 
-    await seedStorm(
-      app,
-      { atcfId: 'EP142026', name: null, basin: 'EP' },
-      [
-        {
-          advisory: {
-            advisoryNumber: 2,
-            issuedAt: new Date('2026-09-10T02:33:27Z'),
-            rawText: 'TCM advisory #2',
-          },
-          points: [
-            {
-              validAt: new Date('2026-09-10T12:00:00Z'),
-              latitude: 16.7,
-              longitude: -118.5,
-              windSpeedKt: 35,
-              pressureMb: null,
-              category: 0,
-            },
-            {
-              validAt: new Date('2026-09-11T00:00:00Z'),
-              latitude: 16.8,
-              longitude: -121.1,
-              windSpeedKt: 40,
-              pressureMb: null,
-              category: 0,
-            },
-          ],
+    await seedStorm(app, { atcfId: 'EP142026', name: null, basin: 'EP' }, [
+      {
+        advisory: {
+          advisoryNumber: 2,
+          issuedAt: new Date('2026-09-10T02:33:27Z'),
+          rawText: 'TCM advisory #2',
         },
-        {
-          advisory: {
-            advisoryNumber: 1,
-            issuedAt: new Date('2026-09-10T00:00:00Z'),
-            rawText: 'TCM advisory #1',
+        points: [
+          {
+            validAt: new Date('2026-09-10T12:00:00Z'),
+            latitude: 16.7,
+            longitude: -118.5,
+            windSpeedKt: 35,
+            pressureMb: null,
+            category: 0,
           },
-          points: [],
+          {
+            validAt: new Date('2026-09-11T00:00:00Z'),
+            latitude: 16.8,
+            longitude: -121.1,
+            windSpeedKt: 40,
+            pressureMb: null,
+            category: 0,
+          },
+        ],
+      },
+      {
+        advisory: {
+          advisoryNumber: 1,
+          issuedAt: new Date('2026-09-10T00:00:00Z'),
+          rawText: 'TCM advisory #1',
         },
-      ],
-    );
+        points: [],
+      },
+    ]);
 
     const adv = await request(app.getHttpServer())
       .get('/storms/EP142026/advisories')

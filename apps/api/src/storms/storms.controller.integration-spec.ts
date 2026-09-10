@@ -21,9 +21,7 @@ describe('Storms endpoints (integration)', () => {
       [],
     );
 
-    const res = await request(app.getHttpServer())
-      .get('/storms')
-      .expect(200);
+    const res = await request(app.getHttpServer()).get('/storms').expect(200);
 
     expect(res.body.meta).toEqual(
       expect.objectContaining({ total: 1, page: 1, limit: 20 }),
@@ -37,29 +35,25 @@ describe('Storms endpoints (integration)', () => {
   });
 
   it('returns a storm with its advisories by atcfId', async () => {
-    await seedStorm(
-      app,
-      { atcfId: 'EP142026', name: null, basin: 'EP' },
-      [
-        {
-          advisory: {
-            advisoryNumber: 2,
-            issuedAt: new Date('2026-09-10T02:33:27Z'),
-            rawText: 'advisory text',
-          },
-          points: [
-            {
-              validAt: new Date('2026-09-10T12:00:00Z'),
-              latitude: 16.7,
-              longitude: -118.5,
-              windSpeedKt: 35,
-              pressureMb: null,
-              category: 0,
-            },
-          ],
+    await seedStorm(app, { atcfId: 'EP142026', name: null, basin: 'EP' }, [
+      {
+        advisory: {
+          advisoryNumber: 2,
+          issuedAt: new Date('2026-09-10T02:33:27Z'),
+          rawText: 'advisory text',
         },
-      ],
-    );
+        points: [
+          {
+            validAt: new Date('2026-09-10T12:00:00Z'),
+            latitude: 16.7,
+            longitude: -118.5,
+            windSpeedKt: 35,
+            pressureMb: null,
+            category: 0,
+          },
+        ],
+      },
+    ]);
 
     const res = await request(app.getHttpServer())
       .get('/storms/EP142026')
@@ -71,9 +65,7 @@ describe('Storms endpoints (integration)', () => {
   });
 
   it('returns 404 for an unknown storm', async () => {
-    await request(app.getHttpServer())
-      .get('/storms/ZZ999999')
-      .expect(404);
+    await request(app.getHttpServer()).get('/storms/ZZ999999').expect(404);
   });
 
   it('paginates and enforces the max limit', async () => {
