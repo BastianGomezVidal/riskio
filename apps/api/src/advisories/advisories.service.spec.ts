@@ -22,13 +22,16 @@ function makeInsertMock() {
 
 function makeRepository() {
   const insert = makeInsertMock();
+  const findAndCount = vi.fn();
+  const findOne = vi.fn();
+  const findOneOrFail = vi.fn();
   const repo = {
-    findAndCount: vi.fn(),
-    findOne: vi.fn(),
-    findOneOrFail: vi.fn(),
+    findAndCount,
+    findOne,
+    findOneOrFail,
     createQueryBuilder: vi.fn(() => insert),
   } as unknown as Repository<Advisory>;
-  return { repo, insert };
+  return { repo, insert, findAndCount, findOne, findOneOrFail };
 }
 
 function makeStorm(overrides: Partial<Storm> = {}): Storm {
@@ -61,23 +64,29 @@ const page = { page: 1, limit: 20 };
 describe('AdvisoriesService', () => {
   let repo: Repository<Advisory>;
   let insert: ReturnType<typeof makeInsertMock>;
+  let findAndCount: ReturnType<typeof vi.fn>;
+  let findOne: ReturnType<typeof vi.fn>;
+  let findOneOrFail: ReturnType<typeof vi.fn>;
   let service: AdvisoriesService;
 
   beforeEach(() => {
     const built = makeRepository();
     repo = built.repo;
     insert = built.insert;
+    findAndCount = built.findAndCount;
+    findOne = built.findOne;
+    findOneOrFail = built.findOneOrFail;
     service = new AdvisoriesService(repo);
   });
 
   describe('findByStorm', () => {
     it('returns paginated advisories for a storm, newest first', async () => {
       const advisories = [makeAdvisory(), makeAdvisory({ advisoryNumber: 1 })];
-      repo.findAndCount.mockResolvedValue([advisories, 2]);
+      findAndCount.mockResolvedValue([advisories, 2]);
 
       const result = await service.findByStorm('EP142026', page);
 
-      expect(repo.findAndCount).toHaveBeenCalledWith(
+      expect(findAndCount).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { storm: { atcfId: 'EP142026' } },
           order: { advisoryNumber: 'DESC' },
@@ -90,11 +99,13 @@ describe('AdvisoriesService', () => {
 
   describe('findOne', () => {
     it('returns a single advisory with forecast points', async () => {
-      const advisory = makeAdvisory({ forecastPoints: [{ id: 'pt-1' } as never] });
-      repo.findOne.mockResolvedValue(advisory);
+      const advisory = makeAdvisory({
+        forecastPoints: [{ id: 'pt-1' } as never],
+      });
+      findOne.mockResolvedValue(advisory);
 
       const result = await service.findOne('adv-1');
-      expect(repo.findOne).toHaveBeenCalledWith({
+      expect(findOne).toHaveBeenCalledWith({
         where: { id: 'adv-1' },
         relations: { forecastPoints: true },
       });
@@ -102,7 +113,7 @@ describe('AdvisoriesService', () => {
     });
 
     it('throws NotFoundException for an unknown advisory', async () => {
-      repo.findOne.mockResolvedValue(null);
+      findOne.mockResolvedValue(null);
       await expect(service.findOne('nope')).rejects.toThrow(NotFoundException);
     });
   });
@@ -120,13 +131,13 @@ describe('AdvisoriesService', () => {
         identifiers: [{ id: 'adv-new' }],
         generatedMaps: [{ id: 'adv-new' }],
       });
-      repo.findOneOrFail.mockResolvedValue(makeAdvisory());
+      findOneOrFail.mockResolvedValue(makeAdvisory());
 
       const result = await service.upsertFromIngestion(input);
 
       expect(insert.orIgnore).toHaveBeenCalled();
       expect(result.inserted).toBe(true);
-      expect(repo.findOneOrFail).toHaveBeenCalled();
+      expect(findOneOrFail).toHaveBeenCalled();
     });
 
     it('reports inserted=false when ON CONFLICT skips (identifiers has null)', async () => {
@@ -135,7 +146,7 @@ describe('AdvisoriesService', () => {
         identifiers: [null],
         generatedMaps: [{}],
       });
-      repo.findOneOrFail.mockResolvedValue(makeAdvisory());
+      findOneOrFail.mockResolvedValue(makeAdvisory());
 
       const result = await service.upsertFromIngestion(input);
 
@@ -144,7 +155,7 @@ describe('AdvisoriesService', () => {
 
     it('issues INSERT ... ON CONFLICT DO NOTHING', async () => {
       insert.execute.mockResolvedValue({ identifiers: [{ id: 'adv-new' }] });
-      repo.findOneOrFail.mockResolvedValue(makeAdvisory());
+      findOneOrFail.mockResolvedValue(makeAdvisory());
 
       await service.upsertFromIngestion(input);
 

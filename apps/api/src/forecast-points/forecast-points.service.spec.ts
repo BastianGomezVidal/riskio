@@ -5,12 +5,17 @@ import { ForecastPoint } from './entities/forecast-point.entity.js';
 import { Advisory } from '../advisories/entities/advisory.entity.js';
 
 function makeRepository() {
-  return {
-    findAndCount: vi.fn(),
-    delete: vi.fn(),
-    create: vi.fn(),
-    save: vi.fn(),
+  const findAndCount = vi.fn();
+  const deletePoint = vi.fn();
+  const create = vi.fn();
+  const save = vi.fn();
+  const repo = {
+    findAndCount,
+    delete: deletePoint,
+    create,
+    save,
   } as unknown as Repository<ForecastPoint>;
+  return { repo, findAndCount, deletePoint, create, save };
 }
 
 function makeAdvisory(overrides: Partial<Advisory> = {}): Advisory {
@@ -29,21 +34,30 @@ function makeAdvisory(overrides: Partial<Advisory> = {}): Advisory {
 const page = { page: 1, limit: 20 };
 
 describe('ForecastPointsService', () => {
-  let repo: ReturnType<typeof makeRepository>;
+  let repo: Repository<ForecastPoint>;
   let service: ForecastPointsService;
+  let findAndCount: ReturnType<typeof vi.fn>;
+  let deletePoint: ReturnType<typeof vi.fn>;
+  let create: ReturnType<typeof vi.fn>;
+  let save: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    repo = makeRepository();
+    const mocks = makeRepository();
+    repo = mocks.repo;
+    findAndCount = mocks.findAndCount;
+    deletePoint = mocks.deletePoint;
+    create = mocks.create;
+    save = mocks.save;
     service = new ForecastPointsService(repo);
   });
 
   describe('findByAdvisory', () => {
     it('returns paginated points ordered by validAt ascending', async () => {
-      repo.findAndCount.mockResolvedValue([[{ id: 'pt-1' }], 1]);
+      findAndCount.mockResolvedValue([[{ id: 'pt-1' }], 1]);
 
       const result = await service.findByAdvisory('adv-1', page);
 
-      expect(repo.findAndCount).toHaveBeenCalledWith(
+      expect(findAndCount).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { advisory: { id: 'adv-1' } },
           order: { validAt: 'ASC' },
@@ -76,16 +90,16 @@ describe('ForecastPointsService', () => {
         },
       ];
       const entities = [{ id: 'a' }, { id: 'b' }];
-      repo.delete.mockResolvedValue({});
-      repo.create.mockReturnValue(entities as never);
-      repo.save.mockResolvedValue(entities);
+      deletePoint.mockResolvedValue({});
+      create.mockReturnValue(entities);
+      save.mockResolvedValue(entities);
 
       const count = await service.replaceForAdvisory(advisory, points);
 
-      expect(repo.delete).toHaveBeenCalledWith({
+      expect(deletePoint).toHaveBeenCalledWith({
         advisory: { id: 'adv-1' },
       });
-      expect(repo.create).toHaveBeenCalledWith([
+      expect(create).toHaveBeenCalledWith([
         expect.objectContaining({
           advisory,
           validAt: points[0].validAt,
@@ -96,7 +110,7 @@ describe('ForecastPointsService', () => {
         }),
         expect.objectContaining({ windSpeedKt: 80, category: 1 }),
       ]);
-      expect(repo.save).toHaveBeenCalledWith(entities);
+      expect(save).toHaveBeenCalledWith(entities);
       expect(count).toBe(2);
     });
 
@@ -105,9 +119,9 @@ describe('ForecastPointsService', () => {
       const count = await service.replaceForAdvisory(advisory, []);
 
       expect(count).toBe(0);
-      expect(repo.delete).toHaveBeenCalled();
-      expect(repo.create).not.toHaveBeenCalled();
-      expect(repo.save).not.toHaveBeenCalled();
+      expect(deletePoint).toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
     });
   });
 });

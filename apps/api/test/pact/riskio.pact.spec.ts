@@ -75,15 +75,13 @@ const paginated = (item: Record<string, unknown>) => ({
   data: Matchers.eachLike(item),
 });
 
-const pact = new PactV4(
-  {
-    consumer: CONSUMER,
-    provider: PROVIDER,
-    dir: PACT_DIR,
-    spec: SpecificationVersion.SPECIFICATION_VERSION_V4,
-  },
-  { logLevel: 'error' as const },
-);
+const pact = new PactV4({
+  consumer: CONSUMER,
+  provider: PROVIDER,
+  dir: PACT_DIR,
+  spec: SpecificationVersion.SPECIFICATION_VERSION_V4,
+  logLevel: 'error' as const,
+});
 
 describe('weather-dashboard <-> riskio-api consumer contract', () => {
   it('reads health', async () => {
@@ -121,9 +119,7 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
       .addInteraction()
       .given('there are storms in the database')
       .uponReceiving('a request for the first page of storms')
-      .withRequest('GET', '/storms', (b) =>
-        b.query({ page: '1', limit: '20' }),
-      )
+      .withRequest('GET', '/storms', (b) => b.query({ page: '1', limit: '20' }))
       .willRespondWith(200, (b) => b.jsonBody(paginated(stormBody)))
       .executeTest(async (mockServer) => {
         const res = await riskioClient.listStorms(mockServer.url, {
@@ -145,7 +141,10 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
       .uponReceiving('a request for a single storm by atcfId')
       .withRequest('GET', `/storms/${STORM_ID}`)
       .willRespondWith(200, (b) =>
-        b.jsonBody({ ...stormBody, advisories: Matchers.eachLike(advisoryBody) }),
+        b.jsonBody({
+          ...stormBody,
+          advisories: Matchers.eachLike(advisoryBody),
+        }),
       )
       .executeTest(async (mockServer) => {
         const storm = await riskioClient.getStorm(mockServer.url, STORM_ID);
@@ -179,10 +178,14 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
       )
       .willRespondWith(200, (b) => b.jsonBody(paginated(advisoryBody)))
       .executeTest(async (mockServer) => {
-        const res = await riskioClient.listAdvisories(mockServer.url, STORM_ID, {
-          page: 1,
-          limit: 20,
-        });
+        const res = await riskioClient.listAdvisories(
+          mockServer.url,
+          STORM_ID,
+          {
+            page: 1,
+            limit: 20,
+          },
+        );
         expect(res.data[0].advisoryNumber).toBe(2);
       });
   });
@@ -221,9 +224,7 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
       .withRequest('GET', `/advisories/${ADVISORY_ID}/forecast-points`, (b) =>
         b.query({ page: '1', limit: '20' }),
       )
-      .willRespondWith(200, (b) =>
-        b.jsonBody(paginated(forecastPointBody)),
-      )
+      .willRespondWith(200, (b) => b.jsonBody(paginated(forecastPointBody)))
       .executeTest(async (mockServer) => {
         const res = await riskioClient.listForecastPoints(
           mockServer.url,
@@ -243,10 +244,7 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
       .addInteraction()
       .given('the advisory does not exist')
       .uponReceiving('a request for an advisory that does not exist')
-      .withRequest(
-        'GET',
-        '/advisories/00000000-0000-0000-0000-000000000000',
-      )
+      .withRequest('GET', '/advisories/00000000-0000-0000-0000-000000000000')
       .willRespondWith(404)
       .executeTest(async (mockServer) => {
         await expect(
@@ -313,7 +311,10 @@ describe('riskio-api provider verification', () => {
   const nhcMock = {
     fetchBasinSummary: (_basin: string) =>
       Promise.resolve(
-        readFileSync(join(__dirname, '..', 'fixtures', 'nhc-ep-active.xml'), 'utf8'),
+        readFileSync(
+          join(__dirname, '..', 'fixtures', 'nhc-ep-active.xml'),
+          'utf8',
+        ),
       ),
     fetchForecastAdvisory: (_wallet: string) =>
       Promise.resolve(

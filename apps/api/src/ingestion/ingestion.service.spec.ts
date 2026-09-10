@@ -12,42 +12,55 @@ const fixture = (name: string) =>
   readFileSync(join(FIXTURES_DIR, name), 'utf8');
 
 function makeServices() {
+  const fetchBasinSummary = vi.fn();
+  const fetchForecastAdvisory = vi.fn();
+  const upsertStorm = vi.fn();
+  const upsertAdvisory = vi.fn();
+  const replaceForAdvisory = vi.fn();
+
   const nhc = {
-    fetchBasinSummary: vi.fn(),
-    fetchForecastAdvisory: vi.fn(),
+    fetchBasinSummary,
+    fetchForecastAdvisory,
   } as unknown as NhcProvider;
 
   const storms = {
-    upsertFromIngestion: vi.fn(),
+    upsertFromIngestion: upsertStorm,
   } as unknown as StormsService;
 
   const advisories = {
-    upsertFromIngestion: vi.fn(),
+    upsertFromIngestion: upsertAdvisory,
   } as unknown as AdvisoriesService;
 
   const forecastPoints = {
-    replaceForAdvisory: vi.fn(),
+    replaceForAdvisory,
   } as unknown as ForecastPointsService;
 
-  return new IngestionService(nhc, storms, advisories, forecastPoints);
+  return {
+    service: new IngestionService(nhc, storms, advisories, forecastPoints),
+    fetchBasinSummary,
+    fetchForecastAdvisory,
+    upsertStorm,
+    upsertAdvisory,
+    replaceForAdvisory,
+  };
 }
 
 describe('IngestionService', () => {
   let service: IngestionService;
-  let nhc: NhcProvider;
-  let storms: StormsService;
-  let advisories: AdvisoriesService;
-  let forecastPoints: ForecastPointsService;
+  let fetchBasinSummary: ReturnType<typeof vi.fn>;
+  let fetchForecastAdvisory: ReturnType<typeof vi.fn>;
+  let upsertStorm: ReturnType<typeof vi.fn>;
+  let upsertAdvisory: ReturnType<typeof vi.fn>;
+  let replaceForAdvisory: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    service = makeServices();
-    nhc = (service as unknown as { nhc: NhcProvider }).nhc;
-    storms = (service as unknown as { storms: StormsService }).storms;
-    advisories = (service as unknown as { advisories: AdvisoriesService })
-      .advisories;
-    forecastPoints = (
-      service as unknown as { forecastPoints: ForecastPointsService }
-    ).forecastPoints;
+    const built = makeServices();
+    service = built.service;
+    fetchBasinSummary = built.fetchBasinSummary;
+    fetchForecastAdvisory = built.fetchForecastAdvisory;
+    upsertStorm = built.upsertStorm;
+    upsertAdvisory = built.upsertAdvisory;
+    replaceForAdvisory = built.replaceForAdvisory;
   });
 
   describe('ingestBasin', () => {
@@ -59,14 +72,14 @@ describe('IngestionService', () => {
         issuedAt: new Date('2026-09-10T02:33:27Z'),
       };
 
-      nhc.fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
-      nhc.fetchForecastAdvisory.mockResolvedValue(fixture('tcm-ep4.xml'));
-      storms.upsertFromIngestion.mockResolvedValue(storm);
-      advisories.upsertFromIngestion.mockResolvedValue({
+      fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
+      fetchForecastAdvisory.mockResolvedValue(fixture('tcm-ep4.xml'));
+      upsertStorm.mockResolvedValue(storm);
+      upsertAdvisory.mockResolvedValue({
         advisory,
         inserted: true,
       });
-      forecastPoints.replaceForAdvisory.mockResolvedValue(8);
+      replaceForAdvisory.mockResolvedValue(8);
 
       const report = await service.ingestBasin('ep');
 
@@ -77,27 +90,27 @@ describe('IngestionService', () => {
       expect(report.forecastPointsInserted).toBe(8);
       expect(report.errors).toEqual([]);
 
-      expect(storms.upsertFromIngestion).toHaveBeenCalledWith({
+      expect(upsertStorm).toHaveBeenCalledWith({
         atcfId: 'EP142026',
         name: null,
         basin: 'EP',
       });
-      expect(nhc.fetchForecastAdvisory).toHaveBeenCalledWith('EP4');
+      expect(fetchForecastAdvisory).toHaveBeenCalledWith('EP4');
     });
 
     it('reports skipped advisories when an existing one is found', async () => {
-      nhc.fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
-      nhc.fetchForecastAdvisory.mockResolvedValue(fixture('tcm-ep4.xml'));
-      storms.upsertFromIngestion.mockResolvedValue({
+      fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
+      fetchForecastAdvisory.mockResolvedValue(fixture('tcm-ep4.xml'));
+      upsertStorm.mockResolvedValue({
         atcfId: 'EP142026',
         name: null,
         basin: 'EP',
       });
-      advisories.upsertFromIngestion.mockResolvedValue({
+      upsertAdvisory.mockResolvedValue({
         advisory: { id: 'adv-1', advisoryNumber: 2 },
         inserted: false,
       });
-      forecastPoints.replaceForAdvisory.mockResolvedValue(8);
+      replaceForAdvisory.mockResolvedValue(8);
 
       const report = await service.ingestBasin('ep');
 
@@ -107,18 +120,18 @@ describe('IngestionService', () => {
     });
 
     it('handles a basin with no active storms', async () => {
-      nhc.fetchBasinSummary.mockResolvedValue(fixture('nhc-at-empty.xml'));
+      fetchBasinSummary.mockResolvedValue(fixture('nhc-at-empty.xml'));
 
       const report = await service.ingestBasin('at');
 
       expect(report.stormsSeen).toBe(0);
       expect(report.stormsUpserted).toBe(0);
       expect(report.errors).toEqual([]);
-      expect(nhc.fetchForecastAdvisory).not.toHaveBeenCalled();
+      expect(fetchForecastAdvisory).not.toHaveBeenCalled();
     });
 
     it('records a fetch failure without throwing', async () => {
-      nhc.fetchBasinSummary.mockRejectedValue(new Error('network down'));
+      fetchBasinSummary.mockRejectedValue(new Error('network down'));
 
       const report = await service.ingestBasin('ep');
 
@@ -128,9 +141,9 @@ describe('IngestionService', () => {
     });
 
     it('continues to the next storm when the TCM fetch fails', async () => {
-      nhc.fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
-      nhc.fetchForecastAdvisory.mockRejectedValue(new Error('TCM 404'));
-      storms.upsertFromIngestion.mockResolvedValue({
+      fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
+      fetchForecastAdvisory.mockRejectedValue(new Error('TCM 404'));
+      upsertStorm.mockResolvedValue({
         atcfId: 'EP142026',
         name: null,
         basin: 'EP',
@@ -142,13 +155,13 @@ describe('IngestionService', () => {
       expect(report.advisoriesInserted).toBe(0);
       expect(report.errors).toHaveLength(1);
       expect(report.errors[0]).toContain('TCM fetch failed');
-      expect(advisories.upsertFromIngestion).not.toHaveBeenCalled();
+      expect(upsertAdvisory).not.toHaveBeenCalled();
     });
 
     it('records per-storm errors without aborting the basin', async () => {
-      nhc.fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
-      nhc.fetchForecastAdvisory.mockResolvedValue(fixture('tcm-ep4.xml'));
-      storms.upsertFromIngestion.mockRejectedValue(new Error('db lock'));
+      fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
+      fetchForecastAdvisory.mockResolvedValue(fixture('tcm-ep4.xml'));
+      upsertStorm.mockRejectedValue(new Error('db lock'));
 
       const report = await service.ingestBasin('ep');
 
@@ -158,15 +171,15 @@ describe('IngestionService', () => {
     });
 
     it('skips a storm when the advisory number cannot be parsed', async () => {
-      nhc.fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
-      nhc.fetchForecastAdvisory.mockResolvedValue(`<?xml version="1.0"?>
+      fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
+      fetchForecastAdvisory.mockResolvedValue(`<?xml version="1.0"?>
         <rss><channel>
           <item>
             <title>POST-TROPICAL CYCLONE LOWELL FORECAST/ADVISORY</title>
             <pubDate>Thu, 10 Sep 2026 02:33:27 GMT</pubDate>
           </item>
         </channel></rss>`);
-      storms.upsertFromIngestion.mockResolvedValue({
+      upsertStorm.mockResolvedValue({
         atcfId: 'EP142026',
         name: null,
         basin: 'EP',
@@ -178,23 +191,23 @@ describe('IngestionService', () => {
       expect(report.advisoriesSkipped).toBe(0);
       expect(report.errors).toHaveLength(1);
       expect(report.errors[0]).toContain('could not parse advisory number');
-      expect(advisories.upsertFromIngestion).not.toHaveBeenCalled();
+      expect(upsertAdvisory).not.toHaveBeenCalled();
     });
 
     it('falls back to the summary date and skips points when TCM fields are missing', async () => {
-      nhc.fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
-      nhc.fetchForecastAdvisory.mockResolvedValue(`<?xml version="1.0"?>
+      fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
+      fetchForecastAdvisory.mockResolvedValue(`<?xml version="1.0"?>
         <rss><channel>
           <item>
             <title>$$ FORECAST/ADVISORY NUMBER 2 FOR TROPICAL STORM LOWELL</title>
           </item>
         </channel></rss>`);
-      storms.upsertFromIngestion.mockResolvedValue({
+      upsertStorm.mockResolvedValue({
         atcfId: 'EP142026',
         name: null,
         basin: 'EP',
       });
-      advisories.upsertFromIngestion.mockResolvedValue({
+      upsertAdvisory.mockResolvedValue({
         advisory: { id: 'adv-1', advisoryNumber: 2 },
         inserted: false,
       });
@@ -203,8 +216,8 @@ describe('IngestionService', () => {
 
       expect(report.errors).toEqual([]);
       expect(report.advisoriesSkipped).toBe(1);
-      expect(forecastPoints.replaceForAdvisory).not.toHaveBeenCalled();
-      expect(advisories.upsertFromIngestion).toHaveBeenCalledWith({
+      expect(replaceForAdvisory).not.toHaveBeenCalled();
+      expect(upsertAdvisory).toHaveBeenCalledWith({
         storm: expect.objectContaining({ atcfId: 'EP142026' }),
         advisoryNumber: 2,
         issuedAt: expect.any(Date),
@@ -213,9 +226,17 @@ describe('IngestionService', () => {
     });
 
     it('processes every basin in ingestAllBasins', async () => {
-      const spy = vi
-        .spyOn(service, 'ingestBasin')
-        .mockImplementation((b) => Promise.resolve({ basin: b } as any));
+      const spy = vi.spyOn(service, 'ingestBasin').mockImplementation((b) =>
+        Promise.resolve({
+          basin: b,
+          stormsSeen: 0,
+          stormsUpserted: 0,
+          advisoriesInserted: 0,
+          advisoriesSkipped: 0,
+          forecastPointsInserted: 0,
+          errors: [],
+        }),
+      );
 
       const reports = await service.ingestAllBasins();
 
