@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { StormsModule } from './storms/storms.module.js';
@@ -13,9 +14,10 @@ import { IngestionModule } from './ingestion/ingestion.module.js';
       type: 'postgres',
       url: process.env.DATABASE_URL,
       autoLoadEntities: true,
-      synchronize: true, // ⚠️ DEV ONLY — replace with migrations before prod
+      synchronize: true,
       logging: ['error', 'warn'],
     }),
+    ScheduleModule.forRoot(), // ← NEW
     StormsModule,
     AdvisoriesModule,
     ForecastPointsModule,

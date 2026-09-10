@@ -29,10 +29,11 @@ services:
       - "${API_PORT}:3000"
     volumes:
       - ./apps/api:/usr/src/app:Z
-      - /usr/src/app/node_modules
+      - api_node_modules:/usr/src/app/node_modules
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   pgdata:
+  api_node_modules:
