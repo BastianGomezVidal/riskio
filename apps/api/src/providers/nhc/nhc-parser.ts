@@ -308,18 +308,3 @@ export function parseForecastPoints(
 
   return out;
 }
-
-// ─────────────────────────────────────────────────────────────
-// Category helper (Saffir-Simpson)
-// ─────────────────────────────────────────────────────────────
-
-export function categoryFromWindKt(kt: number | null): number | null {
-  if (kt === null) return null;
-  if (kt < 34) return null; // not a tropical storm
-  if (kt < 64) return 0; // tropical storm
-  if (kt <= 82) return 1;
-  if (kt <= 95) return 2;
-  if (kt <= 112) return 3;
-  if (kt <= 136) return 4;
-  return 5;
-}

@@ -6,11 +6,10 @@ import {
   parseRssFeed,
   extractStormSummaries,
   parseForecastPoints,
-  categoryFromWindKt,
 } from './nhc-parser.js';
+import { categoryFromWindKt } from '../../storms/storm-category.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const FIXTURES_DIR = join(__dirname, '..', '..', 'test', 'fixtures');
+const FIXTURES_DIR = join(__dirname, '..', '..', '..', 'test', 'fixtures');
 const fixture = (name: string) =>
   readFileSync(join(FIXTURES_DIR, name), 'utf8');
 

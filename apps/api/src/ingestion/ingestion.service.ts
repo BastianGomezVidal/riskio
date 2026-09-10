@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { NhcProvider, NhcBasin } from './nhc.provider.js';
+import { NhcProvider, NhcBasin } from '../providers/nhc/nhc.provider.js';
 import {
   parseRssFeed,
   extractStormSummaries,
   parseForecastPoints,
-} from './nhc-parser.js';
+} from '../providers/nhc/nhc-parser.js';
 import { StormsService } from '../storms/storms.service.js';
 import { AdvisoriesService } from '../advisories/advisories.service.js';
 import { ForecastPointsService } from '../forecast-points/forecast-points.service.js';

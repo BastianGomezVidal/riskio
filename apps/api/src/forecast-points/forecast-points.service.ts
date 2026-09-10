@@ -3,10 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ForecastPoint } from './entities/forecast-point.entity.js';
 import { Advisory } from '../advisories/entities/advisory.entity.js';
-import {
-  categoryFromWindKt,
-  ForecastPointDto,
-} from '../ingestion/nhc-parser.js';
+import { ForecastPointDto } from '../providers/nhc/nhc-parser.js';
+import { categoryFromWindKt } from '../storms/storm-category.js';
 
 @Injectable()
 export class ForecastPointsService {

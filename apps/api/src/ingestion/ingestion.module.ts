@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { NhcProvider } from './nhc.provider.js';
+import { NhcProvider } from '../providers/nhc/nhc.provider.js';
 import { IngestionService } from './ingestion.service.js';
 import { IngestionController } from './ingestion.controller.js';
 import { IngestionScheduler } from './ingestion.scheduler.js';
