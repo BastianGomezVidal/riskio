@@ -1,9 +1,24 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { StormsModule } from './storms/storms.module.js';
+import { AdvisoriesModule } from './advisories/advisories.module.js';
+import { ForecastPointsModule } from './forecast-points/forecast-points.module.js';
 
 @Module({
-  imports: [],
+  imports: [
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      url: process.env.DATABASE_URL,
+      autoLoadEntities: true,
+      synchronize: true, // ⚠️ DEV ONLY — replace with migrations before prod
+      logging: ['error', 'warn'],
+    }),
+    StormsModule,
+    AdvisoriesModule,
+    ForecastPointsModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
