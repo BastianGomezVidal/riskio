@@ -1,11 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 export type NhcBasin = 'at' | 'ep' | 'cp';
 
 @Injectable()
 export class NhcProvider {
   private readonly logger = new Logger(NhcProvider.name);
-  private readonly baseUrl = 'https://www.nhc.noaa.gov';
+  private readonly baseUrl: string;
+  private readonly timeoutMs: number;
+
+  constructor(private readonly config: ConfigService) {
+    this.baseUrl = this.config.get<string>(
+      'NHC_BASE_URL',
+      'https://www.nhc.noaa.gov',
+    );
+    this.timeoutMs = this.config.get<number>('NHC_TIMEOUT_MS', 10_000);
+  }
 
   async fetchXml(pathOrUrl: string): Promise<string> {
     const url = pathOrUrl.startsWith('https')
@@ -13,7 +23,7 @@ export class NhcProvider {
       : `${this.baseUrl}/${pathOrUrl}`;
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
 
     try {
       const res = await fetch(url, {
