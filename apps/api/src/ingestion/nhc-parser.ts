@@ -234,11 +234,16 @@ export function extractStormSummaries(feed: ParsedFeed): StormSummary[] {
  *   FORECAST VALID 10/1200Z 16.7N 118.5W
  *   MAX WIND  35 KT...GUSTS  45 KT.
  */
-export function parseForecastPoints(cdata: string): ForecastPointDto[] {
+export function parseForecastPoints(
+  cdata: string,
+  referenceDate: Date,
+): ForecastPointDto[] {
   const out: ForecastPointDto[] = [];
-
-  // Split on FORECAST VALID / OUTLOOK VALID
   const lines = cdata.split(/(?:\r?\n|<br\s*\/?>)+/i);
+
+  const refYear = referenceDate.getUTCFullYear();
+  const refMonth = referenceDate.getUTCMonth(); // 0-based
+  const refDay = referenceDate.getUTCDate();
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -250,10 +255,25 @@ export function parseForecastPoints(cdata: string): ForecastPointDto[] {
     const [, dd, hh, mm, latRaw, latHemi, lonRaw, lonHemi] = validMatch;
 
     // Year: assume current year. NOAA advisories don't include year.
-    const year = new Date().getUTCFullYear();
-    const validAt = new Date(
-      Date.UTC(year, /* month */ 0, Number(dd), Number(hh), Number(mm)),
-    );
+    const day = Number(dd);
+    const hour = Number(hh);
+    const minute = Number(mm);
+
+    // If the forecast day is less than the reference day, we've rolled
+    // into the next calendar month.
+    let validYear = refYear;
+    let validMonth = refMonth;
+    if (day < refDay) {
+      validMonth += 1;
+    if (validMonth > 11) {
+      validMonth = 0;
+      validYear += 1;
+    }
+}
+
+const validAt = new Date(
+  Date.UTC(validYear, validMonth, day, hour, minute),
+);
     // Note: month/day parsing here is approximate; we refine below using the
     // current advisory date to pick the right month.
 
