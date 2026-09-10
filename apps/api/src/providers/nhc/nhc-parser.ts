@@ -1,9 +1,16 @@
 import { XMLParser } from 'fast-xml-parser';
 
-// ─────────────────────────────────────────────────────────────
-// Public types — these are the contract of the parser
-// ─────────────────────────────────────────────────────────────
+/**
+ * Parser for NOAA NHC feeds.
+ *
+ * Turns raw NHC RSS/XML into typed structures:
+ *  - {@link parseRssFeed} decodes the generic RSS envelope,
+ *  - {@link extractStormSummaries} picks active storms out of the feeds,
+ *  - {@link parseForecastPoints} reads the forecast track points of a TCM
+ *    advisory from its CDATA block.
+ */
 
+/** Cyclone metadata parsed from an item's `nhc:Cyclone` element. */
 export interface CycloneInfo {
   atcfId: string;
   wallet: string;
@@ -16,6 +23,7 @@ export interface CycloneInfo {
   headline: string | null;
 }
 
+/** One RSS `<item>` from a feed, normalized and typed. */
 export interface RssItem {
   title: string;
   description: string | null;
@@ -25,12 +33,14 @@ export interface RssItem {
   cyclone: CycloneInfo | null;
 }
 
+/** A parsed RSS document: feed metadata plus its normalized items. */
 export interface ParsedFeed {
   channelTitle: string;
   channelPubDate: Date | null;
   items: RssItem[];
 }
 
+/** A single forecast track point, as produced by {@link parseForecastPoints}. */
 export interface ForecastPointDto {
   validAt: Date;
   latitude: number;
@@ -40,11 +50,10 @@ export interface ForecastPointDto {
   category: number | null;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────
-
-/** "No current storm" (wallet) and "There are no tropical cyclones..." (summary) */
+/**
+ * Title patterns that mean "no active storm" in a feed.
+ * First matches wallet/area feeds, second matches basin summaries.
+ */
 const SENTINEL_PATTERNS = [
   /No current storm/i,
   /no tropical cyclones at this time/i,
@@ -52,10 +61,7 @@ const SENTINEL_PATTERNS = [
 
 const MPH_TO_KT = 0.868976;
 
-// ─────────────────────────────────────────────────────────────
-// XML parser instance
-// ─────────────────────────────────────────────────────────────
-
+// XML parser options
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
@@ -65,10 +71,6 @@ const parser = new XMLParser({
   // Important: preserve the nhc: namespace prefix on tag names
   removeNSPrefix: false,
 });
-
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
 
 function toArray<T>(value: T | T[] | undefined): T[] {
   if (value === undefined || value === null) return [];
@@ -127,10 +129,11 @@ function isSentinelTitle(title: string): boolean {
   return SENTINEL_PATTERNS.some((p) => p.test(title));
 }
 
-// ─────────────────────────────────────────────────────────────
-// Parser 1: generic RSS feed → ParsedFeed
-// ─────────────────────────────────────────────────────────────
-
+/**
+ * Parse a generic RSS document into a typed {@link ParsedFeed}.
+ *
+ * @throws Error when the document has no `rss.channel` (not RSS).
+ */
 export function parseRssFeed(xml: string): ParsedFeed {
   const parsed = parser.parse(xml);
   const channel = parsed?.rss?.channel;
@@ -187,10 +190,7 @@ export function parseRssFeed(xml: string): ParsedFeed {
   };
 }
 
-// ─────────────────────────────────────────────────────────────
-// Parser 2: extract storm summaries from a ParsedFeed
-// ─────────────────────────────────────────────────────────────
-
+/** A storm in an active state, derived from one RSS item's cyclone data. */
 export interface StormSummary {
   atcfId: string;
   basin: string; // "EP", "AL", "CP" — derived from ATCF prefix
@@ -201,6 +201,12 @@ export interface StormSummary {
   headline: string | null;
 }
 
+/**
+ * Extract the active storm summaries from a parsed feed.
+ *
+ * Items are skipped when their title matches a "no storm" sentinel, when no
+ * cyclone metadata could be parsed, or when no issue date is present.
+ */
 export function extractStormSummaries(feed: ParsedFeed): StormSummary[] {
   const out: StormSummary[] = [];
 
@@ -225,10 +231,6 @@ export function extractStormSummaries(feed: ParsedFeed): StormSummary[] {
 
   return out;
 }
-
-// ─────────────────────────────────────────────────────────────
-// Parser 3: TCM forecast advisory → ForecastPointDto[]
-// ─────────────────────────────────────────────────────────────
 
 /**
  * Parses the CDATA text of a TCM advisory (e.g. TCMEP4.xml) and extracts

@@ -2,6 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { IngestionService } from './ingestion.service.js';
 
+/**
+ * Periodic ingestion of all NHC basins.
+ */
 @Injectable()
 export class IngestionScheduler {
   private readonly logger = new Logger(IngestionScheduler.name);

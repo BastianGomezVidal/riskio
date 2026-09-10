@@ -1,9 +1,19 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
 
-async function bootstrap() {
+/**
+ * Start the HTTP server.
+ *
+ * Responsibilities:
+ *  - enforce DTO validation on every request body/query/param,
+ *  - allow browser front-ends to call the API from a different origin
+ *    (CORS origins come from `CORS_ORIGINS`; empty = allow all),
+ *  - serve the Swagger UI at /docs and the machine-readable spec at /docs-json.
+ */
+async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
   app.useGlobalPipes(
@@ -13,6 +23,17 @@ async function bootstrap() {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
+
+  const configService = app.get(ConfigService);
+  const corsOrigins = configService
+    .get<string>('CORS_ORIGINS', '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+
+  app.enableCors({
+    origin: corsOrigins.length > 0 ? corsOrigins : true,
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Riskio API')

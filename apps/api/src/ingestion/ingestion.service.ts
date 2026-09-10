@@ -9,6 +9,7 @@ import { StormsService } from '../storms/storms.service.js';
 import { AdvisoriesService } from '../advisories/advisories.service.js';
 import { ForecastPointsService } from '../forecast-points/forecast-points.service.js';
 
+/** Counters describing the outcome of one ingestion run for a basin. */
 export interface IngestReport {
   basin: NhcBasin;
   stormsSeen: number;
@@ -19,6 +20,14 @@ export interface IngestReport {
   errors: string[];
 }
 
+/**
+ * Pulls the latest NHC data into the database.
+ *
+ * For each basin the service: (1) fetches the storm summary feed, (2) upserts
+ * every active storm, (3) fetches each storm's TCM forecast-advisory, and
+ * (4) replaces that advisory's forecast points. Failures are collected and
+ * reported instead of aborting the whole run.
+ */
 @Injectable()
 export class IngestionService {
   private readonly logger = new Logger(IngestionService.name);
@@ -30,6 +39,12 @@ export class IngestionService {
     private readonly forecastPoints: ForecastPointsService,
   ) {}
 
+  /**
+   * Ingest a single basin and return its {@link IngestReport}.
+   *
+   * Never throws; unexpected errors are recorded in `report.errors` so the
+   * run can continue to the next storm/basin.
+   */
   async ingestBasin(basin: NhcBasin): Promise<IngestReport> {
     const started = Date.now();
     const report: IngestReport = {
@@ -140,6 +155,7 @@ export class IngestionService {
     return report;
   }
 
+  /** Ingest every tracked basin (Atlantic, East Pacific, Central Pacific). */
   async ingestAllBasins(): Promise<IngestReport[]> {
     const basins: NhcBasin[] = ['at', 'ep', 'cp'];
     const reports: IngestReport[] = [];
@@ -150,7 +166,10 @@ export class IngestionService {
   }
 }
 
-// "… Forecast/Advisory Number 2" → 2
+/**
+ * Extract the advisory number from a TCM title like
+ * "… FORECAST/ADVISORY NUMBER 2 …". Returns null when absent.
+ */
 function extractAdvisoryNumber(title: string): number | null {
   const m = title.match(/Number\s+(\d+)/i);
   return m ? Number(m[1]) : null;

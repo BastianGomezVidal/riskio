@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+/** Pagination metadata returned alongside every collection. */
 export class PageMetaDto {
   @ApiProperty({ description: 'Total number of records across all pages' })
   total: number;

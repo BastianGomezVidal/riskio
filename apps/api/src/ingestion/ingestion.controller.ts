@@ -8,12 +8,16 @@ import {
 import { IngestionService, IngestReport } from './ingestion.service.js';
 import { BasinParamDto } from './dto/basin-param.dto.js';
 
+/**
+ * Development/admin endpoints that trigger NHC ingestion on demand.
+ * In production the scheduler covers this automatically.
+ */
 @ApiTags('ingestion')
 @Controller('admin/ingest')
 export class IngestionController {
   constructor(private readonly ingestion: IngestionService) {}
 
-  /** Manual trigger for development — runs all basins and returns the report. */
+  /** Ingest all basins on demand; returns one report per basin. */
   @Post('run')
   @HttpCode(200)
   @ApiOperation({ summary: 'Run ingestion for all basins' })
@@ -23,7 +27,7 @@ export class IngestionController {
     return this.ingestion.ingestAllBasins();
   }
 
-  /** Same, but only one basin. GET for easy curl testing. */
+  /** Ingest a single basin; useful for quick manual checks of one region. */
   @Get('run/:basin')
   @ApiOperation({ summary: 'Run ingestion for a single basin' })
   @ApiOkResponse({ description: 'Ingestion report for the basin' })

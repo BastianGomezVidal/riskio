@@ -16,6 +16,9 @@ export class ForecastPointsService {
     private readonly forecastPointsRepository: Repository<ForecastPoint>,
   ) {}
 
+  /**
+   * List an advisory's forecast points chronologically, paginated.
+   */
   async findByAdvisory(
     advisoryId: string,
     page: PageQueryDto,
@@ -37,6 +40,15 @@ export class ForecastPointsService {
     return new PaginatedResultDto(meta, data);
   }
 
+  /**
+   * Replace all forecast points of an advisory with the given ones.
+   *
+   * Advisories are immutable in this system, so "replace" effectively means
+   * "write once": the delete is a no-op on first ingest. Saffir-Simpson
+   * categories are derived from each point's wind speed.
+   *
+   * @returns the number of points stored.
+   */
   async replaceForAdvisory(
     advisory: Advisory,
     points: ForecastPointDto[],

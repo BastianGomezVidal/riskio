@@ -6,6 +6,9 @@ import {
 } from '@nestjs/terminus';
 import { ApiTags, ApiOperation, ApiOkResponse } from '@nestjs/swagger';
 
+/**
+ * Readiness/liveness probe for the container healthcheck.
+ */
 @ApiTags('health')
 @Controller('health')
 export class HealthController {

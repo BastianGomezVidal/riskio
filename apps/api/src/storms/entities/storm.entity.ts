@@ -10,6 +10,7 @@ import type { Relation } from 'typeorm';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Advisory } from '../../advisories/entities/advisory.entity.js';
 
+/** A tropical cyclone tracked across basins, identified by its ATCF code. */
 @Entity('storms')
 export class Storm {
   @ApiProperty({ description: 'ATCF storm identifier', example: 'EP142026' })

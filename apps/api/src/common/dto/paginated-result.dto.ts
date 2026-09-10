@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { PageMetaDto } from './page-meta.dto.js';
 
+/** Generic paginated envelope: page metadata plus the records for it. */
 export class PaginatedResultDto<T> {
   @ApiProperty({ description: 'Page metadata' })
   meta: PageMetaDto;

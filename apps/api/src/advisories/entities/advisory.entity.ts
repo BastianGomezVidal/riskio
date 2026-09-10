@@ -13,6 +13,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Storm } from '../../storms/entities/storm.entity.js';
 import { ForecastPoint } from '../../forecast-points/entities/forecast-point.entity.js';
 
+/** One numbered forecast/advisory issued for a storm. */
 @Entity('advisories')
 @Unique(['storm', 'advisoryNumber'])
 export class Advisory {

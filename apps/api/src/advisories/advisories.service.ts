@@ -8,6 +8,7 @@ import { PageMetaDto } from '../common/dto/page-meta.dto.js';
 import { PageQueryDto } from '../common/dto/page-query.dto.js';
 import { ForecastPoint } from '../forecast-points/entities/forecast-point.entity.js';
 
+/** An advisory expanded with its forecast track points. */
 export interface AdvisoryDetail extends Advisory {
   forecastPoints: ForecastPoint[];
 }
@@ -19,6 +20,9 @@ export class AdvisoriesService {
     private readonly advisoriesRepository: Repository<Advisory>,
   ) {}
 
+  /**
+   * List a storm's advisories newest-first, paginated.
+   */
   async findByStorm(
     stormAtcfId: string,
     page: PageQueryDto,
@@ -40,6 +44,11 @@ export class AdvisoriesService {
     return new PaginatedResultDto(meta, data);
   }
 
+  /**
+   * Fetch one advisory by UUID with its forecast points.
+   *
+   * @throws NotFoundException when no advisory matches.
+   */
   async findOne(id: string): Promise<AdvisoryDetail> {
     const advisory = await this.advisoriesRepository.findOne({
       where: { id },
@@ -51,6 +60,11 @@ export class AdvisoriesService {
     return advisory as AdvisoryDetail;
   }
 
+  /**
+   * Insert an advisory for a storm, or skip when it already exists.
+   *
+   * @returns the advisory and whether the row was genuinely inserted.
+   */
   async upsertFromIngestion(input: {
     storm: Storm;
     advisoryNumber: number;

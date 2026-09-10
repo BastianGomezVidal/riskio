@@ -7,6 +7,7 @@ import { PageMetaDto } from '../common/dto/page-meta.dto.js';
 import { PageQueryDto } from '../common/dto/page-query.dto.js';
 import { Advisory } from '../advisories/entities/advisory.entity.js';
 
+/** A storm expanded with the advisories issued for it. */
 export interface StormDetail extends Storm {
   advisories: Advisory[];
 }
@@ -18,6 +19,9 @@ export class StormsService {
     private readonly stormsRepository: Repository<Storm>,
   ) {}
 
+  /**
+   * List known storms ordered by most recently observed, paginated.
+   */
   async findAll(page: PageQueryDto): Promise<PaginatedResultDto<Storm>> {
     const [data, total] = await this.stormsRepository.findAndCount({
       order: { lastSeenAt: 'DESC' },
@@ -35,6 +39,11 @@ export class StormsService {
     return new PaginatedResultDto(meta, data);
   }
 
+  /**
+   * Fetch one storm by ATCF identifier with its advisories.
+   *
+   * @throws NotFoundException when no storm matches.
+   */
   async findOne(atcfId: string): Promise<StormDetail> {
     const storm = await this.stormsRepository.findOne({
       where: { atcfId },
@@ -46,6 +55,10 @@ export class StormsService {
     return storm as StormDetail;
   }
 
+  /**
+   * Create the storm if unknown, otherwise update its name/basin.
+   * Returns the freshly loaded row. Used by the ingestion pipeline.
+   */
   async upsertFromIngestion(input: {
     atcfId: string;
     name: string | null;

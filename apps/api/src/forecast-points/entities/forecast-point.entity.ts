@@ -9,6 +9,7 @@ import type { Relation } from 'typeorm';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Advisory } from '../../advisories/entities/advisory.entity.js';
 
+/** A single forecast track point of an advisory. */
 @Entity('forecast_points')
 export class ForecastPoint {
   @ApiProperty({ description: 'Forecast point UUID' })
@@ -34,12 +35,16 @@ export class ForecastPoint {
   @Column({ type: 'int', nullable: true })
   windSpeedKt: number | null;
 
-  @ApiPropertyOptional({ description: 'Minimum central pressure, hPa', example: 1006 })
+  @ApiPropertyOptional({
+    description: 'Minimum central pressure, hPa',
+    example: 1006,
+  })
   @Column({ type: 'int', nullable: true })
   pressureMb: number | null;
 
   @ApiPropertyOptional({
-    description: 'Saffir-Simpson category (0-5), null below tropical-storm strength',
+    description:
+      'Saffir-Simpson category (0-5), null below tropical-storm strength',
     example: 1,
   })
   @Column({ type: 'int', nullable: true })

@@ -2,6 +2,7 @@ import { IsInt, Max, Min, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
+/** Pagination parameters shared by every list endpoint. */
 export class PageQueryDto {
   @ApiPropertyOptional({
     description: 'Page to fetch (1-indexed)',
