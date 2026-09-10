@@ -189,6 +189,110 @@ describe('parseForecastPoints', () => {
   });
 });
 
+describe('parseRssFeed edge cases', () => {
+  it('returns an empty item list for a channel with no items', () => {
+    const xml = `<?xml version="1.0"?>
+      <rss><channel><title>NHC Empty</title></channel></rss>`;
+    expect(parseRssFeed(xml).items).toEqual([]);
+  });
+
+  it('handles malformed and partial nhc:Cyclone fields without crashing', () => {
+    const xml = `<?xml version="1.0"?>
+      <rss><channel>
+        <item>
+          <title>Summary for Storm A</title>
+          <pubDate>Thu, 10 Sep 2026 02:33:27 GMT</pubDate>
+          <nhc:Cyclone><nhc:center>abc</nhc:center><nhc:type>Tropical Storm</nhc:type>
+            <nhc:name>A</nhc:name><nhc:wallet>AL1</nhc:wallet><nhc:atcf>AL012026</nhc:atcf></nhc:Cyclone>
+        </item>
+        <item>
+          <title>Summary for Storm B</title>
+          <pubDate>Thu, 10 Sep 2026 02:33:27 GMT</pubDate>
+          <nhc:Cyclone><nhc:center><v/></nhc:center><nhc:type>Tropical Storm</nhc:type>
+            <nhc:name>B</nhc:name><nhc:wallet>AL2</nhc:wallet><nhc:atcf>AL022026</nhc:atcf></nhc:Cyclone>
+        </item>
+        <item>
+          <title>Summary for Storm K</title>
+          <pubDate>Thu, 10 Sep 2026 02:33:27 GMT</pubDate>
+          <nhc:Cyclone><nhc:center>10.0, -20.0</nhc:center><nhc:type>Tropical Storm</nhc:type>
+            <nhc:name>K</nhc:name><nhc:wallet>AL3</nhc:wallet><nhc:atcf>AL032026</nhc:atcf>
+            <nhc:pressure>N/A</nhc:pressure><nhc:wind>40 kt</nhc:wind></nhc:Cyclone>
+        </item>
+        <item>
+          <title>Summary for Storm G</title>
+          <pubDate>Thu, 10 Sep 2026 02:33:27 GMT</pubDate>
+          <nhc:Cyclone><nhc:center>10.0, -20.0</nhc:center><nhc:type>Tropical Storm</nhc:type>
+            <nhc:name>G</nhc:name><nhc:wallet>AL4</nhc:wallet><nhc:atcf>AL042026</nhc:atcf>
+            <nhc:wind>gale force</nhc:wind></nhc:Cyclone>
+        </item>
+        <item>
+          <title>Summary for Storm M</title>
+          <pubDate>Thu, 10 Sep 2026 02:33:27 GMT</pubDate>
+          <nhc:Cyclone><nhc:center>10.0, -20.0</nhc:center><nhc:type>Tropical Storm</nhc:type>
+            <nhc:wallet>AL5</nhc:wallet><nhc:atcf>AL052026</nhc:atcf></nhc:Cyclone>
+        </item>
+        <item>
+          <title>Summary for Storm W</title>
+          <pubDate>Thu, 10 Sep 2026 02:33:27 GMT</pubDate>
+          <nhc:Cyclone><nhc:center>10.0, -20.0</nhc:center><nhc:type>Tropical Storm</nhc:type>
+            <nhc:name>W</nhc:name><nhc:atcf>AL062026</nhc:atcf></nhc:Cyclone>
+        </item>
+        <item>
+          <title>Summary for Storm T</title>
+          <pubDate>Thu, 10 Sep 2026 02:33:27 GMT</pubDate>
+          <nhc:Cyclone><nhc:center>10.0, -20.0</nhc:center>
+            <nhc:name>T</nhc:name><nhc:wallet>AL6</nhc:wallet><nhc:atcf>AL062026</nhc:atcf></nhc:Cyclone>
+        </item>
+        <item>
+          <title>Summary for Storm A2</title>
+          <pubDate>Thu, 10 Sep 2026 02:33:27 GMT</pubDate>
+          <nhc:Cyclone><nhc:center>10.0, -20.0</nhc:center><nhc:type>Tropical Storm</nhc:type>
+            <nhc:name>A2</nhc:name><nhc:wallet>AL7</nhc:wallet></nhc:Cyclone>
+        </item>
+        <item>
+          <guid isPermaLink="false"><nested>g</nested></guid>
+          <pubDate>not-a-valid-date</pubDate>
+        </item>
+      </channel></rss>`;
+
+    const items = parseRssFeed(xml).items;
+    expect(items).toHaveLength(9);
+    expect(items[0].cyclone).toBeNull(); // malformed center
+    expect(items[1].cyclone).toBeNull(); // non-string center
+    expect(items[2].cyclone?.name).toBe('K');
+    expect(items[2].cyclone?.windKt).toBe(40); // kt arm of parseWindKt
+    expect(items[2].cyclone?.pressureMb).toBeNull(); // "N/A" → no match
+    expect(items[3].cyclone?.windKt).toBeNull(); // "gale force" → no match
+    expect(items[4].cyclone?.name).toBeNull(); // missing name
+    expect(items[4].cyclone?.windKt).toBeNull(); // missing wind
+    expect(items[5].cyclone).toBeNull(); // missing wallet
+    expect(items[6].cyclone?.stormType).toBe(''); // missing type
+    expect(items[7].cyclone).toBeNull(); // missing atcf
+    expect(items[8].title).toBe(''); // missing title
+    expect(items[8].guid).toBe(''); // object guid without #text
+    expect(items[8].pubDate).toBeNull(); // invalid date
+  });
+});
+
+describe('extractStormSummaries sentinel handling', () => {
+  it('skips items flagged as having no current storm', () => {
+    const xml = `<?xml version="1.0"?>
+      <rss><channel>
+        <item>
+          <title>No current storm for area of interest.</title>
+          <pubDate>Thu, 10 Sep 2026 02:33:27 GMT</pubDate>
+        </item>
+        <item>
+          <title>There are no tropical cyclones at this time.</title>
+          <pubDate>Thu, 10 Sep 2026 02:33:27 GMT</pubDate>
+        </item>
+      </channel></rss>`;
+
+    const summaries = extractStormSummaries(parseRssFeed(xml));
+    expect(summaries).toEqual([]);
+  });
+});
+
 describe('categoryFromWindKt', () => {
   it('maps wind speeds to Saffir-Simpson categories', () => {
     expect(categoryFromWindKt(30)).toBeNull(); // below TS

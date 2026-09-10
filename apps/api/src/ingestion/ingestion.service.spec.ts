@@ -43,9 +43,11 @@ describe('IngestionService', () => {
     service = makeServices();
     nhc = (service as unknown as { nhc: NhcProvider }).nhc;
     storms = (service as unknown as { storms: StormsService }).storms;
-    advisories = (service as unknown as { advisories: AdvisoriesService }).advisories;
-    forecastPoints = (service as unknown as { forecastPoints: ForecastPointsService })
-      .forecastPoints;
+    advisories = (service as unknown as { advisories: AdvisoriesService })
+      .advisories;
+    forecastPoints = (
+      service as unknown as { forecastPoints: ForecastPointsService }
+    ).forecastPoints;
   });
 
   describe('ingestBasin', () => {
@@ -153,6 +155,76 @@ describe('IngestionService', () => {
       expect(report.errors).toHaveLength(1);
       expect(report.errors[0]).toContain('db lock');
       expect(report.stormsUpserted).toBe(0);
+    });
+
+    it('skips a storm when the advisory number cannot be parsed', async () => {
+      nhc.fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
+      nhc.fetchForecastAdvisory.mockResolvedValue(`<?xml version="1.0"?>
+        <rss><channel>
+          <item>
+            <title>POST-TROPICAL CYCLONE LOWELL FORECAST/ADVISORY</title>
+            <pubDate>Thu, 10 Sep 2026 02:33:27 GMT</pubDate>
+          </item>
+        </channel></rss>`);
+      storms.upsertFromIngestion.mockResolvedValue({
+        atcfId: 'EP142026',
+        name: null,
+        basin: 'EP',
+      });
+
+      const report = await service.ingestBasin('ep');
+
+      expect(report.advisoriesInserted).toBe(0);
+      expect(report.advisoriesSkipped).toBe(0);
+      expect(report.errors).toHaveLength(1);
+      expect(report.errors[0]).toContain('could not parse advisory number');
+      expect(advisories.upsertFromIngestion).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the summary date and skips points when TCM fields are missing', async () => {
+      nhc.fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
+      nhc.fetchForecastAdvisory.mockResolvedValue(`<?xml version="1.0"?>
+        <rss><channel>
+          <item>
+            <title>$$ FORECAST/ADVISORY NUMBER 2 FOR TROPICAL STORM LOWELL</title>
+          </item>
+        </channel></rss>`);
+      storms.upsertFromIngestion.mockResolvedValue({
+        atcfId: 'EP142026',
+        name: null,
+        basin: 'EP',
+      });
+      advisories.upsertFromIngestion.mockResolvedValue({
+        advisory: { id: 'adv-1', advisoryNumber: 2 },
+        inserted: false,
+      });
+
+      const report = await service.ingestBasin('ep');
+
+      expect(report.errors).toEqual([]);
+      expect(report.advisoriesSkipped).toBe(1);
+      expect(forecastPoints.replaceForAdvisory).not.toHaveBeenCalled();
+      expect(advisories.upsertFromIngestion).toHaveBeenCalledWith({
+        storm: expect.objectContaining({ atcfId: 'EP142026' }),
+        advisoryNumber: 2,
+        issuedAt: expect.any(Date),
+        rawText: null,
+      });
+    });
+
+    it('processes every basin in ingestAllBasins', async () => {
+      const spy = vi
+        .spyOn(service, 'ingestBasin')
+        .mockImplementation((b) => Promise.resolve({ basin: b } as any));
+
+      const reports = await service.ingestAllBasins();
+
+      expect(reports.map((r) => r.basin)).toEqual(['at', 'ep', 'cp']);
+      expect(spy).toHaveBeenCalledTimes(3);
+      expect(spy).toHaveBeenNthCalledWith(1, 'at');
+      expect(spy).toHaveBeenNthCalledWith(2, 'ep');
+      expect(spy).toHaveBeenNthCalledWith(3, 'cp');
+      spy.mockRestore();
     });
   });
 });
