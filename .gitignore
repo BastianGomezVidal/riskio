@@ -13,6 +13,7 @@ dist/
 build/
 apps/*/dist/
 apps/*/build/
+apps/api/tsconfig.build.tsbuildinfo
 
 # IDE
 .vscode/
