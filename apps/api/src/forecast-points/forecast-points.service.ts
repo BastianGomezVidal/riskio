@@ -5,6 +5,9 @@ import { ForecastPoint } from './entities/forecast-point.entity.js';
 import { Advisory } from '../advisories/entities/advisory.entity.js';
 import { ForecastPointDto } from '../providers/nhc/nhc-parser.js';
 import { categoryFromWindKt } from '../storms/storm-category.js';
+import { PaginatedResultDto } from '../common/dto/paginated-result.dto.js';
+import { PageMetaDto } from '../common/dto/page-meta.dto.js';
+import { PageQueryDto } from '../common/dto/page-query.dto.js';
 
 @Injectable()
 export class ForecastPointsService {
@@ -13,11 +16,25 @@ export class ForecastPointsService {
     private readonly forecastPointsRepository: Repository<ForecastPoint>,
   ) {}
 
-  findByAdvisory(advisoryId: string): Promise<ForecastPoint[]> {
-    return this.forecastPointsRepository.find({
+  async findByAdvisory(
+    advisoryId: string,
+    page: PageQueryDto,
+  ): Promise<PaginatedResultDto<ForecastPoint>> {
+    const [data, total] = await this.forecastPointsRepository.findAndCount({
       where: { advisory: { id: advisoryId } },
       order: { validAt: 'ASC' },
+      skip: (page.page - 1) * page.limit,
+      take: page.limit,
     });
+
+    const meta: PageMetaDto = {
+      total,
+      page: page.page,
+      limit: page.limit,
+      pageCount: Math.ceil(total / page.limit),
+      hasNextPage: page.page * page.limit < total,
+    };
+    return new PaginatedResultDto(meta, data);
   }
 
   async replaceForAdvisory(
