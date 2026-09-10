@@ -1,0 +1,370 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:georss="http://www.georss.org/georss"
+  xmlns:gml="http://www.opengis.net/gml"
+  xmlns:nhc="https://www.nhc.noaa.gov">
+  <channel>
+    <pubDate>Thu, 10 Sep 2026 02:37:08 GMT</pubDate>
+    <title>CPHC Central North Pacific</title>
+    <description>Active tropical cyclones in the Central North Pacific</description>
+    <link>https://www.nhc.noaa.gov/</link>
+    <copyright>none</copyright>
+    <managingEditor>nhcwebmaster@noaa.gov (NHC Webmaster)</managingEditor>
+    <language>en-us</language>
+    <webMaster>nhcwebmaster@noaa.gov (NHC Webmaster)</webMaster>
+    <image>
+      <url>https://www.nhc.noaa.gov/gifs/xml_logo_nhc.gif</url>
+      <link>https://www.nhc.noaa.gov/</link>
+      <title>CPHC Central North Pacific</title>
+      <description>NOAA logo</description>
+      <width>95</width>
+      <height>45</height>
+    </image>
+    <item>
+      <title>Central North Pacific Tropical Weather Outlook</title>
+      <description>
+      <![CDATA[000<br />ACPN50 PHFO 092321<br />TWOCP <br /><br />Tropical Weather Outlook<br />NWS Central Pacific Hurricane Center Honolulu HI<br />Issued by NWS National Hurricane Center Miami FL<br />200 PM HST Wed Sep 09 2026<br /><br />For the central North Pacific...between 140W and 180W:<br /><br />Active Systems:<br />The National Hurricane Center is issuing advisories on Tropical<br />Storm Lowell, located several hundred miles north-northwest of the<br />Hawaiian Islands and on newly formed Tropical Depression<br />Fourteen-E, located several hundred miles southwest of the southern<br />tip of the Baja California Peninsula.<br /><br />Well South-Southeast of the Hawaiian Islands:<br />A broad trough of low pressure associated with disorganized showers<br />and thunderstorms has formed well to the south-southeast of the<br />Hawaiian Islands. Some gradual development of this system is<br />possible late this week into the weekend as this system moves<br />generally northward.<br />* Formation chance through 48 hours...low...10 percent.<br />* Formation chance through 7 days...low...20 percent.<br /><br />Central Portion and West Portion of the East Pacific:<br />An area of low pressure is forecast to form several hundred miles<br />south of the southern tip of the Baja California Peninsula this<br />weekend or early next week. Some gradual development is possible<br />thereafter, and a tropical depression could form early next week<br />while the system moves generally westward.<br />* Formation chance through 48 hours...low...near 0 percent.<br />* Formation chance through 7 days...medium...50 percent.<br /><br />&&<br />Public Advisories on Tropical Depression Fourteen-E are issued under<br />WMO header WTPZ34 KNHC and under AWIPS header MIATCPEP4.<br />Forecast/Advisories on Tropical Depression Fourteen-E are issued<br />under WMO header WTPZ24 KNHC and under AWIPS header MIATCMEP4.<br /><br />$$<br />Forecaster Papin<br />NNNN]]>
+      </description>
+      <pubDate>Wed, 09 Sep 2026 23:21:31 GMT</pubDate>
+      <link>https://www.nhc.noaa.gov/gtwo.php?basin=cpac</link>
+      <guid>https://www.nhc.noaa.gov/gtwo.php?basin=cpac&amp;202609092321</guid>
+      <author>nhcwebmaster@noaa.gov (NHC Webmaster)</author>
+    </item>
+    <item>
+      <title>Summary for Tropical Storm Lowell (CP4/EP122026)</title>
+      <guid isPermaLink="false">summary-ep122026-202609100232</guid>
+      <pubDate>Thu, 10 Sep 2026 02:32:29 GMT</pubDate>
+      <author>nhcwebmaster@noaa.gov (NHC Webmaster)</author>
+      <link>https://www.nhc.noaa.gov/text/refresh/HFOTCPCP4+shtml/100232.shtml</link>
+      <description>...LOWELL TURNING WESTWARD AS IT GRADUALLY WEAKENS... As of 5:00 PM HST Wed Sep 09 the center of Lowell was located near 29.2, -165.1 with movement W at 14 mph. The minimum central pressure was 991 mb with maximum sustained winds of about 50 mph.</description>
+      <nhc:Cyclone>
+        <nhc:center>29.2, -165.1</nhc:center>
+        <nhc:type>Tropical Storm</nhc:type>
+        <nhc:name>Lowell</nhc:name>
+        <nhc:wallet>CP4</nhc:wallet>
+        <nhc:atcf>EP122026</nhc:atcf>
+        <nhc:datetime>5:00 PM HST Wed Sep 09</nhc:datetime>
+        <nhc:movement>W at 14 mph</nhc:movement>
+        <nhc:pressure>991 mb</nhc:pressure>
+        <nhc:wind>50 mph</nhc:wind>
+        <nhc:headline>...LOWELL TURNING WESTWARD AS IT GRADUALLY WEAKENS...</nhc:headline>
+      </nhc:Cyclone>
+    </item>
+    <item>
+      <title>Tropical Storm Lowell Public Advisory Number 56</title>
+      <description>Issued at 500 PM HST Wed Sep 09 2026 <![CDATA[<pre>000
+WTPA34 PHFO 100232
+TCPCP4
+ 
+BULLETIN
+Tropical Storm Lowell Advisory Number  56
+NWS Central Pacific Hurricane Center Honolulu HI   EP122026
+Issued by NWS National Hurricane Center Miami FL
+500 PM HST Wed Sep 09 2026
+ 
+...LOWELL TURNING WESTWARD AS IT GRADUALLY WEAKENS...
+ 
+ 
+SUMMARY OF 500 PM HST...0300 UTC...INFORMATION
+----------------------------------------------
+LOCATION...29.2N 165.1W
+ABOUT 610 MI...985 KM NW OF LIHUE HAWAII
+MAXIMUM SUSTAINED WINDS...50 MPH...85 KM/H
+PRESENT MOVEMENT...W OR 280 DEGREES AT 14 MPH...22 KM/H
+MINIMUM CENTRAL PRESSURE...991 MB...29.27 INCHES
+ 
+ 
+WATCHES AND WARNINGS
+--------------------
+There are no coastal watches or warnings in effect.
+ 
+ 
+DISCUSSION AND OUTLOOK
+----------------------
+At 500 PM HST (0300 UTC), the center of Tropical Storm Lowell was
+located near latitude 29.2 North, longitude 165.1 West. Lowell is 
+now moving toward the west near 14 mph (22 km/h). A general 
+westward motion is forecast for the next day or so. Then, the 
+system's forward motion is expected to slow late this week as it 
+turns back northwestward. 
+ 
+Maximum sustained winds have decreased to near 50 mph (85 km/h) 
+with higher gusts. Gradual weakening is forecast during the next 
+day or so followed by a brief period of reintensification by the 
+end of the week. 
+ 
+Tropical-storm-force winds extend outward up to 195 miles (315 km)
+from the center.
+ 
+The estimated minimum central pressure is 991 mb (29.27 inches).
+ 
+ 
+HAZARDS AFFECTING LAND
+----------------------
+None.
+ 
+ 
+NEXT ADVISORY
+-------------
+Next complete advisory at 1100 PM HST.
+ 
+$$
+Forecaster Papin</pre>]]></description>
+          
+      <pubDate>Thu, 10 Sep 2026 02:32:29 GMT</pubDate>
+      <link>https://www.nhc.noaa.gov/text/refresh/HFOTCPCP4+shtml/100232.shtml</link>
+      <guid>https://www.nhc.noaa.gov/text/refresh/HFOTCPCP4+shtml/100232.shtml</guid>
+      <author>nhcwebmaster@noaa.gov (NHC Webmaster)</author>
+    </item>
+    <item>
+      <title>Tropical Storm Lowell Forecast Advisory Number 56</title>
+      <description>Issued at 0300 UTC THU SEP 10 2026 <![CDATA[<pre>000
+WTPA24 PHFO 100232
+TCMCP4
+ 
+TROPICAL STORM LOWELL FORECAST/ADVISORY NUMBER  56
+NWS CENTRAL PACIFIC HURRICANE CENTER HONOLULU HI   EP122026
+ISSUED BY NWS NATIONAL HURRICANE CENTER MIAMI FL
+0300 UTC THU SEP 10 2026
+ 
+TROPICAL STORM CENTER LOCATED NEAR 29.2N 165.1W AT 10/0300Z
+POSITION ACCURATE WITHIN  30 NM
+ 
+PRESENT MOVEMENT TOWARD THE WEST OR 280 DEGREES AT  12 KT
+ 
+ESTIMATED MINIMUM CENTRAL PRESSURE  991 MB
+MAX SUSTAINED WINDS  45 KT WITH GUSTS TO  55 KT.
+34 KT.......170NE 100SE  50SW 130NW.
+4 M SEAS....450NE 300SE 270SW 330NW.
+WINDS AND SEAS VARY GREATLY IN EACH QUADRANT.  RADII IN NAUTICAL
+MILES ARE THE LARGEST RADII EXPECTED ANYWHERE IN THAT QUADRANT.
+ 
+REPEAT...CENTER LOCATED NEAR 29.2N 165.1W AT 10/0300Z
+AT 10/0000Z CENTER WAS LOCATED NEAR 29.1N 164.4W
+ 
+FORECAST VALID 10/1200Z 29.3N 167.1W
+MAX WIND  40 KT...GUSTS  50 KT.
+34 KT...140NE  60SE   0SW 110NW.
+ 
+FORECAST VALID 11/0000Z 29.2N 169.5W
+MAX WIND  35 KT...GUSTS  45 KT.
+34 KT...100NE   0SE   0SW  80NW.
+ 
+FORECAST VALID 11/1200Z 29.4N 171.2W
+MAX WIND  35 KT...GUSTS  45 KT.
+34 KT... 80NE   0SE   0SW  50NW.
+ 
+FORECAST VALID 12/0000Z 30.6N 172.0W
+MAX WIND  40 KT...GUSTS  50 KT.
+34 KT... 90NE  50SE   0SW  50NW.
+ 
+FORECAST VALID 12/1200Z 32.2N 172.4W
+MAX WIND  45 KT...GUSTS  55 KT.
+34 KT...110NE  90SE   0SW  80NW.
+ 
+FORECAST VALID 13/0000Z 33.3N 173.4W
+MAX WIND  40 KT...GUSTS  50 KT.
+34 KT... 90NE  70SE   0SW  50NW.
+ 
+EXTENDED OUTLOOK. NOTE...ERRORS FOR TRACK HAVE AVERAGED NEAR 150 NM
+ON DAY 4 AND 200 NM ON DAY 5...AND FOR INTENSITY NEAR 20 KT EACH DAY
+ 
+OUTLOOK VALID 14/0000Z 32.8N 175.1W...POST-TROP/REMNT LOW
+MAX WIND  30 KT...GUSTS  40 KT.
+ 
+OUTLOOK VALID 15/0000Z 31.6N 175.4W...POST-TROP/REMNT LOW
+MAX WIND  25 KT...GUSTS  35 KT.
+ 
+REQUEST FOR 3 HOURLY SHIP REPORTS WITHIN 300 MILES OF 29.2N 165.1W
+ 
+NEXT ADVISORY AT 10/0900Z
+ 
+$$
+FORECASTER PAPIN</pre>]]></description>
+          
+      <pubDate>Thu, 10 Sep 2026 02:32:29 GMT</pubDate>
+      <link>https://www.nhc.noaa.gov/text/refresh/HFOTCMCP4+shtml/100232.shtml</link>
+      <guid>https://www.nhc.noaa.gov/text/refresh/HFOTCMCP4+shtml/100232.shtml</guid>
+      <author>nhcwebmaster@noaa.gov (NHC Webmaster)</author>
+    </item>
+    <item>
+      <title>Tropical Storm Lowell Forecast Discussion Number 56</title>
+      <description>Issued at 500 PM HST Wed Sep 09 2026 <![CDATA[<pre>000
+WTPA44 PHFO 100232
+TCDCP4
+ 
+Tropical Storm Lowell Discussion Number  56
+NWS Central Pacific Hurricane Center Honolulu HI   EP122026
+Issued by NWS National Hurricane Center Miami FL
+500 PM HST Wed Sep 09 2026
+
+Lowell's convective structure on satellite imagery is not very 
+impressive, consisting of a well-defined low-level swirl with some 
+colder cloud tops attempting to form on the northeast side of the 
+circulation. The storm is clearly being negatively impacted by 
+moderate westerly shear importing nearby dry air and marginally warm 
+sea-surface temperatures. Scatterometer data received after the 
+prior advisory indicated a robust surface wind field remains, with 
+peak wind-retrievals in the 45 to 50 kt range. However, subjective 
+and objective satellite estimates continue to decrease, and assuming 
+the low-level circulation continues to spin down without much deep 
+convection, the initial intensity is set to 45 kt for this advisory.
+
+The tropical cyclone has turned westward, with the estimated motion 
+now 280 degrees at 12 kt. Lowell is now being steered primarily by a 
+low- to mid-level ridge located north of the tropical storm, and 
+this should maintain a general westward motion over the next 24-36 
+h. After that time, a mid- to upper-level trough located northwest 
+of Lowell is anticipated to cutoff and interact with the cyclone, 
+with the track guidance coming into better agreement that this will 
+lead to a sharp turn to the northwest or north in 60-72 h. By the 
+end of the forecast period, the upper-level cutoff low moves east 
+of Lowell, leaving behind a shallow low-level circulation sandwiched 
+between two low-level ridges. The track guidance responds to this 
+change by indicating a slow southward drift as the cyclone becomes a 
+remnant low. The NHC track forecast is very similar to the prior one 
+for the first 2-3 days, but shows a sharper turn southward 
+by the end of the forecast. This track is closest to the Google 
+DeepMind (GDMI) and HFIP Corrected Consensus Approach (HCCA) aids.  
+
+Moderate westerly vertical wind shear, abundant dry air, and only 
+marginally warm sea-surface temperatures are likely to lead to 
+further weakening over the next 36 h. In fact, Lowell could struggle 
+to produce enough convection to be considered a tropical cyclone 
+during this period. Nonetheless, the aforementioned trough 
+interaction in the 2-3 day time frame will likely reinvigorate some 
+convection on the storm's down-shear side via baroclinic processes, 
+which could help intensify Lowell's wind field. Most of the 
+intensity guidance shows at least some intensification during this 
+period of interaction, and the NHC intensity forecast was adjusted 
+somewhat to reflect this solution, though it remains below the 
+HAFS-A/B hurricane models. After 72 h, the upper-level low 
+interacting with Lowell will pass it to the east, leaving the storm 
+in an area of enhanced subsidence that will likely diminish the 
+remaining convection when the storm will be over sub-26 C SSTs. 
+Thus, the latest NHC forecast still shows Lowell becoming a 
+post-tropical low in 96 h. There is still a healthy amount of track 
+uncertainty towards the end of the forecast, though the guidance is 
+coming into better agreement on Lowell losing its tropical 
+characteristics by this time.
+ 
+ 
+KEY MESSAGES:
+ 
+1. Post-storm safety: Follow advice of local officials and avoid
+areas of downed power lines and flooding. Ensure generators are
+properly ventilated and placed outside at least 20 feet away from
+dwellings and garages to avoid carbon monoxide poisoning. During
+clean up, be careful when using chainsaws and power tools. Drink
+plenty of water to avoid heat exhaustion.
+ 
+ 
+FORECAST POSITIONS AND MAX WINDS
+ 
+INIT  10/0300Z 29.2N 165.1W   45 KT  50 MPH
+ 12H  10/1200Z 29.3N 167.1W   40 KT  45 MPH
+ 24H  11/0000Z 29.2N 169.5W   35 KT  40 MPH
+ 36H  11/1200Z 29.4N 171.2W   35 KT  40 MPH
+ 48H  12/0000Z 30.6N 172.0W   40 KT  45 MPH
+ 60H  12/1200Z 32.2N 172.4W   45 KT  50 MPH
+ 72H  13/0000Z 33.3N 173.4W   40 KT  45 MPH
+ 96H  14/0000Z 32.8N 175.1W   30 KT  35 MPH...POST-TROP/REMNT LOW
+120H  15/0000Z 31.6N 175.4W   25 KT  30 MPH...POST-TROP/REMNT LOW
+ 
+$$
+Forecaster Papin</pre>]]></description>
+          
+      <pubDate>Thu, 10 Sep 2026 02:32:56 GMT</pubDate>
+      <link>https://www.nhc.noaa.gov/text/refresh/HFOTCDCP4+shtml/100232.shtml</link>
+      <guid>https://www.nhc.noaa.gov/text/refresh/HFOTCDCP4+shtml/100232.shtml</guid>
+      <author>nhcwebmaster@noaa.gov (NHC Webmaster)</author>
+    </item>
+    <item>
+      <title>Tropical Storm Lowell Wind Speed Probabilities Number 56</title>
+      <description>Issued at 0300 UTC THU SEP 10 2026 <![CDATA[<pre>000
+FOPA14 PHFO 100232
+PWSCP4
+                                                                    
+TROPICAL STORM LOWELL WIND SPEED PROBABILITIES NUMBER  56           
+NWS CENTRAL PACIFIC HURRICANE CENTER HONOLULU HI   EP122026         
+ISSUED BY NWS NATIONAL HURRICANE CENTER MIAMI FL                    
+0300 UTC THU SEP 10 2026                                            
+                                                                    
+AT 0300Z THE CENTER OF TROPICAL STORM LOWELL WAS LOCATED NEAR       
+LATITUDE 29.2 NORTH...LONGITUDE 165.1 WEST WITH MAXIMUM SUSTAINED   
+WINDS NEAR 45 KTS...50 MPH...85 KM/H.                               
+                                                                    
+Z INDICATES COORDINATED UNIVERSAL TIME (GREENWICH)                  
+   PACIFIC  DAYLIGHT TIME (PDT)...SUBTRACT 7 HOURS FROM Z TIME      
+   HAWAIIAN STANDARD TIME (HST)...SUBTRACT 10 HOURS FROM Z TIME     
+                                                                    
+WIND SPEED PROBABILITY TABLE FOR SPECIFIC LOCATIONS                 
+                                                                    
+CHANCES OF SUSTAINED (1-MINUTE AVERAGE) WIND SPEEDS OF AT LEAST     
+   ...34 KT (39 MPH... 63 KM/H)...                                  
+   ...50 KT (58 MPH... 93 KM/H)...                                  
+   ...64 KT (74 MPH...119 KM/H)...                                  
+FOR LOCATIONS AND TIME PERIODS DURING THE NEXT 5 DAYS               
+                                                                    
+PROBABILITIES FOR LOCATIONS ARE GIVEN AS OP(CP) WHERE               
+    OP  IS THE PROBABILITY OF THE EVENT BEGINNING DURING            
+        AN INDIVIDUAL TIME PERIOD (ONSET PROBABILITY)               
+   (CP) IS THE PROBABILITY OF THE EVENT OCCURRING BETWEEN           
+        00Z THU AND THE FORECAST HOUR (CUMULATIVE PROBABILITY)      
+                                                                    
+PROBABILITIES ARE GIVEN IN PERCENT                                  
+X INDICATES PROBABILITIES LESS THAN 1 PERCENT                       
+PROBABILITIES FOR 34 KT AND 50 KT ARE SHOWN AT A GIVEN LOCATION WHEN
+THE 5-DAY CUMULATIVE PROBABILITY IS AT LEAST 3 PERCENT.             
+PROBABILITIES FOR 34...50...64 KT SHOWN WHEN THE 5-DAY              
+64-KT CUMULATIVE PROBABILITY IS AT LEAST 1 PERCENT.                 
+                                                                    
+                                                                    
+  - - - - WIND SPEED PROBABILITIES FOR SELECTED LOCATIONS - - - -   
+                                                                    
+               FROM    FROM    FROM    FROM    FROM    FROM    FROM 
+  TIME       00Z THU 12Z THU 00Z FRI 12Z FRI 00Z SAT 00Z SUN 00Z MON
+PERIODS         TO      TO      TO      TO      TO      TO      TO  
+             12Z THU 00Z FRI 12Z FRI 00Z SAT 00Z SUN 00Z MON 00Z TUE
+                                                                    
+FORECAST HOUR    (12)   (24)    (36)    (48)    (72)    (96)   (120)
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+LOCATION       KT                                                   
+                                                                    
+30N 165W       34 99   X(99)   X(99)   X(99)   X(99)   X(99)   X(99)
+ 
+30N 170W       34  1  25(26)  11(37)   2(39)   1(40)   X(40)   X(40)
+30N 170W       50  X   2( 2)   2( 4)   1( 5)   X( 5)   X( 5)   X( 5)
+ 
+30N 175W       34  X   X( X)   X( X)   1( 1)   1( 2)   X( 2)   3( 5)
+ 
+35N 175W       34  X   X( X)   X( X)   X( X)   5( 5)   7(12)   1(13)
+ 
+$$                                                                  
+FORECASTER PAPIN</pre>]]></description>
+          
+      <pubDate>Thu, 10 Sep 2026 02:32:56 GMT</pubDate>
+      <link>https://www.nhc.noaa.gov/text/refresh/HFOPWSCP4+shtml/100232.shtml</link>
+      <guid>https://www.nhc.noaa.gov/text/refresh/HFOPWSCP4+shtml/100232.shtml</guid>
+      <author>nhcwebmaster@noaa.gov (NHC Webmaster)</author>
+    </item>
+    <item>
+      <title>Tropical Storm Lowell Graphics</title>
+      <description>
+<![CDATA[
+
+<br />
+<br /><a href="https://www.nhc.noaa.gov/refresh/graphics_cp4+shtml/023704.shtml?tswind120">
+<img src="https://www.nhc.noaa.gov/storm_graphics/CP12/EP122026_wind_probs_34_F120_sm2.png"
+alt="Tropical Storm Lowell 34-Knot Wind Speed Probabilities" width="500" height="400" /> </a>
+<br />Wind Speed Probabilities last updated Thu, 10 Sep 2026 02:34:47 GMT
+]]>
+      </description>
+      <pubDate>Thu, 10 Sep 2026 02:37:04 GMT</pubDate>
+      <link>https://www.nhc.noaa.gov/refresh/graphics_cp4+shtml/023704.shtml?cone</link>
+      <guid>https://www.nhc.noaa.gov/refresh/graphics_cp4+shtml/023704.shtml?cone</guid>
+      <author>nhcwebmaster@noaa.gov (NHC Webmaster)</author>
+    </item>
+  </channel>
+</rss>
