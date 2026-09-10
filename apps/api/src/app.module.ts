@@ -14,7 +14,9 @@ import { IngestionModule } from './ingestion/ingestion.module.js';
       type: 'postgres',
       url: process.env.DATABASE_URL,
       autoLoadEntities: true,
-      synchronize: true,
+      synchronize: false,
+      migrations: ['dist/database/migrations/*.js'],
+      migrationsRun: true,
       logging: ['error', 'warn'],
     }),
     ScheduleModule.forRoot(), // ← NEW
