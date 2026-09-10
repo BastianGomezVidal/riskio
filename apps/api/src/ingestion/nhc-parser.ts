@@ -7,7 +7,7 @@ import { XMLParser } from 'fast-xml-parser';
 export interface CycloneInfo {
   atcfId: string;
   wallet: string;
-  name: string | null;         // null if unnamed (e.g. "Fourteen-E")
+  name: string | null; // null if unnamed (e.g. "Fourteen-E")
   stormType: string;
   latitude: number;
   longitude: number;
@@ -113,7 +113,11 @@ function normalizeName(raw: unknown): string | null {
   if (typeof raw !== 'string' || !raw.trim()) return null;
   const name = raw.trim();
   // Designation patterns: "One", "Fourteen-E", "Twenty-Two"
-  if (/^(One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|Eleven|Twelve|Thirteen|Fourteen|Fifteen|Sixteen|Seventeen|Eighteen|Nineteen|Twenty|Twenty-One|Twenty-Two|Twenty-Three)(-[A-Z])?$/i.test(name)) {
+  if (
+    /^(One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|Eleven|Twelve|Thirteen|Fourteen|Fifteen|Sixteen|Seventeen|Eighteen|Nineteen|Twenty|Twenty-One|Twenty-Two|Twenty-Three)(-[A-Z])?$/i.test(
+      name,
+    )
+  ) {
     return null;
   }
   return name;
@@ -189,7 +193,7 @@ export function parseRssFeed(xml: string): ParsedFeed {
 
 export interface StormSummary {
   atcfId: string;
-  basin: string;         // "EP", "AL", "CP" — derived from ATCF prefix
+  basin: string; // "EP", "AL", "CP" — derived from ATCF prefix
   name: string | null;
   stormType: string;
   wallet: string;
@@ -265,15 +269,15 @@ export function parseForecastPoints(
     let validMonth = refMonth;
     if (day < refDay) {
       validMonth += 1;
-    if (validMonth > 11) {
-      validMonth = 0;
-      validYear += 1;
+      if (validMonth > 11) {
+        validMonth = 0;
+        validYear += 1;
+      }
     }
-}
 
-const validAt = new Date(
-  Date.UTC(validYear, validMonth, day, hour, minute),
-);
+    const validAt = new Date(
+      Date.UTC(validYear, validMonth, day, hour, minute),
+    );
     // Note: month/day parsing here is approximate; we refine below using the
     // current advisory date to pick the right month.
 
@@ -298,7 +302,7 @@ const validAt = new Date(
       longitude: lon,
       windSpeedKt,
       pressureMb: null, // TCM advisories don't include forecast pressure
-      category: null,   // we'll compute later from windSpeedKt
+      category: null, // we'll compute later from windSpeedKt
     });
   }
 
@@ -311,8 +315,8 @@ const validAt = new Date(
 
 export function categoryFromWindKt(kt: number | null): number | null {
   if (kt === null) return null;
-  if (kt < 34) return null;   // not a tropical storm
-  if (kt < 64) return 0;      // tropical storm
+  if (kt < 34) return null; // not a tropical storm
+  if (kt < 64) return 0; // tropical storm
   if (kt <= 82) return 1;
   if (kt <= 95) return 2;
   if (kt <= 112) return 3;

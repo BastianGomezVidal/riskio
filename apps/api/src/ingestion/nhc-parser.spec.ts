@@ -52,32 +52,32 @@ describe('parseForecastPoints', () => {
   });
 
   it('rolls over to the next month when forecast day < reference day', () => {
-  // Advisory issued Sep 30, forecast valid day 01 → should be Oct 01
-  const refDate = new Date(Date.UTC(2026, 8, 30, 12, 0, 0)); // Sep 30 2026
-  const cdata = 'FORECAST VALID 01/0000Z 15.0N 120.0W<br />MAX WIND  40 KT';
-  const points = parseForecastPoints(cdata, refDate);
-  expect(points).toHaveLength(1);
-  const p = points[0];
-  expect(p.validAt.getUTCFullYear()).toBe(2026);
-  expect(p.validAt.getUTCMonth()).toBe(9); // October (0-based)
-  expect(p.validAt.getUTCDate()).toBe(1);
-  expect(p.validAt.getUTCHours()).toBe(0);
+    // Advisory issued Sep 30, forecast valid day 01 → should be Oct 01
+    const refDate = new Date(Date.UTC(2026, 8, 30, 12, 0, 0)); // Sep 30 2026
+    const cdata = 'FORECAST VALID 01/0000Z 15.0N 120.0W<br />MAX WIND  40 KT';
+    const points = parseForecastPoints(cdata, refDate);
+    expect(points).toHaveLength(1);
+    const p = points[0];
+    expect(p.validAt.getUTCFullYear()).toBe(2026);
+    expect(p.validAt.getUTCMonth()).toBe(9); // October (0-based)
+    expect(p.validAt.getUTCDate()).toBe(1);
+    expect(p.validAt.getUTCHours()).toBe(0);
   });
 
   it('rolls over to the next year when crossing December 31', () => {
-  const refDate = new Date(Date.UTC(2026, 11, 31, 12, 0, 0)); // Dec 31 2026
-  const cdata = 'FORECAST VALID 01/0000Z 15.0N 120.0W<br />MAX WIND  40 KT';
-  const points = parseForecastPoints(cdata, refDate);
-  expect(points[0].validAt.getUTCFullYear()).toBe(2027);
-  expect(points[0].validAt.getUTCMonth()).toBe(0); // January
-  expect(points[0].validAt.getUTCDate()).toBe(1);
+    const refDate = new Date(Date.UTC(2026, 11, 31, 12, 0, 0)); // Dec 31 2026
+    const cdata = 'FORECAST VALID 01/0000Z 15.0N 120.0W<br />MAX WIND  40 KT';
+    const points = parseForecastPoints(cdata, refDate);
+    expect(points[0].validAt.getUTCFullYear()).toBe(2027);
+    expect(points[0].validAt.getUTCMonth()).toBe(0); // January
+    expect(points[0].validAt.getUTCDate()).toBe(1);
   });
 });
 
 describe('categoryFromWindKt', () => {
   it('maps wind speeds to Saffir-Simpson categories', () => {
     expect(categoryFromWindKt(30)).toBeNull(); // below TS
-    expect(categoryFromWindKt(40)).toBe(0);    // TS
+    expect(categoryFromWindKt(40)).toBe(0); // TS
     expect(categoryFromWindKt(70)).toBe(1);
     expect(categoryFromWindKt(90)).toBe(2);
     expect(categoryFromWindKt(110)).toBe(3);

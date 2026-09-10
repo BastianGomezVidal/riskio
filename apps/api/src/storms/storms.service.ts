@@ -26,4 +26,22 @@ export class StormsService {
     }
     return storm;
   }
+
+  async upsertFromIngestion(input: {
+    atcfId: string;
+    name: string | null;
+    basin: string;
+  }): Promise<Storm> {
+    await this.stormsRepository.upsert(
+      {
+        atcfId: input.atcfId,
+        name: input.name,
+        basin: input.basin,
+      },
+      { conflictPaths: ['atcfId'] },
+    );
+    return this.stormsRepository.findOneOrFail({
+      where: { atcfId: input.atcfId },
+    });
+  }
 }

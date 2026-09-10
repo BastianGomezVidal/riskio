@@ -1,0 +1,13 @@
+import { Module } from '@nestjs/common';
+import { NhcProvider } from './nhc.provider.js';
+import { IngestionService } from './ingestion.service.js';
+import { StormsModule } from '../storms/storms.module.js';
+import { AdvisoriesModule } from '../advisories/advisories.module.js';
+import { ForecastPointsModule } from '../forecast-points/forecast-points.module.js';
+
+@Module({
+  imports: [StormsModule, AdvisoriesModule, ForecastPointsModule],
+  providers: [NhcProvider, IngestionService],
+  exports: [IngestionService],
+})
+export class IngestionModule {}

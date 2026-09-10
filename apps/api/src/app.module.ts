@@ -5,6 +5,7 @@ import { AppService } from './app.service.js';
 import { StormsModule } from './storms/storms.module.js';
 import { AdvisoriesModule } from './advisories/advisories.module.js';
 import { ForecastPointsModule } from './forecast-points/forecast-points.module.js';
+import { IngestionModule } from './ingestion/ingestion.module.js';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ForecastPointsModule } from './forecast-points/forecast-points.module.j
     StormsModule,
     AdvisoriesModule,
     ForecastPointsModule,
+    IngestionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
