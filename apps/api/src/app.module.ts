@@ -9,6 +9,7 @@ import { StormsModule } from './storms/storms.module.js';
 import { AdvisoriesModule } from './advisories/advisories.module.js';
 import { ForecastPointsModule } from './forecast-points/forecast-points.module.js';
 import { IngestionModule } from './ingestion/ingestion.module.js';
+import { HealthModule } from './health/health.module.js';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { IngestionModule } from './ingestion/ingestion.module.js';
     AdvisoriesModule,
     ForecastPointsModule,
     IngestionModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
