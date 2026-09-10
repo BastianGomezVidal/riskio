@@ -3,14 +3,19 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { envValidationSchema } from './config/env.validation.js';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
 import { StormsModule } from './storms/storms.module.js';
 import { AdvisoriesModule } from './advisories/advisories.module.js';
 import { ForecastPointsModule } from './forecast-points/forecast-points.module.js';
 import { IngestionModule } from './ingestion/ingestion.module.js';
 import { HealthModule } from './health/health.module.js';
 
+/**
+ * Root application module.
+ *
+ * Wires up environment validation, the Postgres connection (migrations run
+ * automatically on boot), the ingestion scheduler and the feature modules:
+ * storms, advisories, forecast-points, ingestion and health.
+ */
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -30,14 +35,12 @@ import { HealthModule } from './health/health.module.js';
         logging: ['error', 'warn'],
       }),
     }),
-    ScheduleModule.forRoot(), // ← NEW
+    ScheduleModule.forRoot(),
     StormsModule,
     AdvisoriesModule,
     ForecastPointsModule,
     IngestionModule,
     HealthModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}

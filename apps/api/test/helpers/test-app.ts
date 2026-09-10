@@ -3,8 +3,6 @@ import { Test } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
-import { AppController } from '../../src/app.controller.js';
-import { AppService } from '../../src/app.service.js';
 import { StormsModule } from '../../src/storms/storms.module.js';
 import { AdvisoriesModule } from '../../src/advisories/advisories.module.js';
 import { ForecastPointsModule } from '../../src/forecast-points/forecast-points.module.js';
@@ -48,8 +46,6 @@ export async function createTestApp(
       IngestionModule,
       HealthModule,
     ],
-    controllers: [AppController],
-    providers: [AppService],
   });
 
   for (const { provide, useValue } of overrides) {
