@@ -15,6 +15,10 @@ export class IngestionScheduler {
    * Runs every 10 minutes at second 0.
    * NestJS @Cron uses the `cron` package's 6-field format:
    *   sec min hour day-of-month month day-of-week
+   *
+   * Delegates to {@link IngestionService.ingestAllBasins} and logs a compact
+   * per-basin summary; per-basin failures are reported, never thrown, so one
+   * bad basin cannot stop the remaining ones.
    */
   @Cron('0 */10 * * * *')
   async pollAllBasins(): Promise<void> {
@@ -26,7 +30,7 @@ export class IngestionScheduler {
       const summary = reports
         .map(
           (r) =>
-            `${r.basin}:storms=${r.stormsUpserted}/~${r.stormsSeen},adv+${r.advisoriesInserted}/~${r.advisoriesSkipped},pts+${r.forecastPointsInserted},err=${r.errors.length}`,
+            `${r.basin}:storms=${r.stormsUpserted}/~${r.stormsSeen},adv+${r.advisoriesInserted}/~${r.advisoriesSkipped},pts+${r.forecastPointsInserted},geo+${r.geometriesUpdated},ww+${r.warningSegments},err=${r.errors.length}`,
         )
         .join(' | ');
       const errored = reports.filter((r) => r.errors.length > 0);

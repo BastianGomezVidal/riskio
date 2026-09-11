@@ -21,6 +21,9 @@ export class StormsService {
 
   /**
    * List known storms ordered by most recently observed, paginated.
+   *
+   * @param page 1-indexed pagination parameters (`page`, `limit`).
+   * @returns paginated storms ordered by `lastSeenAt` descending.
    */
   async findAll(page: PageQueryDto): Promise<PaginatedResultDto<Storm>> {
     const [data, total] = await this.stormsRepository.findAndCount({
@@ -42,6 +45,8 @@ export class StormsService {
   /**
    * Fetch one storm by ATCF identifier with its advisories.
    *
+   * @param atcfId ATCF storm identifier, e.g. `EP142026`.
+   * @returns the storm with its `advisories` relation loaded.
    * @throws NotFoundException when no storm matches.
    */
   async findOne(atcfId: string): Promise<StormDetail> {
@@ -58,6 +63,9 @@ export class StormsService {
   /**
    * Create the storm if unknown, otherwise update its name/basin.
    * Returns the freshly loaded row. Used by the ingestion pipeline.
+   *
+   * @param input ATCF id, nullable name and basin code.
+   * @returns the persisted storm row.
    */
   async upsertFromIngestion(input: {
     atcfId: string;

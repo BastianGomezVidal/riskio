@@ -18,6 +18,10 @@ export class ForecastPointsService {
 
   /**
    * List an advisory's forecast points chronologically, paginated.
+   *
+   * @param advisoryId advisory UUID.
+   * @param page 1-indexed pagination parameters (`page`, `limit`).
+   * @returns paginated points ordered by `validAt` ascending.
    */
   async findByAdvisory(
     advisoryId: string,
@@ -47,6 +51,8 @@ export class ForecastPointsService {
    * "write once": the delete is a no-op on first ingest. Saffir-Simpson
    * categories are derived from each point's wind speed.
    *
+   * @param advisory owning advisory entity.
+   * @param points forecast points parsed from the TCM advisory text.
    * @returns the number of points stored.
    */
   async replaceForAdvisory(
