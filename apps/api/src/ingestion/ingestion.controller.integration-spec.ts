@@ -23,6 +23,7 @@ describe('Ingestion endpoints (integration)', () => {
       Promise.resolve(fixture('nhc-ep-active.xml')),
     fetchForecastAdvisory: (_wallet: string) =>
       Promise.resolve(fixture('tcm-ep4.xml')),
+    fetchAdvisoryProduct: () => Promise.resolve(null),
   };
 
   beforeAll(async () => {
@@ -106,6 +107,55 @@ describe('Ingestion endpoints (integration)', () => {
     expect(
       res.body.every((r: { errors: string[] }) => r.errors.length === 0),
     ).toBe(true);
+  });
+
+  it('stores track/cone geometry and warning segments from KMZ products', async () => {
+    const geometryDir = join(FIXTURES_DIR, 'geometry');
+    const readKmz = (name: string) => readFileSync(join(geometryDir, name));
+    const productFor = (kind: string): Buffer | null => {
+      if (kind === 'TRACK') return readKmz('ep142026_005adv_TRACK.kmz');
+      if (kind === 'CONE') return readKmz('ep142026_005adv_CONE.kmz');
+      if (kind === 'WW') return readKmz('al112017_020adv_WW.kmz');
+      return null;
+    };
+    const kmzApp = await createTestApp([
+      {
+        provide: NhcProvider,
+        useValue: {
+          fetchBasinSummary: () =>
+            Promise.resolve(fixture('nhc-ep-active.xml')),
+          fetchForecastAdvisory: () => Promise.resolve(fixture('tcm-ep4.xml')),
+          fetchAdvisoryProduct: (_atcfId: string, _n: number, kind: string) =>
+            Promise.resolve(productFor(kind)),
+        },
+      },
+    ]);
+    try {
+      const res = await request(kmzApp.getHttpServer())
+        .get('/admin/ingest/run/ep')
+        .expect(200);
+
+      expect(res.body.geometriesUpdated).toBe(1);
+      expect(res.body.warningSegments).toBeGreaterThanOrEqual(1);
+      expect(res.body.errors).toEqual([]);
+
+      const adv = await request(kmzApp.getHttpServer())
+        .get('/storms/EP142026/advisories')
+        .expect(200);
+      expect(adv.body.data[0].track).toMatchObject({ type: 'LineString' });
+      expect(adv.body.data[0].cone).toMatchObject({ type: 'Polygon' });
+
+      const warnings = await request(kmzApp.getHttpServer())
+        .get(`/advisories/${adv.body.data[0].id}/warnings`)
+        .expect(200);
+      expect(warnings.body.type).toBe('FeatureCollection');
+      expect(warnings.body.features.length).toBeGreaterThanOrEqual(1);
+      expect(warnings.body.features[0].properties.warningType).toBe(
+        'Hurricane Watch',
+      );
+    } finally {
+      await kmzApp.close();
+    }
   });
 
   it('rejects an unknown basin', async () => {

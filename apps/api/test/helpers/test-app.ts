@@ -9,6 +9,7 @@ import { ForecastPointsModule } from '../../src/forecast-points/forecast-points.
 import { IngestionModule } from '../../src/ingestion/ingestion.module.js';
 import { HealthModule } from '../../src/health/health.module.js';
 import { InitialSchema1789065155402 } from '../../src/database/migrations/1789065155402-InitialSchema.js';
+import { AddStormGeometry1888240000000 } from '../../src/database/migrations/1888240000000-AddStormGeometry.js';
 import { TEST_DATABASE_URL } from '../setup-integration.js';
 import { StormsService } from '../../src/storms/storms.service.js';
 import { AdvisoriesService } from '../../src/advisories/advisories.service.js';
@@ -35,7 +36,7 @@ export async function createTestApp(
         url: TEST_DATABASE_URL,
         autoLoadEntities: true,
         synchronize: false,
-        migrations: [InitialSchema1789065155402],
+        migrations: [InitialSchema1789065155402, AddStormGeometry1888240000000],
         migrationsRun: true,
         logging: false,
       }),
@@ -76,6 +77,12 @@ export interface AdvisorySeed {
   advisoryNumber: number;
   issuedAt: Date;
   rawText: string | null;
+  track?: { type: 'LineString'; coordinates: number[][] } | null;
+  cone?: { type: 'Polygon'; coordinates: number[][][] } | null;
+  warnings?: Array<{
+    warningType: string;
+    geometry: { type: 'LineString'; coordinates: number[][] };
+  }>;
 }
 
 export interface PointSeed {
@@ -111,6 +118,19 @@ export async function seedStorm(
         rawText: advisory.rawText,
       });
     await forecastPointsService.replaceForAdvisory(savedAdvisory, points);
+    if (advisory.track !== undefined || advisory.cone !== undefined) {
+      await advisoriesService.setTrackCone(
+        savedAdvisory.id,
+        (advisory.track as never) ?? null,
+        (advisory.cone as never) ?? null,
+      );
+    }
+    if (advisory.warnings && advisory.warnings.length > 0) {
+      await advisoriesService.replaceWarnings(
+        savedAdvisory,
+        advisory.warnings as never[],
+      );
+    }
   }
 
   return savedStorm;

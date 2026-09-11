@@ -27,6 +27,9 @@ function makeAdvisory(overrides: Partial<Advisory> = {}): Advisory {
     ingestedAt: new Date('2026-09-10T00:01:00Z'),
     storm: undefined as never,
     forecastPoints: [],
+    track: null,
+    cone: null,
+    warnings: [],
     ...overrides,
   };
 }

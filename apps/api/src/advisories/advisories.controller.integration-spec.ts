@@ -111,4 +111,48 @@ describe('Advisories & forecast-points endpoints (integration)', () => {
       .get('/advisories/00000000-0000-0000-0000-000000000000')
       .expect(404);
   });
+
+  it('round-trips track and cone geometry stored on the advisory', async () => {
+    const track = {
+      type: 'LineString' as const,
+      coordinates: [
+        [-120.5, 16.5],
+        [-122.5, 16.5],
+      ],
+    };
+    const cone = {
+      type: 'Polygon' as const,
+      coordinates: [
+        [
+          [-120.5, 16.5],
+          [-118.5, 15.5],
+          [-120.5, 16.5],
+        ],
+      ],
+    };
+    await seedStorm(app, { atcfId: 'AL012026', name: 'Geo', basin: 'AL' }, [
+      {
+        advisory: {
+          advisoryNumber: 3,
+          issuedAt: new Date('2026-09-10T02:33:27Z'),
+          rawText: 'geo advisory',
+          track,
+          cone,
+        },
+        points: [],
+      },
+    ]);
+
+    const res = await request(app.getHttpServer())
+      .get('/storms/AL012026/advisories')
+      .expect(200);
+
+    expect(res.body.data[0]).toMatchObject({
+      advisoryNumber: 3,
+      track: expect.objectContaining({ type: 'LineString' }),
+      cone: expect.objectContaining({ type: 'Polygon' }),
+    });
+    expect(res.body.data[0].track.coordinates).toHaveLength(2);
+    expect(res.body.data[0].cone.coordinates[0]).toHaveLength(3);
+  });
 });
