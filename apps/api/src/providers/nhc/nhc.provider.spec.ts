@@ -116,4 +116,45 @@ describe('NhcProvider', () => {
       expect.anything(),
     );
   });
+
+  describe('fetchAdvisoryProduct', () => {
+    it('fetches a zero-padded Track KMZ and returns its bytes', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        arrayBuffer: async () => new TextEncoder().encode('KML').buffer,
+      });
+
+      const kmz = await provider.fetchAdvisoryProduct('EP142026', 5, 'TRACK');
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://www.nhc.noaa.gov/storm_graphics/api/EP142026_005adv_TRACK.kmz',
+        expect.anything(),
+      );
+      expect(kmz?.toString('utf8')).toBe('KML');
+    });
+
+    it('returns null on 404 (product not published, e.g. no coastal warnings)', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 404,
+        arrayBuffer: async () => new ArrayBuffer(0),
+      });
+
+      const kmz = await provider.fetchAdvisoryProduct('EP142026', 5, 'WW');
+      expect(kmz).toBeNull();
+    });
+
+    it('throws on other non-2xx statuses', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 500,
+        arrayBuffer: async () => new ArrayBuffer(0),
+      });
+
+      await expect(
+        provider.fetchAdvisoryProduct('EP142026', 5, 'CONE'),
+      ).rejects.toThrow('NHC returned 500');
+    });
+  });
 });

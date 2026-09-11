@@ -5,6 +5,12 @@ import {
   extractStormSummaries,
   parseForecastPoints,
 } from '../providers/nhc/nhc-parser.js';
+import {
+  parseKmz,
+  parseTrackKml,
+  parseConeKml,
+  parseWatchWarningsKml,
+} from '../providers/nhc/kml-parser.js';
 import { StormsService } from '../storms/storms.service.js';
 import { AdvisoriesService } from '../advisories/advisories.service.js';
 import { ForecastPointsService } from '../forecast-points/forecast-points.service.js';
@@ -17,16 +23,22 @@ export interface IngestReport {
   advisoriesInserted: number;
   advisoriesSkipped: number;
   forecastPointsInserted: number;
+  geometriesUpdated: number;
+  warningSegments: number;
   errors: string[];
 }
+
+/** Alias kept for Swagger: the controller returns the shape of {@link IngestReportDto}. */
+export type { IngestReportDto } from './dto/ingest-report.dto.js';
 
 /**
  * Pulls the latest NHC data into the database.
  *
  * For each basin the service: (1) fetches the storm summary feed, (2) upserts
- * every active storm, (3) fetches each storm's TCM forecast-advisory, and
- * (4) replaces that advisory's forecast points. Failures are collected and
- * reported instead of aborting the whole run.
+ * every active storm, (3) fetches each storm's TCM forecast-advisory, (4)
+ * replaces that advisory's forecast points, and (5) stores the advisory's
+ * track/cone geometry and coastal watch/warning segments from NHC's KMZ
+ * products. Failures are collected and reported instead of aborting the run.
  */
 @Injectable()
 export class IngestionService {
@@ -54,6 +66,8 @@ export class IngestionService {
       advisoriesInserted: 0,
       advisoriesSkipped: 0,
       forecastPointsInserted: 0,
+      geometriesUpdated: 0,
+      warningSegments: 0,
       errors: [],
     };
 
@@ -141,6 +155,54 @@ export class IngestionService {
             points,
           );
           report.forecastPointsInserted += n;
+        }
+
+        // Track and cone geometry from the advisory KMZ products
+        try {
+          const [trackKmz, coneKmz] = await Promise.all([
+            this.nhc.fetchAdvisoryProduct(
+              storm.atcfId,
+              advisoryNumber,
+              'TRACK',
+            ),
+            this.nhc.fetchAdvisoryProduct(storm.atcfId, advisoryNumber, 'CONE'),
+          ]);
+          const track = trackKmz
+            ? (parseTrackKml(parseKmz(trackKmz))?.lineString ?? null)
+            : null;
+          const cone = coneKmz
+            ? (parseConeKml(parseKmz(coneKmz))?.polygon ?? null)
+            : null;
+          await this.advisories.setTrackCone(advisory.id, track, cone);
+          if (track || cone) {
+            report.geometriesUpdated++;
+          }
+        } catch (err) {
+          const msg = `${ctx} geometry fetch failed: ${(err as Error).message}`;
+          this.logger.warn(msg);
+          report.errors.push(msg);
+        }
+
+        // Coastal watch/warning segments (published only while active)
+        try {
+          const wwKmz = await this.nhc.fetchAdvisoryProduct(
+            storm.atcfId,
+            advisoryNumber,
+            'WW',
+          );
+          const segments = wwKmz ? parseWatchWarningsKml(parseKmz(wwKmz)) : [];
+          const n = await this.advisories.replaceWarnings(
+            advisory,
+            segments.map((segment) => ({
+              warningType: segment.type,
+              geometry: segment.lineString,
+            })),
+          );
+          report.warningSegments += n;
+        } catch (err) {
+          const msg = `${ctx} warnings fetch failed: ${(err as Error).message}`;
+          this.logger.warn(msg);
+          report.errors.push(msg);
         }
       } catch (err) {
         const msg = `${ctx} storm processing failed: ${(err as Error).message}`;

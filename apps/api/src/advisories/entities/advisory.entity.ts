@@ -9,9 +9,11 @@ import {
   Unique,
 } from 'typeorm';
 import type { Relation } from 'typeorm';
+import type { LineString, Polygon } from 'geojson';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Storm } from '../../storms/entities/storm.entity.js';
 import { ForecastPoint } from '../../forecast-points/entities/forecast-point.entity.js';
+import { Warning } from './warning.entity.js';
 
 /** One numbered forecast/advisory issued for a storm. */
 @Entity('advisories')
@@ -51,4 +53,48 @@ export class Advisory {
   })
   @OneToMany(() => ForecastPoint, (point) => point.advisory)
   forecastPoints: Relation<ForecastPoint[]>;
+
+  @ApiPropertyOptional({
+    description: 'Forecast track polyline (GeoJSON LineString)',
+    example: {
+      type: 'LineString',
+      coordinates: [
+        [-120.5, 16.5],
+        [-122.5, 16.5],
+      ],
+    },
+  })
+  @Column('geography', {
+    spatialFeatureType: 'LineString',
+    srid: 4326,
+    nullable: true,
+  })
+  track: LineString | null;
+
+  @ApiPropertyOptional({
+    description: 'Cone of uncertainty (GeoJSON Polygon)',
+    example: {
+      type: 'Polygon',
+      coordinates: [
+        [
+          [-120.5, 16.5],
+          [-118.5, 15.5],
+        ],
+      ],
+    },
+  })
+  @Column('geography', {
+    spatialFeatureType: 'Polygon',
+    srid: 4326,
+    nullable: true,
+  })
+  cone: Polygon | null;
+
+  @ApiPropertyOptional({
+    type: () => Warning,
+    isArray: true,
+    description: 'Coastal watch/warning segments',
+  })
+  @OneToMany(() => Warning, (warning) => warning.advisory)
+  warnings: Relation<Warning[]>;
 }
