@@ -43,6 +43,7 @@ async function bootstrap(): Promise<void> {
     .addTag('advisories', 'Per-storm forecast advisories')
     .addTag('forecast-points', 'Time-indexed forecast track points')
     .addTag('ingestion', 'Manual ingestion triggers')
+    .addTag('health', 'Liveness and readiness probes')
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);

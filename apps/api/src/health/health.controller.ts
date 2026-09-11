@@ -17,6 +17,9 @@ export class HealthController {
     private readonly db: TypeOrmHealthIndicator,
   ) {}
 
+  /**
+   * Liveness + readiness probe: returns `ok` when the database is reachable.
+   */
   @Get()
   @HealthCheck()
   @ApiOperation({ summary: 'Health probe (liveness & readiness)' })
