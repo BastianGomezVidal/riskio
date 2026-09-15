@@ -18,10 +18,10 @@ export class CredentialsDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ description: 'Password', minLength: 8 })
+  @ApiProperty({ description: 'Password', minLength: 4 })
   @IsString()
   @IsStrongPassword({
-    minLength: 8,
+    minLength: 4,
     minLowercase: 0,
     minUppercase: 0,
     minNumbers: 0,
@@ -59,10 +59,10 @@ export class RegisterDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ description: 'Password (min 8 chars)', minLength: 8 })
+  @ApiProperty({ description: 'Password (min 4 chars)', minLength: 4 })
   @IsString()
   @IsStrongPassword({
-    minLength: 8,
+    minLength: 4,
     minLowercase: 0,
     minUppercase: 0,
     minNumbers: 0,
