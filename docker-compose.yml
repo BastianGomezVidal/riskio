@@ -28,9 +28,6 @@ services:
       PORT: 3000
     ports:
       - "${BACKEND_API_PORT:-3000}:3000"
-    volumes:
-      - ./backend:/usr/src/app:Z
-      - backend_node_modules:/usr/src/app/node_modules
     healthcheck:
       test:
         [
@@ -59,9 +56,6 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
-    volumes:
-      - ./backend:/usr/src/app:Z
-      - backend_node_modules:/usr/src/app/node_modules
     depends_on:
       db:
         condition: service_healthy
@@ -80,4 +74,3 @@ services:
 
 volumes:
   pgdata:
-  backend_node_modules:
