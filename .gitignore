@@ -6,14 +6,11 @@
 
 # Dependencies
 node_modules/
-apps/*/node_modules/
 
 # Build outputs
 dist/
 build/
-apps/*/dist/
-apps/*/build/
-apps/api/tsconfig.build.tsbuildinfo
+*.tsbuildinfo
 
 # IDE
 .vscode/
@@ -37,5 +34,5 @@ coverage/
 .nyc_output/
 
 # NestJS
-apps/api/.env
-apps/api/.eslintrc.js
+backend/.env
+backend/.eslintrc.js
