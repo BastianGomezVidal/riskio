@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ConfigService } from '@nestjs/config';
-import { NhcProvider } from './nhc/nhc.provider.js';
+import { NhcProvider } from './nhc.provider.js';
 
 describe('NhcProvider', () => {
   let provider: NhcProvider;
