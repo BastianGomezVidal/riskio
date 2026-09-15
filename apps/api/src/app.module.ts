@@ -3,10 +3,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { envValidationSchema } from './config/env.validation.js';
-import { StormsModule } from './storms/storms.module.js';
-import { AdvisoriesModule } from './advisories/advisories.module.js';
-import { ForecastPointsModule } from './forecast-points/forecast-points.module.js';
-import { IngestionModule } from './ingestion/ingestion.module.js';
+import { StormsModule } from './domain/weather/storms/storms.module.js';
+import { AdvisoriesModule } from './domain/weather/advisories/advisories.module.js';
+import { ForecastPointsModule } from './domain/weather/forecast-points/forecast-points.module.js';
+import { IngestionModule } from './domain/feeds/ingestion/ingestion.module.js';
 import { HealthModule } from './health/health.module.js';
 
 /**

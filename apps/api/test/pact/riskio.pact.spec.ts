@@ -7,10 +7,10 @@ import pactPkg from '@pact-foundation/pact';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { createTestApp } from '../helpers/test-app.js';
-import { NhcProvider } from '../../src/providers/nhc/nhc.provider.js';
-import { Storm } from '../../src/storms/entities/storm.entity.js';
-import { Advisory } from '../../src/advisories/entities/advisory.entity.js';
-import { ForecastPoint } from '../../src/forecast-points/entities/forecast-point.entity.js';
+import { NhcProvider } from '../../src/domain/feeds/providers/nhc/nhc.provider.js';
+import { Storm } from '../../src/domain/weather/storms/entities/storm.entity.js';
+import { Advisory } from '../../src/domain/weather/advisories/entities/advisory.entity.js';
+import { ForecastPoint } from '../../src/domain/weather/forecast-points/entities/forecast-point.entity.js';
 import { riskioClient } from './riskio-client.js';
 
 const { PactV4, Matchers, SpecificationVersion, Verifier } = pactPkg;

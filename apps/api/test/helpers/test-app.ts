@@ -3,17 +3,17 @@ import { Test } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
-import { StormsModule } from '../../src/storms/storms.module.js';
-import { AdvisoriesModule } from '../../src/advisories/advisories.module.js';
-import { ForecastPointsModule } from '../../src/forecast-points/forecast-points.module.js';
-import { IngestionModule } from '../../src/ingestion/ingestion.module.js';
+import { StormsModule } from '../../src/domain/weather/storms/storms.module.js';
+import { AdvisoriesModule } from '../../src/domain/weather/advisories/advisories.module.js';
+import { ForecastPointsModule } from '../../src/domain/weather/forecast-points/forecast-points.module.js';
+import { IngestionModule } from '../../src/domain/feeds/ingestion/ingestion.module.js';
 import { HealthModule } from '../../src/health/health.module.js';
 import { InitialSchema1789065155402 } from '../../src/database/migrations/1789065155402-InitialSchema.js';
 import { AddStormGeometry1888240000000 } from '../../src/database/migrations/1888240000000-AddStormGeometry.js';
 import { TEST_DATABASE_URL } from '../setup-integration.js';
-import { StormsService } from '../../src/storms/storms.service.js';
-import { AdvisoriesService } from '../../src/advisories/advisories.service.js';
-import { ForecastPointsService } from '../../src/forecast-points/forecast-points.service.js';
+import { StormsService } from '../../src/domain/weather/storms/storms.service.js';
+import { AdvisoriesService } from '../../src/domain/weather/advisories/advisories.service.js';
+import { ForecastPointsService } from '../../src/domain/weather/forecast-points/forecast-points.service.js';
 
 export interface ProviderOverride<T> {
   provide: unknown;

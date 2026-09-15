@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:georss="http://www.georss.org/georss"
+  xmlns:gml="http://www.opengis.net/gml"
+  xmlns:nhc="https://www.nhc.noaa.gov">
+
+  <channel>
+    <pubDate>Thu, 10 Sep 2026 02:37:08 GMT</pubDate>
+    <title>NHC Eastern Pacific</title>
+    <description>Active tropical cyclones in the Eastern Pacific</description>
+    <link>https://www.nhc.noaa.gov/</link>
+    <copyright>none</copyright>
+    <managingEditor>nhcwebmaster@noaa.gov (NHC Webmaster)</managingEditor>
+    <language>en-us</language>
+    <webMaster>nhcwebmaster@noaa.gov (NHC Webmaster)</webMaster>
+
+    <image>
+      <url>https://www.nhc.noaa.gov/gifs/xml_logo_nhc.gif</url>
+      <link>https://www.nhc.noaa.gov/</link>
+      <title>NHC Eastern Pacific</title>
+      <description>NOAA logo</description>
+      <width>95</width>
+      <height>45</height>
+    </image>
+
+    <!-- First storm: this one will fail during upsertStorm() -->
+
+    <item>
+      <title>Summary for Tropical Storm Lowell (EP4/EP142026)</title>
+      <guid isPermaLink="false">summary-ep142026-202609100232</guid>
+      <pubDate>Thu, 10 Sep 2026 02:32:29 GMT</pubDate>
+      <author>nhcwebmaster@noaa.gov (NHC Webmaster)</author>
+
+      <link>
+        https://www.nhc.noaa.gov/text/refresh/MIATCPEP4+shtml/100232.shtml
+      </link>
+
+      <description>
+        ...LOWELL TURNING WESTWARD AS IT GRADUALLY WEAKENS...
+        As of 5:00 PM HST Wed Sep 09 the center of Lowell was located
+        near 29.2, -165.1 with movement W at 14 mph.
+      </description>
+
+      <nhc:Cyclone>
+        <nhc:center>29.2, -165.1</nhc:center>
+        <nhc:type>Tropical Storm</nhc:type>
+        <nhc:name>Lowell</nhc:name>
+        <nhc:wallet>EP4</nhc:wallet>
+        <nhc:atcf>EP142026</nhc:atcf>
+        <nhc:datetime>5:00 PM HST Wed Sep 09</nhc:datetime>
+        <nhc:movement>W at 14 mph</nhc:movement>
+        <nhc:pressure>991 mb</nhc:pressure>
+        <nhc:wind>50 mph</nhc:wind>
+        <nhc:headline>
+          ...LOWELL TURNING WESTWARD AS IT GRADUALLY WEAKENS...
+        </nhc:headline>
+      </nhc:Cyclone>
+    </item>
+
+    <!-- Second storm: this one must be different and should succeed -->
+
+    <item>
+      <title>Summary for Tropical Storm Test (EP5/EP152026)</title>
+      <guid isPermaLink="false">summary-ep152026-202609100240</guid>
+      <pubDate>Thu, 10 Sep 2026 02:40:00 GMT</pubDate>
+      <author>nhcwebmaster@noaa.gov (NHC Webmaster)</author>
+
+      <link>
+        https://www.nhc.noaa.gov/text/refresh/MIATCPEP5+shtml/100240.shtml
+      </link>
+
+      <description>
+        Tropical Storm Test is moving westward over the eastern Pacific.
+        The system is expected to continue moving westward during the
+        next several days.
+      </description>
+
+      <nhc:Cyclone>
+        <nhc:center>15.0, -120.0</nhc:center>
+        <nhc:type>Tropical Storm</nhc:type>
+        <nhc:name>Test</nhc:name>
+        <nhc:wallet>EP5</nhc:wallet>
+        <nhc:atcf>EP152026</nhc:atcf>
+        <nhc:datetime>5:00 PM HST Wed Sep 09</nhc:datetime>
+        <nhc:movement>W at 10 mph</nhc:movement>
+        <nhc:pressure>995 mb</nhc:pressure>
+        <nhc:wind>45 mph</nhc:wind>
+        <nhc:headline>
+          Tropical Storm Test moving westward
+        </nhc:headline>
+      </nhc:Cyclone>
+    </item>
+
+  </channel>
+</rss>
