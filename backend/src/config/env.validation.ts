@@ -20,12 +20,12 @@ export const envValidationSchema = Joi.object({
   /** Access token lifetime, e.g. `15m` or `7d`. */
   JWT_EXPIRES_IN: Joi.string().default('15m'),
   /** Comma-separated browser origins allowed to call the API. Empty = allow all. */
-  CORS_ORIGINS: Joi.string().default(''),
+  CORS_ORIGINS: Joi.string().allow('').default(''),
   /**
    * Comma-separated emails promoted to `admin` on register/login.
    * Every other account is a `client`.
    */
-  ADMIN_EMAILS: Joi.string().default(''),
+  ADMIN_EMAILS: Joi.string().allow('').default(''),
   /** Public base URL of this API, used to build OAuth callback URLs. */
   PUBLIC_BASE_URL: Joi.string().uri().default('http://localhost:3000'),
   /** Base URL of the frontend SPA, used to return from OAuth callbacks. */
