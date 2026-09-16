@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { generateApiToken, hashToken, API_TOKEN_PREFIX, parseDurationToSeconds } from './auth.utils.js';
+import {
+  generateApiToken,
+  generateTemporaryPassword,
+  hashToken,
+  API_TOKEN_PREFIX,
+  parseDurationToSeconds,
+} from './auth.utils.js';
 
 describe('generateApiToken', () => {
   it('returns a unique prefixed token with hash and prefix', () => {
@@ -32,5 +38,21 @@ describe('parseDurationToSeconds', () => {
   it('throws on malformed durations', () => {
     expect(() => parseDurationToSeconds('15')).toThrow();
     expect(() => parseDurationToSeconds('abc')).toThrow();
+  });
+});
+
+describe('generateTemporaryPassword', () => {
+  it('returns a unique, un-ambiguous alphanumeric password', () => {
+    const a = generateTemporaryPassword();
+    const b = generateTemporaryPassword();
+
+    expect(a).toHaveLength(12);
+    expect(a).toMatch(/^[A-HJ-KM-NP-Za-km-np-z2-9]{12}$/);
+    expect(b).toHaveLength(12);
+    expect(a).not.toBe(b);
+  });
+
+  it('honours a custom length', () => {
+    expect(generateTemporaryPassword(20)).toHaveLength(20);
   });
 });

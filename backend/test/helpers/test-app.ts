@@ -7,9 +7,11 @@ import { StormsModule } from '../../src/domain/weather/storms/storms.module.js';
 import { AdvisoriesModule } from '../../src/domain/weather/advisories/advisories.module.js';
 import { ForecastPointsModule } from '../../src/domain/weather/forecast-points/forecast-points.module.js';
 import { IngestionModule } from '../../src/domain/feeds/ingestion/ingestion.module.js';
+import { AuthModule } from '../../src/domain/auth/auth.module.js';
 import { HealthModule } from '../../src/health/health.module.js';
 import { InitialSchema1789065155402 } from '../../src/database/migrations/1789065155402-InitialSchema.js';
 import { AddStormGeometry1888240000000 } from '../../src/database/migrations/1888240000000-AddStormGeometry.js';
+import { AddAuthTables1890000000000 } from '../../src/database/migrations/1890000000000-AddAuthTables.js';
 import { TEST_DATABASE_URL } from '../setup-integration.js';
 import { StormsService } from '../../src/domain/weather/storms/storms.service.js';
 import { AdvisoriesService } from '../../src/domain/weather/advisories/advisories.service.js';
@@ -30,13 +32,24 @@ export async function createTestApp(
 ): Promise<INestApplication> {
   const builder = Test.createTestingModule({
     imports: [
-      ConfigModule.forRoot({ isGlobal: true }),
+      ConfigModule.forRoot({
+        isGlobal: true,
+        load: [
+          () => ({
+            JWT_SECRET: 'test-secret-at-least-16-chars',
+          }),
+        ],
+      }),
       TypeOrmModule.forRoot({
         type: 'postgres',
         url: TEST_DATABASE_URL,
         autoLoadEntities: true,
         synchronize: false,
-        migrations: [InitialSchema1789065155402, AddStormGeometry1888240000000],
+        migrations: [
+          InitialSchema1789065155402,
+          AddStormGeometry1888240000000,
+          AddAuthTables1890000000000,
+        ],
         migrationsRun: true,
         logging: false,
       }),
@@ -45,6 +58,7 @@ export async function createTestApp(
       AdvisoriesModule,
       ForecastPointsModule,
       IngestionModule,
+      AuthModule,
       HealthModule,
     ],
   });

@@ -1,3 +1,4 @@
+// src/auth/auth.service.ts
 import {
   Injectable,
   ConflictException,
@@ -12,14 +13,17 @@ import { Repository, IsNull } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from './entities/user.entity.js';
 import { ApiToken } from './entities/api-token.entity.js';
-import { generateApiToken, hashToken } from './auth.utils.js';
+import {
+  generateApiToken,
+  generateTemporaryPassword,
+  hashToken,
+} from './auth.utils.js';
 import { AuthResponseDto } from './dto/credentials.dto.js';
+import { ForgotPasswordResponseDto } from './dto/forgot-password.dto.js';
 import { CreatedApiTokenDto } from './dto/create-api-token.dto.js';
 import { Role, AuthPrincipal, resolveRole } from './auth.roles.js';
-import {
-  OAuthService,
-  OAuthProviderName,
-} from './oauth/oauth.service.js';
+import { OAuthService, OAuthProviderName } from './oauth/oauth.service.js';
+import { MailerService } from './mailer.service.js';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -50,6 +54,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     config: ConfigService,
     private readonly oauth: OAuthService,
+    private readonly mailer: MailerService,
   ) {
     this.adminEmails = new Set(
       (config.get<string>('ADMIN_EMAILS', '') ?? '')
@@ -125,6 +130,45 @@ export class AuthService {
     }
 
     return this.session(user);
+  }
+
+  /**
+   * Reset an account password to a freshly generated temporary one.
+   *
+   * This method never reveals whether an email exists: the response is
+   * identical for unknown emails, OAuth-only accounts, and valid accounts
+   * with a password. The temporary password is delivered out of band by
+   * the mailer and never returned in the HTTP body.
+   *
+   * @param email the login email of the account to reset.
+   * @returns a neutral confirmation message.
+   */
+  async resetPassword(email: string): Promise<ForgotPasswordResponseDto> {
+    const normalized = this.normalizeEmail(email);
+
+    const NEUTRAL_MESSAGE =
+      'If an account exists for that email, a temporary password has been sent.';
+
+    const user = await this.usersRepository.findOne({
+      where: { email: normalized },
+    });
+
+    if (!user) {
+      await bcrypt.hash('timing-equalizer', BCRYPT_ROUNDS);
+      return { message: NEUTRAL_MESSAGE };
+    }
+
+    if (user.passwordHash === null) {
+      return { message: NEUTRAL_MESSAGE };
+    }
+
+    const temporaryPassword = generateTemporaryPassword();
+    user.passwordHash = await bcrypt.hash(temporaryPassword, BCRYPT_ROUNDS);
+    await this.usersRepository.save(user);
+
+    await this.mailer.sendTemporaryPassword(user.email, temporaryPassword);
+
+    return { message: NEUTRAL_MESSAGE };
   }
 
   /** Whether an OAuth provider is available (credentials configured). */

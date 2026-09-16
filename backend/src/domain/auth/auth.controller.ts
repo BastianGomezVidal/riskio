@@ -20,6 +20,8 @@ import {
   ApiCreatedResponse,
   ApiOkResponse,
   ApiUnauthorizedResponse,
+  ApiNotFoundResponse,
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiParam,
   ApiProduces,
@@ -30,6 +32,10 @@ import {
   RegisterDto,
   AuthResponseDto,
 } from './dto/credentials.dto.js';
+import {
+  ForgotPasswordDto,
+  ForgotPasswordResponseDto,
+} from './dto/forgot-password.dto.js';
 import {
   CreateApiTokenDto,
   CreatedApiTokenDto,
@@ -71,6 +77,22 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
   login(@Body() credentials: CredentialsDto): Promise<AuthResponseDto> {
     return this.auth.login(credentials.email, credentials.password);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset an account password to a temporary one' })
+  @ApiOkResponse({
+    description:
+      'Password reset; the response includes the temporary password (no mailer configured)',
+    type: ForgotPasswordResponseDto,
+  })
+  @ApiNotFoundResponse({ description: 'No account matches the email' })
+  @ApiBadRequestResponse({ description: 'OAuth-only account has no password' })
+  forgotPassword(
+    @Body() body: ForgotPasswordDto,
+  ): Promise<ForgotPasswordResponseDto> {
+    return this.auth.resetPassword(body.email);
   }
 
   @Get('oauth/:provider')
