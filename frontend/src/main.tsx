@@ -1,14 +1,35 @@
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App';
-import './index.css';
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
 
-const root = document.getElementById('root');
+import "@fontsource-variable/sora/wght.css";
+
+import App from "./App";
+import { BrowserRouter } from "react-router-dom";
+import { SessionProvider } from "./auth/session-context";
+import { ThemeProvider } from "./design-system/ThemeProvider";
+import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
+import "./index.css";
+import { resetHealth, resetStorms } from "./api/promises";
+
+const root = document.getElementById("root");
 
 if (root) {
   createRoot(root).render(
     <StrictMode>
-      <App />
+      <ErrorBoundary
+        onReset={() => {
+          resetHealth();
+          resetStorms();
+        }}
+      >
+        <BrowserRouter>
+          <SessionProvider>
+            <ThemeProvider>
+              <App />
+            </ThemeProvider>
+          </SessionProvider>
+        </BrowserRouter>
+      </ErrorBoundary>
     </StrictMode>,
   );
 }

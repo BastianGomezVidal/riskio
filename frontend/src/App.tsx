@@ -1,104 +1,69 @@
-import { useEffect, useState } from 'react';
-import { api, Session, Storm, User } from './api/client';
-import {
-  clearAccessToken,
-  decodeTokenClaims,
-  getAccessToken,
-  hasValidSession,
-} from './auth/session';
-import Login from './pages/Login';
-import OAuthCallback from './pages/OAuthCallback';
+// src/App.tsx
+import { lazy, Suspense } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { Skeleton } from "antd";
 
-/** Minimal user derived from the stored JWT claims after OAuth/reload. */
-function userFromClaims(): User | null {
-  const token = getAccessToken();
-  if (!token) return null;
+import { ProtectedRoute } from "./routes/Protected/ProtectedRoute";
+import { PublicOnlyRoute } from "./routes/Public/PublicRoute";
 
-  const claims = decodeTokenClaims(token);
-  if (!claims) return null;
+const SignInPage = lazy(() =>
+  import("./pages/Auth/SignInPage").then((module) => ({
+    default: module.SignInPage,
+  })),
+);
 
-  return {
-    id: claims.sub ?? '',
-    email: claims.email ?? '',
-    role: claims.role === 'admin' ? 'admin' : 'client',
-    firstName: '',
-    lastName: '',
-  };
+const SignUpPage = lazy(() =>
+  import("./pages/Auth/SignUpPage").then((module) => ({
+    default: module.SignUpPage,
+  })),
+);
+
+const ForgotPage = lazy(() =>
+  import("./pages/Auth/ForgotPasswordPage").then((module) => ({
+    default: module.ForgotPasswordPage,
+  })),
+);
+
+const Dashboard = lazy(() =>
+  import("./pages/Dashboard/Dashboard").then((module) => ({
+    default: module.Dashboard,
+  })),
+);
+
+const OAuthCallback = lazy(() => import("./auth/oauthCallback"));
+
+function PageFallback() {
+  return (
+    <main className="mx-auto w-full max-w-2xl px-4 py-8">
+      <Skeleton active title paragraph={{ rows: 5 }} />
+    </main>
+  );
 }
 
 export default function App() {
-  const isOAuthCallback = window.location.pathname === '/auth/callback';
-  const [user, setUser] = useState<User | null>(() =>
-    hasValidSession() ? userFromClaims() : null,
-  );
-  const [apiStatus, setApiStatus] = useState<string>('checking…');
-  const [storms, setStorms] = useState<Storm[]>([]);
-
-  function handleAuthed(session: Session) {
-    setUser(session.user);
-  }
-
-  function handleOAuthDone(_message: { kind: 'token' } | { kind: 'error'; reason: string }) {
-    setUser(userFromClaims());
-  }
-
-  function handleLogout() {
-    clearAccessToken();
-    setUser(null);
-  }
-
-  useEffect(() => {
-    if (isOAuthCallback || !user) return;
-
-    api
-      .health()
-      .then(({ status }) => setApiStatus(status))
-      .catch((err: unknown) =>
-        setApiStatus(err instanceof Error ? err.message : 'unreachable'),
-      );
-
-    api
-      .storms()
-      .then((page) => setStorms(page.data))
-      .catch(() => setStorms([]));
-  }, [isOAuthCallback, user]);
-
-  if (isOAuthCallback) {
-    return <OAuthCallback onDone={handleOAuthDone} />;
-  }
-
-  if (!user) {
-    return <Login onAuthed={handleAuthed} />;
-  }
-
   return (
-    <main>
-      <header className="topbar">
-        <h1>Riskio</h1>
-        <div className="account">
-          <span className="role-badge">{user.role}</span>
-          {user.email && <span className="email">{user.email}</span>}
-          <button type="button" onClick={handleLogout}>
-            Sign out
-          </button>
-        </div>
-      </header>
-      <p>
-        API: <code>{apiStatus}</code>
-      </p>
-      <h2>Active storms</h2>
-      {storms.length === 0 ? (
-        <p>No storms stored yet.</p>
-      ) : (
-        <ul>
-          {storms.map((storm) => (
-            <li key={storm.atcfId}>
-              <strong>{storm.name ?? storm.atcfId}</strong>{' '}
-              <span>({storm.basin})</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </main>
+    <Suspense fallback={<PageFallback />}>
+      <Routes>
+        {/* Públicas: si ya hay sesión, el guard redirige a /dashboard */}
+        <Route element={<PublicOnlyRoute />}>
+          <Route path="/" element={<SignInPage />} />
+          <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/forgot" element={<ForgotPage />} />
+        </Route>
+
+        {/* OAuth: FUERA de los guards. Es una ruta de tránsito.
+            Si estuviera dentro de PublicOnlyRoute y ya hubiera sesión,
+            el guard redirigiría a /dashboard antes de procesar el token. */}
+        <Route path="/auth/callback" element={<OAuthCallback />} />
+
+        {/* Protegidas: si no hay sesión, el guard redirige a / */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+        </Route>
+
+        {/* Catch-all: cualquier URL desconocida → login */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
