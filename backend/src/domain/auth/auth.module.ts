@@ -6,6 +6,7 @@ import { User } from './entities/user.entity.js';
 import { ApiToken } from './entities/api-token.entity.js';
 import { AuthService } from './auth.service.js';
 import { AuthController } from './auth.controller.js';
+import { MailerService } from './mailer.service.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { ApiKeyGuard } from './guards/api-key.guard.js';
 import { RolesGuard } from './guards/roles.guard.js';
@@ -37,6 +38,7 @@ import { parseDurationToSeconds } from './auth.utils.js';
   providers: [
     AuthService,
     OAuthService,
+    MailerService,
     JwtAuthGuard,
     ApiKeyGuard,
     RolesGuard,
