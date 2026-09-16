@@ -2,10 +2,10 @@
 import { useActionState, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button, Input } from "antd";
-import { api, authErrorMessage } from "../../api/client";
-import type { AuthMode } from "../../auth/auth-mode";
-import { useSession } from "../../auth/session-context";
-import { EMAIL_PATTERN } from "../../auth/validation";
+import { api, authErrorMessage } from "../../../api/client";
+import type { AuthMode } from "../../../auth/auth-mode";
+import { useSession } from "../../../auth/session-context";
+import { EMAIL_PATTERN } from "../../../auth/validation";
 import { FieldError, FormError } from "../AuthError/AuthError";
 
 interface InternalAuthProps {

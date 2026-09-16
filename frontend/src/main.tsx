@@ -7,7 +7,7 @@ import App from "./App";
 import { BrowserRouter } from "react-router-dom";
 import { SessionProvider } from "./auth/session-context";
 import { ThemeProvider } from "./design-system/ThemeProvider";
-import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
+import { ErrorBoundary } from "./features/general/ErrorBoundary/ErrorBoundary";
 import "./index.css";
 import { resetHealth, resetStorms } from "./api/promises";
 

@@ -1,7 +1,7 @@
 import { useActionState, useState } from "react";
 import { Alert, Button, Input, Typography } from "antd";
-import { api, authErrorMessage, type ForgotPasswordResult } from "../../api/client";
-import { EMAIL_PATTERN } from "../../auth/validation";
+import { api, authErrorMessage, type ForgotPasswordResult } from "../../../api/client";
+import { EMAIL_PATTERN } from "../../../auth/validation";
 import { FieldError, FormError } from "../AuthError/AuthError";
 
 interface ForgotPasswordProps {

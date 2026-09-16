@@ -1,5 +1,5 @@
 // src/components/AuthContent/AuthContent.tsx
-import type { AuthMode } from "../../auth/auth-mode";
+import type { AuthMode } from "../../../auth/auth-mode";
 import { ExternalAuth } from "./ExternalAuth";
 import { InternalAuth } from "./InternalAuth";
 import { Welcome } from "./Welcome";

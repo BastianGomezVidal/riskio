@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { Card } from "../../components/Card/Card";
+import { LoginCard } from "../../features/login/LoginCard/LoginCard";
 
 import stormBackground from "../../assets/Kate_Storm.jpg";
 
@@ -19,10 +19,10 @@ export function AuthLayout({ children, footer }: AuthLayoutProps) {
     <main className="flex min-h-screen flex-col" style={AUTH_BACKGROUND}>
       <div className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="w-full max-w-sm">
-          <Card>
+          <LoginCard>
             <h1 className="mb-6 text-center text-xl font-semibold">Riskio</h1>
             {children}
-          </Card>
+          </LoginCard>
         </div>
       </div>
       {footer && <div className="flex justify-center px-4 pb-6">{footer}</div>}

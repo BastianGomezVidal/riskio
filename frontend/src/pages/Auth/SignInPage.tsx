@@ -1,10 +1,10 @@
 import { AuthLayout } from "./AuthLayout";
-import { AuthHeader } from "../../components/AuthHeader/AuthHeader";
-import { AuthContent } from "../../components/AuthContent/AuthContent";
+import { AuthHeader } from "../../features/login/AuthHeader/AuthHeader";
+import { AuthContent } from "../../features/login/AuthContent/AuthContent";
 import {
   CookieBanner,
   useCookieConsent,
-} from "../../components/CookieBanner/CookieBanner";
+} from "../../features/login/CookieBanner/CookieBanner";
 
 export function SignInPage() {
   const [consent, onConsent] = useCookieConsent();

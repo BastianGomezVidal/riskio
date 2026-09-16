@@ -1,6 +1,6 @@
 import { GoogleOutlined } from "@ant-design/icons";
 import { Button } from "antd";
-import { oauthAuthorizeUrl } from "../../api/client";
+import { oauthAuthorizeUrl } from "../../../api/client";
 
 function MicrosoftIcon() {
   return (

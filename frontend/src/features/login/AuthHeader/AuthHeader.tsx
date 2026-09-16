@@ -1,6 +1,6 @@
 // src/components/AuthHeader/AuthHeader.tsx
 import { Link } from "react-router-dom";
-import type { AuthMode } from "../../auth/auth-mode";
+import type { AuthMode } from "../../../auth/auth-mode";
 
 interface AuthHeaderProps {
   active: AuthMode;

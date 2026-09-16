@@ -7,7 +7,10 @@ import {
   type ForgotPasswordResult,
 } from "../../api/client";
 import { EMAIL_PATTERN } from "../../auth/validation";
-import { FieldError, FormError } from "../../components/AuthError/AuthError";
+import {
+  FieldError,
+  FormError,
+} from "../../features/login/AuthError/AuthError";
 import { AuthLayout } from "./AuthLayout";
 
 interface ForgotErrors {

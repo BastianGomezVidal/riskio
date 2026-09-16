@@ -1,4 +1,4 @@
-import type { AuthMode } from "../../auth/auth-mode";
+import type { AuthMode } from "../../../auth/auth-mode";
 
 interface WelcomeProps {
   mode: AuthMode;

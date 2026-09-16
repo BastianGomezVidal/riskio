@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 import { Card as AntCard } from "antd";
-import { semantic } from "../../design-system/tokens/semantic";
+import { semantic } from "../../../design-system/tokens/semantic";
 
 interface CardProps {
   children: ReactNode;
 }
 
-export function Card({ children }: CardProps) {
+export function LoginCard({ children }: CardProps) {
   return (
     <AntCard
       styles={{
