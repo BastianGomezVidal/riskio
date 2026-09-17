@@ -1,3 +1,13 @@
+import type {
+  AdvisoryDetail,
+  StormDetail,
+} from "@/domain/storm";
+import type {
+  ForgotPasswordResult,
+  Session,
+} from "@/domain/auth";
+import type { DashboardSummary } from "@/domain/dashboard";
+
 /** Base URL of the Riskio backend API. */
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
@@ -58,78 +68,6 @@ function extractError(body: string): string | null {
   return null;
 }
 
-/* ------------------------------------------------------------------ */
-/* Domain types owned by the web app                                   */
-/* ------------------------------------------------------------------ */
-
-export type Role = "admin" | "client";
-
-export interface User {
-  id: string;
-  email: string;
-  role: Role;
-  firstName: string;
-  lastName: string;
-}
-
-export interface Session {
-  accessToken: string;
-  user: User;
-}
-
-export interface ForgotPasswordResult {
-  email: string;
-  temporaryPassword: string;
-  message: string;
-}
-
-export interface Storm {
-  atcfId: string;
-  name: string | null;
-  basin: string;
-  lastSeenAt: string;
-}
-
-export interface ForecastPoint {
-  id: string;
-  validAt: string;
-  latitude: number;
-  longitude: number;
-  windSpeedKt: number | null;
-  pressureMb: number | null;
-  category: number | null;
-}
-
-export interface Advisory {
-  id: string;
-  advisoryNumber: number;
-  issuedAt: string;
-  rawText: string | null;
-  ingestedAt: string;
-  track: { type: "LineString"; coordinates: [number, number][] } | null;
-  cone: { type: "Polygon"; coordinates: [number, number][][] } | null;
-}
-
-export interface AdvisoryDetail extends Advisory {
-  forecastPoints: ForecastPoint[];
-  warnings: { id: string; warningType: string }[];
-}
-
-export interface Paginated<T> {
-  meta: {
-    total: number;
-    page: number;
-    limit: number;
-    pageCount: number;
-    hasNextPage: boolean;
-  };
-  data: T[];
-}
-
-/* ------------------------------------------------------------------ */
-/* API surface                                                         */
-/* ------------------------------------------------------------------ */
-
 /** OAuth provider consent URL that starts a Google/Outlook sign-in. */
 export function oauthAuthorizeUrl(provider: "google" | "outlook"): string {
   return `${API_URL}/auth/oauth/${provider}`;
@@ -138,21 +76,11 @@ export function oauthAuthorizeUrl(provider: "google" | "outlook"): string {
 export const api = {
   health: () => request<{ status: string }>("/health"),
 
-  storms: (page = 1, limit = 20) =>
-    request<Paginated<Storm>>(`/storms?page=${page}&limit=${limit}`),
-
-  advisories: (atcfId: string, page = 1, limit = 1) =>
-    request<Paginated<Advisory>>(
-      `/storms/${encodeURIComponent(atcfId)}/advisories?page=${page}&limit=${limit}`,
-    ),
+  storm: (atcfId: string) =>
+    request<StormDetail>(`/storms/${encodeURIComponent(atcfId)}`),
 
   advisory: (id: string) =>
     request<AdvisoryDetail>(`/advisories/${encodeURIComponent(id)}`),
-
-  forecastPoints: (advisoryId: string, page = 1, limit = 20) =>
-    request<Paginated<ForecastPoint>>(
-      `/advisories/${encodeURIComponent(advisoryId)}/forecast-points?page=${page}&limit=${limit}`,
-    ),
 
   register: (input: {
     firstName: string;
@@ -180,4 +108,6 @@ export const api = {
 
   tokens: () =>
     request<{ id: string; name: string; prefix: string }[]>("/auth/tokens"),
+
+  dashboardSummary: () => request<DashboardSummary>("/dashboard/summary"),
 };

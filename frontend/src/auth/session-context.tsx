@@ -1,5 +1,5 @@
 import { createContext, use, useMemo, useState, type ReactNode } from "react";
-import type { Session, User } from "../api/client";
+import type { Session, User } from "@/domain/auth";
 import {
   clearAccessToken,
   decodeTokenClaims,

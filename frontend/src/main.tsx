@@ -2,14 +2,15 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import "@fontsource-variable/sora/wght.css";
+import "leaflet/dist/leaflet.css";
 
-import App from "./App";
+import App from "./app/App";
 import { BrowserRouter } from "react-router-dom";
 import { SessionProvider } from "./auth/session-context";
 import { ThemeProvider } from "./design-system/ThemeProvider";
-import { ErrorBoundary } from "./features/general/ErrorBoundary/ErrorBoundary";
+import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
 import "./index.css";
-import { resetHealth, resetStorms } from "./api/promises";
+import { resetAllCaches } from "./data/promises";
 
 const root = document.getElementById("root");
 
@@ -18,8 +19,7 @@ if (root) {
     <StrictMode>
       <ErrorBoundary
         onReset={() => {
-          resetHealth();
-          resetStorms();
+          resetAllCaches();
         }}
       >
         <BrowserRouter>
