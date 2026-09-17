@@ -188,6 +188,7 @@
             "atcfId": "EP142026",
             "basin": "EP",
             "firstSeenAt": "2026-09-10T02:33:27.000Z",
+            "isActive": true,
             "lastSeenAt": "2026-09-10T02:33:27.000Z",
             "name": "Lowell"
           },
@@ -275,6 +276,14 @@
                 {
                   "match": "regex",
                   "regex": "^\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d(:?[0-5]\\d)?|Z)$"
+                }
+              ]
+            },
+            "$.isActive": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
                 }
               ]
             },
@@ -642,6 +651,7 @@
               "atcfId": "EP142026",
               "basin": "EP",
               "firstSeenAt": "2026-09-10T02:33:27.000Z",
+              "isActive": true,
               "lastSeenAt": "2026-09-10T02:33:27.000Z",
               "name": "Lowell"
             }
@@ -687,6 +697,14 @@
                 {
                   "match": "regex",
                   "regex": "^\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d(:?[0-5]\\d)?|Z)$"
+                }
+              ]
+            },
+            "$[*].isActive": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
                 }
               ]
             },

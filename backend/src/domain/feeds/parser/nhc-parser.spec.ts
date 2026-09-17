@@ -271,6 +271,15 @@ describe('parseRssFeed edge cases', () => {
     expect(items[8].title).toBe(''); // missing title
     expect(items[8].guid).toBe(''); // object guid without #text
     expect(items[8].pubDate).toBeNull(); // invalid date
+
+    // nhc:Cyclone was present, so these are storm items even though the
+    // payload could not be turned into a usable CycloneInfo.
+    expect(items[0].hasCycloneElement).toBe(true); // malformed center
+    expect(items[5].hasCycloneElement).toBe(true); // missing wallet
+    expect(items[7].hasCycloneElement).toBe(true); // missing atcf
+
+    // The guid-only item carries no nhc:Cyclone element.
+    expect(items[8].hasCycloneElement).toBe(false);
   });
 });
 
@@ -288,8 +297,11 @@ describe('extractStormSummaries sentinel handling', () => {
         </item>
       </channel></rss>`;
 
-    const summaries = extractStormSummaries(parseRssFeed(xml));
-    expect(summaries).toEqual([]);
+    const feed = parseRssFeed(xml);
+    // Informational items carry no nhc:Cyclone element, so the ingestion
+    // guard must not treat them as failed storm items.
+    expect(feed.items.every((item) => !item.hasCycloneElement)).toBe(true);
+    expect(extractStormSummaries(feed)).toEqual([]);
   });
 });
 

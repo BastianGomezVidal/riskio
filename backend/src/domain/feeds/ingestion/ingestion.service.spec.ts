@@ -28,7 +28,8 @@ function makeServices() {
   const fetchForecastAdvisory = vi.fn();
   const fetchAdvisoryProduct = vi.fn();
 
-  const upsertStorm = vi.fn();
+  const reconcileFromFeed = vi.fn();
+  const findStorm = vi.fn();
   const upsertAdvisory = vi.fn();
   const replaceForAdvisory = vi.fn();
   const setTrackCone = vi.fn();
@@ -41,7 +42,8 @@ function makeServices() {
   } as unknown as NhcProvider;
 
   const storms = {
-    upsertFromIngestion: upsertStorm,
+    reconcileFromFeed,
+    findOne: findStorm,
   } as unknown as StormsService;
 
   const advisories = {
@@ -59,7 +61,8 @@ function makeServices() {
     fetchBasinSummary,
     fetchForecastAdvisory,
     fetchAdvisoryProduct,
-    upsertStorm,
+    reconcileFromFeed,
+    findStorm,
     upsertAdvisory,
     replaceForAdvisory,
     setTrackCone,
@@ -72,7 +75,8 @@ describe('IngestionService', () => {
   let fetchBasinSummary: ReturnType<typeof vi.fn>;
   let fetchForecastAdvisory: ReturnType<typeof vi.fn>;
   let fetchAdvisoryProduct: ReturnType<typeof vi.fn>;
-  let upsertStorm: ReturnType<typeof vi.fn>;
+  let reconcileFromFeed: ReturnType<typeof vi.fn>;
+  let findStorm: ReturnType<typeof vi.fn>;
   let upsertAdvisory: ReturnType<typeof vi.fn>;
   let replaceForAdvisory: ReturnType<typeof vi.fn>;
   let setTrackCone: ReturnType<typeof vi.fn>;
@@ -85,7 +89,8 @@ describe('IngestionService', () => {
     fetchBasinSummary = built.fetchBasinSummary;
     fetchForecastAdvisory = built.fetchForecastAdvisory;
     fetchAdvisoryProduct = built.fetchAdvisoryProduct;
-    upsertStorm = built.upsertStorm;
+    reconcileFromFeed = built.reconcileFromFeed;
+    findStorm = built.findStorm;
     upsertAdvisory = built.upsertAdvisory;
     replaceForAdvisory = built.replaceForAdvisory;
     setTrackCone = built.setTrackCone;
@@ -112,7 +117,8 @@ describe('IngestionService', () => {
 
       fetchAdvisoryProduct.mockResolvedValue(null);
 
-      upsertStorm.mockResolvedValue(storm);
+      reconcileFromFeed.mockResolvedValue(undefined);
+      findStorm.mockResolvedValue(storm);
 
       upsertAdvisory.mockResolvedValue({
         advisory,
@@ -137,11 +143,15 @@ describe('IngestionService', () => {
         errors: [],
       });
 
-      expect(upsertStorm).toHaveBeenCalledWith({
-        atcfId: 'EP142026',
-        name: null,
-        basin: 'EP',
-      });
+      expect(reconcileFromFeed).toHaveBeenCalledWith('ep', [
+        {
+          atcfId: 'EP142026',
+          name: null,
+          basin: 'EP',
+        },
+      ]);
+
+      expect(findStorm).toHaveBeenCalledWith('EP142026');
 
       expect(fetchForecastAdvisory).toHaveBeenCalledWith('EP4');
 
@@ -161,7 +171,8 @@ describe('IngestionService', () => {
 
       fetchForecastAdvisory.mockResolvedValue(fixture('tcm-ep4.xml'));
 
-      upsertStorm.mockResolvedValue({
+      reconcileFromFeed.mockResolvedValue(undefined);
+      findStorm.mockResolvedValue({
         atcfId: 'EP142026',
         name: null,
         basin: 'EP',
@@ -205,8 +216,46 @@ describe('IngestionService', () => {
         errors: [],
       });
 
+      // An empty but cleanly parsed feed authorizes flipping the basin
+      // inactive before the early return.
+      expect(reconcileFromFeed).toHaveBeenCalledWith('at', []);
+
+      expect(findStorm).not.toHaveBeenCalled();
       expect(fetchForecastAdvisory).not.toHaveBeenCalled();
-      expect(upsertStorm).not.toHaveBeenCalled();
+    });
+
+    it('refuses to flip activity flags when a feed has items but no storms are extracted', async () => {
+      fetchBasinSummary.mockResolvedValue(`
+        <?xml version="1.0"?>
+        <rss version="2.0" xmlns:nhc="https://www.nhc.noaa.gov">
+          <channel>
+            <item>
+              <title>Summary for Tropical Storm Mystery (EP9/EP902026)</title>
+              <pubDate>Thu, 10 Sep 2026 02:33:27 GMT</pubDate>
+              <nhc:Cyclone>
+                <nhc:name>Mystery</nhc:name>
+                <nhc:type>Tropical Storm</nhc:type>
+                <nhc:center>12.3, -130.1</nhc:center>
+                <nhc:wind>45 mph</nhc:wind>
+              </nhc:Cyclone>
+            </item>
+          </channel>
+        </rss>
+      `);
+
+      const report = await service.ingestBasin('ep');
+
+      // One item carries an nhc:Cyclone element but is missing the ATCF id
+      // and wallet, so no storm was extracted. That is format drift, not a
+      // genuinely quiet basin, so state must stay untouched.
+      expect(report.stormsSeen).toBe(0);
+      expect(report.errors).toHaveLength(1);
+      expect(report.errors[0]).toContain('refusing to flip activity flags');
+      expect(report.errors[0]).toContain('1 cyclone item');
+
+      expect(reconcileFromFeed).not.toHaveBeenCalled();
+      expect(findStorm).not.toHaveBeenCalled();
+      expect(fetchForecastAdvisory).not.toHaveBeenCalled();
     });
 
     it('records a basin fetch failure without throwing', async () => {
@@ -218,7 +267,7 @@ describe('IngestionService', () => {
       expect(report.errors).toHaveLength(1);
       expect(report.errors[0]).toContain('network down');
 
-      expect(upsertStorm).not.toHaveBeenCalled();
+      expect(reconcileFromFeed).not.toHaveBeenCalled();
     });
 
     it('records a basin parsing failure without throwing', async () => {
@@ -230,7 +279,7 @@ describe('IngestionService', () => {
       expect(report.errors).toHaveLength(1);
       expect(report.errors[0]).toContain('fetch/parse failed');
 
-      expect(upsertStorm).not.toHaveBeenCalled();
+      expect(reconcileFromFeed).not.toHaveBeenCalled();
     });
 
     it('continues to the next storm when the TCM fetch fails', async () => {
@@ -238,7 +287,8 @@ describe('IngestionService', () => {
 
       fetchForecastAdvisory.mockRejectedValue(new Error('TCM 404'));
 
-      upsertStorm.mockResolvedValue({
+      reconcileFromFeed.mockResolvedValue(undefined);
+      findStorm.mockResolvedValue({
         atcfId: 'EP142026',
         name: null,
         basin: 'EP',
@@ -260,7 +310,8 @@ describe('IngestionService', () => {
 
       fetchForecastAdvisory.mockResolvedValue('<invalid xml>');
 
-      upsertStorm.mockResolvedValue({
+      reconcileFromFeed.mockResolvedValue(undefined);
+      findStorm.mockResolvedValue({
         atcfId: 'EP142026',
         name: null,
         basin: 'EP',
@@ -294,7 +345,8 @@ describe('IngestionService', () => {
         </rss>
       `);
 
-      upsertStorm.mockResolvedValue({
+      reconcileFromFeed.mockResolvedValue(undefined);
+      findStorm.mockResolvedValue({
         atcfId: 'EP142026',
         name: null,
         basin: 'EP',
@@ -328,7 +380,8 @@ describe('IngestionService', () => {
         </rss>
       `);
 
-      upsertStorm.mockResolvedValue({
+      reconcileFromFeed.mockResolvedValue(undefined);
+      findStorm.mockResolvedValue({
         atcfId: 'EP142026',
         name: null,
         basin: 'EP',
@@ -365,7 +418,8 @@ describe('IngestionService', () => {
 
       fetchForecastAdvisory.mockResolvedValue(fixture('tcm-ep4.xml'));
 
-      upsertStorm.mockResolvedValue({
+      reconcileFromFeed.mockResolvedValue(undefined);
+      findStorm.mockResolvedValue({
         atcfId: 'EP142026',
         name: null,
         basin: 'EP',
@@ -391,7 +445,8 @@ describe('IngestionService', () => {
 
       fetchForecastAdvisory.mockResolvedValue(fixture('tcm-ep4.xml'));
 
-      upsertStorm.mockResolvedValue({
+      reconcileFromFeed.mockResolvedValue(undefined);
+      findStorm.mockResolvedValue({
         atcfId: 'EP142026',
         name: null,
         basin: 'EP',
@@ -430,7 +485,8 @@ describe('IngestionService', () => {
 
       fetchForecastAdvisory.mockResolvedValue(fixture('tcm-ep4.xml'));
 
-      upsertStorm.mockResolvedValue({
+      reconcileFromFeed.mockResolvedValue(undefined);
+      findStorm.mockResolvedValue({
         atcfId: 'EP142026',
         name: null,
         basin: 'EP',
@@ -461,7 +517,8 @@ describe('IngestionService', () => {
 
       fetchForecastAdvisory.mockResolvedValue(fixture('tcm-ep4.xml'));
 
-      upsertStorm.mockResolvedValue({
+      reconcileFromFeed.mockResolvedValue(undefined);
+      findStorm.mockResolvedValue({
         atcfId: 'EP142026',
         name: null,
         basin: 'EP',
@@ -553,7 +610,8 @@ describe('IngestionService', () => {
 
       fetchForecastAdvisory.mockResolvedValue(fixture('tcm-ep4.xml'));
 
-      upsertStorm.mockResolvedValue({
+      reconcileFromFeed.mockResolvedValue(undefined);
+      findStorm.mockResolvedValue({
         atcfId: 'EP142026',
         name: null,
         basin: 'EP',
@@ -607,7 +665,8 @@ describe('IngestionService', () => {
 
       fetchForecastAdvisory.mockResolvedValue(fixture('tcm-ep4.xml'));
 
-      upsertStorm.mockResolvedValue({
+      reconcileFromFeed.mockResolvedValue(undefined);
+      findStorm.mockResolvedValue({
         atcfId: 'EP142026',
         name: null,
         basin: 'EP',
@@ -648,12 +707,12 @@ describe('IngestionService', () => {
       expect(replaceWarnings).not.toHaveBeenCalled();
     });
 
-    it('records a storm persistence failure without aborting the basin', async () => {
+    it('returns early without throwing when activity reconciliation fails', async () => {
       fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
 
       fetchForecastAdvisory.mockResolvedValue(fixture('tcm-ep4.xml'));
 
-      upsertStorm.mockRejectedValue(new Error('db lock'));
+      reconcileFromFeed.mockRejectedValue(new Error('db lock'));
 
       const report = await service.ingestBasin('ep');
 
@@ -661,9 +720,11 @@ describe('IngestionService', () => {
       expect(report.stormsUpserted).toBe(0);
 
       expect(report.errors).toHaveLength(1);
-
+      expect(report.errors[0]).toContain('activity reconciliation failed');
       expect(report.errors[0]).toContain('db lock');
 
+      // The basin is left in its prior state, so no per-storm work runs.
+      expect(findStorm).not.toHaveBeenCalled();
       expect(fetchForecastAdvisory).not.toHaveBeenCalled();
     });
 
@@ -672,9 +733,11 @@ describe('IngestionService', () => {
         fixture('nhc-ep-active-two-storms.xml'),
       );
 
+      reconcileFromFeed.mockResolvedValue(undefined);
+
       let stormCall = 0;
 
-      upsertStorm.mockImplementation(async ({ atcfId, name, basin }) => {
+      findStorm.mockImplementation(async (atcfId: string) => {
         stormCall++;
 
         if (stormCall === 1) {
@@ -683,14 +746,14 @@ describe('IngestionService', () => {
 
         return {
           atcfId,
-          name: name ?? 'Test',
-          basin,
+          name: 'Test',
+          basin: 'EP',
         };
       });
 
       /*
-       * Only the second storm should reach this call because
-       * the first storm fails during upsertStorm().
+       * Both storms are reconciled in a single batch. The first storm
+       * then fails inside the per-storm loop when findOne() loads it.
        *
        * The second fixture storm uses EP5, so the service should
        * request EP5 here.
@@ -733,7 +796,14 @@ describe('IngestionService', () => {
       expect(report.errors).toHaveLength(1);
       expect(report.errors[0]).toContain('first storm failed');
 
-      expect(upsertStorm).toHaveBeenCalledTimes(2);
+      // Reconciliation is a single batch call for the whole basin.
+      expect(reconcileFromFeed).toHaveBeenCalledTimes(1);
+      expect(reconcileFromFeed).toHaveBeenCalledWith('ep', [
+        { atcfId: 'EP142026', name: 'Lowell', basin: 'EP' },
+        { atcfId: 'EP152026', name: 'Test', basin: 'EP' },
+      ]);
+
+      expect(findStorm).toHaveBeenCalledTimes(2);
 
       /*
        * The failed first storm must not continue into TCM

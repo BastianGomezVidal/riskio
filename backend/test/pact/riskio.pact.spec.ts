@@ -37,6 +37,7 @@ const stormBody = {
   basin: Matchers.string('EP'),
   firstSeenAt: dt,
   lastSeenAt: dt,
+  isActive: Matchers.boolean(true),
 };
 
 const advisoryBody = {
@@ -348,7 +349,13 @@ describe('riskio-api provider verification', () => {
   const seedStorm = async () => {
     await clearAllData();
     const storms = app.get(getRepositoryToken(Storm)) as Repository<Storm>;
-    await storms.insert({ atcfId: STORM_ID, name: 'Lowell', basin: 'EP' });
+    await storms.insert({
+      atcfId: STORM_ID,
+      name: 'Lowell',
+      basin: 'EP',
+      isActive: true,
+      lastSeenInFeedAt: new Date(ISSUED_AT),
+    });
   };
 
   const seedAdvisory = async () => {

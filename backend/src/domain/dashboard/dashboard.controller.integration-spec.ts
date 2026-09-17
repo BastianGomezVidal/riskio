@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { createTestApp, seedStorm } from '../../../test/helpers/test-app.js';
+import { Storm } from '../weather/storms/entities/storm.entity.js';
 
 describe('Dashboard summary endpoint (integration)', () => {
   let app: INestApplication;
@@ -69,6 +72,12 @@ describe('Dashboard summary endpoint (integration)', () => {
 
     // Storm without any advisory yet.
     await seedStorm(app, { atcfId: 'CP072026', name: 'Zeta', basin: 'CP' }, []);
+
+    // Storm that dropped out of the active feed: seeded then flipped inactive.
+    await seedStorm(app, { atcfId: 'CP082026', name: 'Ghost', basin: 'CP' }, []);
+    await app
+      .get<Repository<Storm>>(getRepositoryToken(Storm))
+      .update({ atcfId: 'CP082026' }, { isActive: false });
   });
 
   afterAll(async () => {
@@ -136,5 +145,24 @@ describe('Dashboard summary endpoint (integration)', () => {
     expect(zeta.latestAdvisory).toBeNull();
     // Named counts even without an advisory.
     expect(res.body.totals.named).toBe(2);
+  });
+
+  it('excludes storms that are no longer active', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/dashboard/summary')
+      .expect(200);
+
+    const ghost = res.body.storms.find(
+      (s: { storm: { atcfId: string } }) => s.storm.atcfId === 'CP082026',
+    );
+
+    expect(ghost).toBeUndefined();
+    expect(res.body.storms).toHaveLength(3);
+    expect(res.body.totals).toEqual({
+      events: 3,
+      named: 2,
+      hurricanes: 1,
+      ace: 1.2,
+    });
   });
 });

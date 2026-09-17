@@ -16,6 +16,8 @@ function makeStorm(overrides: Partial<Storm> = {}): Storm {
     basin: 'EP',
     firstSeenAt: new Date('2026-09-10T00:00:00Z'),
     lastSeenAt: new Date('2026-09-10T01:00:00Z'),
+    isActive: true,
+    lastSeenInFeedAt: new Date('2026-09-10T01:00:00Z'),
     advisories: [],
     ...overrides,
   };
@@ -96,14 +98,15 @@ describe('DashboardService', () => {
     expect(findLatestPerStorm).not.toHaveBeenCalled();
   });
 
-  it('queries storms most-recently-seen first', async () => {
+  it('queries only active storms, most recently seen in feed first', async () => {
     stormsFind.mockResolvedValue([makeStorm()]);
     findLatestPerStorm.mockResolvedValue([]);
 
     await service.getSummary();
 
     expect(stormsFind).toHaveBeenCalledWith({
-      order: { lastSeenAt: 'DESC' },
+      where: { isActive: true },
+      order: { lastSeenInFeedAt: 'DESC' },
       take: 100,
     });
   });
