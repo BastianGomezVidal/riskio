@@ -1,17 +1,13 @@
-FROM node:22-alpine
+FROM node:24-slim
 
 WORKDIR /usr/src/app
 
-# Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci
+RUN npm ci 
 
-# Copy source code
 COPY . .
 
-# Build the API
 RUN npm run build
 
 EXPOSE 3000

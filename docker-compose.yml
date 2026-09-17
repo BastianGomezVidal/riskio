@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432" # solo local
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -24,7 +24,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: ${DATABASE_URL} # debe apuntar a @db:5432
       PORT: 3000
     ports:
       - "${BACKEND_API_PORT:-3000}:3000"
@@ -32,10 +32,9 @@ services:
       test:
         [
           "CMD",
-          "wget",
-          "-q",
-          "--spider",
-          "http://localhost:3000/health",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 30s
       timeout: 5s
@@ -45,8 +44,6 @@ services:
       db:
         condition: service_healthy
 
-  # NOAA NHC polling worker: runs the ingestion scheduler on its own process
-  # so the API container stays up if ingestion misbehaves.
   backend-worker:
     build:
       context: ./backend
@@ -60,17 +57,17 @@ services:
       db:
         condition: service_healthy
 
-  # Standalone React + Vite SPA, served by nginx on port 80.
   frontend:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://backend-api:3000}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000} # host visible por el navegador
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-8080}:80"
     depends_on:
-      - backend-api
+      backend-api:
+        condition: service_healthy
 
 volumes:
   pgdata:
