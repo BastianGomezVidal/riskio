@@ -5,9 +5,6 @@ import { ForecastPoint } from './entities/forecast-point.entity.js';
 import { Advisory } from '../advisories/entities/advisory.entity.js';
 import { ForecastPointDto } from '../../feeds/parser/nhc-parser.js';
 import { categoryFromWindKt } from '../storms/storm-category.js';
-import { PaginatedResultDto } from '../../../common/dto/paginated-result.dto.js';
-import { PageMetaDto } from '../../../common/dto/page-meta.dto.js';
-import { PageQueryDto } from '../../../common/dto/page-query.dto.js';
 
 @Injectable()
 export class ForecastPointsService {
@@ -17,31 +14,16 @@ export class ForecastPointsService {
   ) {}
 
   /**
-   * List an advisory's forecast points chronologically, paginated.
+   * List an advisory's forecast points chronologically.
    *
    * @param advisoryId advisory UUID.
-   * @param page 1-indexed pagination parameters (`page`, `limit`).
-   * @returns paginated points ordered by `validAt` ascending.
+   * @returns points ordered by `validAt` ascending.
    */
-  async findByAdvisory(
-    advisoryId: string,
-    page: PageQueryDto,
-  ): Promise<PaginatedResultDto<ForecastPoint>> {
-    const [data, total] = await this.forecastPointsRepository.findAndCount({
+  async findByAdvisory(advisoryId: string): Promise<ForecastPoint[]> {
+    return this.forecastPointsRepository.find({
       where: { advisory: { id: advisoryId } },
       order: { validAt: 'ASC' },
-      skip: (page.page - 1) * page.limit,
-      take: page.limit,
     });
-
-    const meta: PageMetaDto = {
-      total,
-      page: page.page,
-      limit: page.limit,
-      pageCount: Math.ceil(total / page.limit),
-      hasNextPage: page.page * page.limit < total,
-    };
-    return new PaginatedResultDto(meta, data);
   }
 
   /**

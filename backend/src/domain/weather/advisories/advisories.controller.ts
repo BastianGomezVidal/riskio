@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiExtraModels,
@@ -6,7 +6,6 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
-  ApiQuery,
   ApiTags,
   getSchemaPath,
 } from '@nestjs/swagger';
@@ -14,9 +13,8 @@ import { AdvisoriesService } from './advisories.service.js';
 import { Advisory } from './entities/advisory.entity.js';
 import { Warning } from './entities/warning.entity.js';
 import { ForecastPoint } from '../forecast-points/entities/forecast-point.entity.js';
-import { PageQueryDto } from '../../../common/dto/page-query.dto.js';
-import { PaginatedResultDto } from '../../../common/dto/paginated-result.dto.js';
 import { WarningsFeatureCollectionDto } from './dto/warnings-feature-collection.dto.js';
+import { AdvisoryDetailDto, WarningRefDto } from './dto/advisory-detail.dto.js';
 
 /**
  * HTTP API for querying storm advisories and their associated forecast,
@@ -29,9 +27,10 @@ import { WarningsFeatureCollectionDto } from './dto/warnings-feature-collection.
 @ApiTags('advisories')
 @ApiExtraModels(
   Advisory,
+  AdvisoryDetailDto,
+  WarningRefDto,
   Warning,
   ForecastPoint,
-  PaginatedResultDto,
   WarningsFeatureCollectionDto,
 )
 @Controller()
@@ -42,8 +41,7 @@ export class AdvisoriesController {
    * List a storm's advisories newest-first.
    *
    * @param atcfId ATCF storm identifier, for example `EP142026`.
-   * @param page Pagination parameters.
-   * @returns Paginated advisories for the requested storm.
+   * @returns advisories for the requested storm, newest first.
    */
   @Get('storms/:atcfId/advisories')
   @ApiOperation({
@@ -56,49 +54,13 @@ export class AdvisoriesController {
     description: 'ATCF storm identifier',
     example: 'EP142026',
   })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    example: 1,
-    description: 'Page number (1-indexed).',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    example: 20,
-    description: 'Number of items per page (maximum 100).',
-  })
   @ApiOkResponse({
-    description: 'Paginated list of advisories.',
-    schema: {
-      allOf: [
-        {
-          $ref: getSchemaPath(PaginatedResultDto),
-        },
-        {
-          type: 'object',
-          properties: {
-            data: {
-              type: 'array',
-              items: {
-                $ref: getSchemaPath(Advisory),
-              },
-            },
-          },
-        },
-      ],
-    },
+    description: 'Advisories for the storm, newest first.',
+    type: Advisory,
+    isArray: true,
   })
-  @ApiBadRequestResponse({
-    description: 'Invalid pagination parameters.',
-  })
-  findByStorm(
-    @Param('atcfId') atcfId: string,
-    @Query() page: PageQueryDto,
-  ): Promise<PaginatedResultDto<Advisory>> {
-    return this.advisoriesService.findByStorm(atcfId, page);
+  findByStorm(@Param('atcfId') atcfId: string): Promise<Advisory[]> {
+    return this.advisoriesService.findByStorm(atcfId);
   }
 
   /**
@@ -111,7 +73,9 @@ export class AdvisoriesController {
   @ApiOperation({
     summary: 'Get an advisory by UUID',
     description:
-      'Returns a single advisory together with its forecast points and warning relationships.',
+      'Returns a single advisory together with its forecastPoints and warning ' +
+      'relations. Warnings are lightweight references (id + type); use ' +
+      'GET /advisories/:id/warnings for their GeoJSON geometry.',
   })
   @ApiParam({
     name: 'id',
@@ -121,15 +85,15 @@ export class AdvisoriesController {
   })
   @ApiOkResponse({
     description: 'Advisory with forecast points and warnings.',
-    type: Advisory,
+    type: AdvisoryDetailDto,
   })
   @ApiBadRequestResponse({
     description: 'The advisory id is not a valid UUID.',
   })
-  @ApiNotFoundResponse({
-    description: 'No advisory matches the supplied id.',
-  })
-  findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<Advisory> {
+  @ApiNotFoundResponse({ description: 'No advisory matches the supplied id.' })
+  findOne(
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ): Promise<AdvisoryDetailDto> {
     return this.advisoriesService.findOne(id);
   }
 
@@ -156,16 +120,12 @@ export class AdvisoriesController {
   })
   @ApiOkResponse({
     description: 'GeoJSON FeatureCollection of warning lines.',
-    schema: {
-      $ref: getSchemaPath(WarningsFeatureCollectionDto),
-    },
+    schema: { $ref: getSchemaPath(WarningsFeatureCollectionDto) },
   })
   @ApiBadRequestResponse({
     description: 'The advisory id is not a valid UUID.',
   })
-  @ApiNotFoundResponse({
-    description: 'No advisory matches the supplied id.',
-  })
+  @ApiNotFoundResponse({ description: 'No advisory matches the supplied id.' })
   findWarnings(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.advisoriesService.findWarnings(id);
   }

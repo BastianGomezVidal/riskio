@@ -302,7 +302,7 @@
       "type": "Synchronous/HTTP"
     },
     {
-      "description": "a request for a storm advisories page",
+      "description": "a request for a storm advisories list",
       "pending": false,
       "providerStates": [
         {
@@ -311,36 +311,19 @@
       ],
       "request": {
         "method": "GET",
-        "path": "/storms/EP142026/advisories",
-        "query": {
-          "limit": [
-            "20"
-          ],
-          "page": [
-            "1"
-          ]
-        }
+        "path": "/storms/EP142026/advisories"
       },
       "response": {
         "body": {
-          "content": {
-            "data": [
-              {
-                "advisoryNumber": 2,
-                "id": "11111111-1111-4111-8111-111111111111",
-                "ingestedAt": "2026-09-10T02:33:27.000Z",
-                "issuedAt": "2026-09-10T02:33:27.000Z",
-                "rawText": "TCM - forecast advisory"
-              }
-            ],
-            "meta": {
-              "hasNextPage": false,
-              "limit": 20,
-              "page": 1,
-              "pageCount": 1,
-              "total": 1
+          "content": [
+            {
+              "advisoryNumber": 2,
+              "id": "11111111-1111-4111-8111-111111111111",
+              "ingestedAt": "2026-09-10T02:33:27.000Z",
+              "issuedAt": "2026-09-10T02:33:27.000Z",
+              "rawText": "TCM - forecast advisory"
             }
-          },
+          ],
           "contentType": "application/json",
           "encoded": false
         },
@@ -351,7 +334,7 @@
         },
         "matchingRules": {
           "body": {
-            "$.data": {
+            "$": {
               "combine": "AND",
               "matchers": [
                 {
@@ -360,7 +343,7 @@
                 }
               ]
             },
-            "$.data[*].advisoryNumber": {
+            "$[*].advisoryNumber": {
               "combine": "AND",
               "matchers": [
                 {
@@ -368,7 +351,7 @@
                 }
               ]
             },
-            "$.data[*].id": {
+            "$[*].id": {
               "combine": "AND",
               "matchers": [
                 {
@@ -377,7 +360,7 @@
                 }
               ]
             },
-            "$.data[*].ingestedAt": {
+            "$[*].ingestedAt": {
               "combine": "AND",
               "matchers": [
                 {
@@ -386,7 +369,7 @@
                 }
               ]
             },
-            "$.data[*].issuedAt": {
+            "$[*].issuedAt": {
               "combine": "AND",
               "matchers": [
                 {
@@ -395,51 +378,11 @@
                 }
               ]
             },
-            "$.data[*].rawText": {
+            "$[*].rawText": {
               "combine": "AND",
               "matchers": [
                 {
                   "match": "type"
-                }
-              ]
-            },
-            "$.meta.hasNextPage": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "type"
-                }
-              ]
-            },
-            "$.meta.limit": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "integer"
-                }
-              ]
-            },
-            "$.meta.page": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "integer"
-                }
-              ]
-            },
-            "$.meta.pageCount": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "integer"
-                }
-              ]
-            },
-            "$.meta.total": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "integer"
                 }
               ]
             }
@@ -484,154 +427,7 @@
       "type": "Synchronous/HTTP"
     },
     {
-      "description": "a request for the first page of storms",
-      "pending": false,
-      "providerStates": [
-        {
-          "name": "there are storms in the database"
-        }
-      ],
-      "request": {
-        "method": "GET",
-        "path": "/storms",
-        "query": {
-          "limit": [
-            "20"
-          ],
-          "page": [
-            "1"
-          ]
-        }
-      },
-      "response": {
-        "body": {
-          "content": {
-            "data": [
-              {
-                "atcfId": "EP142026",
-                "basin": "EP",
-                "firstSeenAt": "2026-09-10T02:33:27.000Z",
-                "lastSeenAt": "2026-09-10T02:33:27.000Z",
-                "name": "Lowell"
-              }
-            ],
-            "meta": {
-              "hasNextPage": false,
-              "limit": 20,
-              "page": 1,
-              "pageCount": 1,
-              "total": 1
-            }
-          },
-          "contentType": "application/json",
-          "encoded": false
-        },
-        "headers": {
-          "Content-Type": [
-            "application/json"
-          ]
-        },
-        "matchingRules": {
-          "body": {
-            "$.data": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "type",
-                  "min": 1
-                }
-              ]
-            },
-            "$.data[*].atcfId": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "type"
-                }
-              ]
-            },
-            "$.data[*].basin": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "type"
-                }
-              ]
-            },
-            "$.data[*].firstSeenAt": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "regex",
-                  "regex": "^\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d(:?[0-5]\\d)?|Z)$"
-                }
-              ]
-            },
-            "$.data[*].lastSeenAt": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "regex",
-                  "regex": "^\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d(:?[0-5]\\d)?|Z)$"
-                }
-              ]
-            },
-            "$.data[*].name": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "type"
-                }
-              ]
-            },
-            "$.meta.hasNextPage": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "type"
-                }
-              ]
-            },
-            "$.meta.limit": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "integer"
-                }
-              ]
-            },
-            "$.meta.page": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "integer"
-                }
-              ]
-            },
-            "$.meta.pageCount": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "integer"
-                }
-              ]
-            },
-            "$.meta.total": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "integer"
-                }
-              ]
-            }
-          }
-        },
-        "status": 200
-      },
-      "type": "Synchronous/HTTP"
-    },
-    {
-      "description": "a request for the forecast points page",
+      "description": "a request for the forecast points list",
       "pending": false,
       "providerStates": [
         {
@@ -640,38 +436,21 @@
       ],
       "request": {
         "method": "GET",
-        "path": "/advisories/11111111-1111-4111-8111-111111111111/forecast-points",
-        "query": {
-          "limit": [
-            "20"
-          ],
-          "page": [
-            "1"
-          ]
-        }
+        "path": "/advisories/11111111-1111-4111-8111-111111111111/forecast-points"
       },
       "response": {
         "body": {
-          "content": {
-            "data": [
-              {
-                "category": 1,
-                "id": "22222222-2222-4222-8222-222222222222",
-                "latitude": 16.7,
-                "longitude": -118.5,
-                "pressureMb": 1006,
-                "validAt": "2026-09-10T02:33:27.000Z",
-                "windSpeedKt": 35
-              }
-            ],
-            "meta": {
-              "hasNextPage": false,
-              "limit": 20,
-              "page": 1,
-              "pageCount": 1,
-              "total": 1
+          "content": [
+            {
+              "category": 1,
+              "id": "22222222-2222-4222-8222-222222222222",
+              "latitude": 16.7,
+              "longitude": -118.5,
+              "pressureMb": 1006,
+              "validAt": "2026-09-10T02:33:27.000Z",
+              "windSpeedKt": 35
             }
-          },
+          ],
           "contentType": "application/json",
           "encoded": false
         },
@@ -682,7 +461,7 @@
         },
         "matchingRules": {
           "body": {
-            "$.data": {
+            "$": {
               "combine": "AND",
               "matchers": [
                 {
@@ -691,7 +470,7 @@
                 }
               ]
             },
-            "$.data[*].category": {
+            "$[*].category": {
               "combine": "AND",
               "matchers": [
                 {
@@ -699,7 +478,7 @@
                 }
               ]
             },
-            "$.data[*].id": {
+            "$[*].id": {
               "combine": "AND",
               "matchers": [
                 {
@@ -708,7 +487,7 @@
                 }
               ]
             },
-            "$.data[*].latitude": {
+            "$[*].latitude": {
               "combine": "AND",
               "matchers": [
                 {
@@ -716,7 +495,7 @@
                 }
               ]
             },
-            "$.data[*].longitude": {
+            "$[*].longitude": {
               "combine": "AND",
               "matchers": [
                 {
@@ -724,7 +503,7 @@
                 }
               ]
             },
-            "$.data[*].pressureMb": {
+            "$[*].pressureMb": {
               "combine": "AND",
               "matchers": [
                 {
@@ -732,7 +511,7 @@
                 }
               ]
             },
-            "$.data[*].validAt": {
+            "$[*].validAt": {
               "combine": "AND",
               "matchers": [
                 {
@@ -741,47 +520,7 @@
                 }
               ]
             },
-            "$.data[*].windSpeedKt": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "integer"
-                }
-              ]
-            },
-            "$.meta.hasNextPage": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "type"
-                }
-              ]
-            },
-            "$.meta.limit": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "integer"
-                }
-              ]
-            },
-            "$.meta.page": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "integer"
-                }
-              ]
-            },
-            "$.meta.pageCount": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "integer"
-                }
-              ]
-            },
-            "$.meta.total": {
+            "$[*].windSpeedKt": {
               "combine": "AND",
               "matchers": [
                 {
@@ -885,6 +624,96 @@
       "type": "Synchronous/HTTP"
     },
     {
+      "description": "a request for the list of storms",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "there are storms in the database"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/storms"
+      },
+      "response": {
+        "body": {
+          "content": [
+            {
+              "atcfId": "EP142026",
+              "basin": "EP",
+              "firstSeenAt": "2026-09-10T02:33:27.000Z",
+              "lastSeenAt": "2026-09-10T02:33:27.000Z",
+              "name": "Lowell"
+            }
+          ],
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$[*].atcfId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$[*].basin": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$[*].firstSeenAt": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d(:?[0-5]\\d)?|Z)$"
+                }
+              ]
+            },
+            "$[*].lastSeenAt": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d(:?[0-5]\\d)?|Z)$"
+                }
+              ]
+            },
+            "$[*].name": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
       "description": "a request to ingest all basins",
       "pending": false,
       "providerStates": [
@@ -893,6 +722,11 @@
         }
       ],
       "request": {
+        "headers": {
+          "x-api-key": [
+            "riskio_pact_consumer_token"
+          ]
+        },
         "method": "POST",
         "path": "/admin/ingest/run"
       },
@@ -994,7 +828,12 @@
       "description": "a request to ingest an unknown basin",
       "pending": false,
       "request": {
-        "method": "GET",
+        "headers": {
+          "x-api-key": [
+            "riskio_pact_consumer_token"
+          ]
+        },
+        "method": "POST",
         "path": "/admin/ingest/run/xx"
       },
       "response": {
@@ -1011,7 +850,12 @@
         }
       ],
       "request": {
-        "method": "GET",
+        "headers": {
+          "x-api-key": [
+            "riskio_pact_consumer_token"
+          ]
+        },
+        "method": "POST",
         "path": "/admin/ingest/run/ep"
       },
       "response": {

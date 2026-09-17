@@ -1,83 +1,62 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiParam,
   ApiOkResponse,
-  ApiQuery,
   ApiNotFoundResponse,
-  ApiBadRequestResponse,
   ApiExtraModels,
-  getSchemaPath,
 } from '@nestjs/swagger';
 import { StormsService } from './storms.service.js';
 import { Storm } from './entities/storm.entity.js';
 import { Advisory } from '../advisories/entities/advisory.entity.js';
-import { PageQueryDto } from '../../../common/dto/page-query.dto.js';
-import { PaginatedResultDto } from '../../../common/dto/paginated-result.dto.js';
+import { StormDetailDto } from './dto/storm-detail.dto.js';
 
 @ApiTags('storms')
-@ApiExtraModels(Storm, Advisory, PaginatedResultDto)
+@ApiExtraModels(Storm, StormDetailDto, Advisory)
 @Controller('storms')
 export class StormsController {
   constructor(private readonly stormsService: StormsService) {}
 
   /**
    * List all known storms, most recently seen first.
-   *
-   * @param page 1-indexed pagination parameters.
    */
   @Get()
-  @ApiOperation({ summary: 'List all known storms (paginated)' })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    example: 1,
-    description: 'Page number (1-indexed)',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    example: 20,
-    description: 'Items per page (max 100)',
-  })
+  @ApiOperation({ summary: 'List all known storms' })
   @ApiOkResponse({
-    description: 'Paginated list of storms',
-    schema: {
-      allOf: [
-        { $ref: getSchemaPath(PaginatedResultDto) },
-        {
-          type: 'object',
-          properties: {
-            data: {
-              type: 'array',
-              items: { $ref: getSchemaPath(Storm) },
-            },
-          },
-        },
-      ],
-    },
+    description: 'List of storms',
+    type: Storm,
+    isArray: true,
   })
-  @ApiBadRequestResponse({ description: 'Invalid pagination parameters' })
-  findAll(@Query() page: PageQueryDto): Promise<PaginatedResultDto<Storm>> {
-    return this.stormsService.findAll(page);
+  findAll(): Promise<Storm[]> {
+    return this.stormsService.findAll();
   }
 
   /**
    * Get a single storm with its advisories.
    *
+   * The advisories returned here are the plain rows; their forecastPoints
+   * and warnings relations are NOT loaded. Use GET /advisories/:id for the
+   * expanded advisory.
+   *
    * @param atcfId ATCF storm identifier, e.g. `EP142026`.
    */
   @Get(':atcfId')
-  @ApiOperation({ summary: 'Get a single storm with its advisories' })
+  @ApiOperation({
+    summary: 'Get a single storm with its advisories',
+    description:
+      'Returns the storm together with its advisories. The advisories are the ' +
+      'plain rows; forecastPoints and warnings are NOT included here — fetch ' +
+      'GET /advisories/:id for the expanded advisory.',
+  })
   @ApiParam({
     name: 'atcfId',
     description: 'ATCF storm identifier',
     example: 'EP142026',
   })
-  @ApiOkResponse({ description: 'Storm with advisories', type: Storm })
+  @ApiOkResponse({ description: 'Storm with advisories', type: StormDetailDto })
   @ApiNotFoundResponse({ description: 'No storm matches the atcfId' })
-  findOne(@Param('atcfId') atcfId: string): Promise<Storm> {
+  findOne(@Param('atcfId') atcfId: string): Promise<StormDetailDto> {
     return this.stormsService.findOne(atcfId);
   }
 }

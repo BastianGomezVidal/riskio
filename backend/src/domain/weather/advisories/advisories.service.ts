@@ -5,17 +5,7 @@ import type { FeatureCollection, LineString, Polygon } from 'geojson';
 import { Advisory } from './entities/advisory.entity.js';
 import { Warning } from './entities/warning.entity.js';
 import { Storm } from '../storms/entities/storm.entity.js';
-import { PaginatedResultDto } from '../../../common/dto/paginated-result.dto.js';
-import { PageMetaDto } from '../../../common/dto/page-meta.dto.js';
-import { PageQueryDto } from '../../../common/dto/page-query.dto.js';
-import { ForecastPoint } from '../forecast-points/entities/forecast-point.entity.js';
-
-/**
- * An advisory expanded with its associated forecast points.
- */
-export interface AdvisoryDetail extends Advisory {
-  forecastPoints: ForecastPoint[];
-}
+import { AdvisoryDetailDto } from './dto/advisory-detail.dto.js';
 
 /**
  * A coastal watch/warning geometry received from the ingestion layer.
@@ -35,7 +25,8 @@ export interface WarningSegmentDto {
  * Service responsible for querying and updating storm advisories.
  *
  * This service owns advisory-related persistence operations, including:
- * - paginated advisory queries;
+ * - advisory list queries;
+ * - latest-advisory-per-storm lookups;
  * - advisory detail retrieval;
  * - forecast track and cone geometry updates;
  * - coastal watch/warning replacement;
@@ -59,16 +50,10 @@ export class AdvisoriesService {
    * recent advisory appears first.
    *
    * @param stormAtcfId ATCF identifier of the owning storm.
-   * @param page 1-indexed pagination parameters.
-   * @returns Paginated advisory results and pagination metadata.
+   * @returns advisories for the storm, newest first.
    */
-  async findByStorm(
-    stormAtcfId: string,
-    page: PageQueryDto,
-  ): Promise<PaginatedResultDto<Advisory>> {
-    const skip = (page.page - 1) * page.limit;
-
-    const [data, total] = await this.advisoriesRepository.findAndCount({
+  async findByStorm(stormAtcfId: string): Promise<Advisory[]> {
+    return this.advisoriesRepository.find({
       where: {
         storm: {
           atcfId: stormAtcfId,
@@ -77,21 +62,43 @@ export class AdvisoriesService {
       order: {
         advisoryNumber: 'DESC',
       },
-      skip,
-      take: page.limit,
     });
+  }
 
-    const pageCount = total === 0 ? 0 : Math.ceil(total / page.limit);
+  /**
+   * List the latest advisory for each of the supplied storms.
+   *
+   * A single batched query fetches every advisory (with storm and forecast
+   * points) for the given ATCF ids, ordered so that the newest advisory for
+   * each storm appears first. The first row seen per storm is retained.
+   *
+   * @param atcfIds ATCF identifiers of the storms to look up.
+   * @returns One advisory per storm that has at least one advisory.
+   */
+  async findLatestPerStorm(atcfIds: string[]): Promise<Advisory[]> {
+    if (atcfIds.length === 0) {
+      return [];
+    }
 
-    const meta: PageMetaDto = {
-      total,
-      page: page.page,
-      limit: page.limit,
-      pageCount,
-      hasNextPage: page.page * page.limit < total,
-    };
+    const rows = await this.advisoriesRepository
+      .createQueryBuilder('a')
+      .innerJoinAndSelect('a.storm', 'storm')
+      .leftJoinAndSelect('a.forecastPoints', 'point')
+      .where('storm.atcfId IN (:...atcfIds)', { atcfIds })
+      .orderBy('storm.atcfId', 'ASC')
+      .addOrderBy('a.advisoryNumber', 'DESC')
+      .addOrderBy('point.validAt', 'ASC')
+      .getMany();
 
-    return new PaginatedResultDto(meta, data);
+    const latestByStorm = new Map<string, Advisory>();
+
+    for (const advisory of rows) {
+      if (!latestByStorm.has(advisory.storm.atcfId)) {
+        latestByStorm.set(advisory.storm.atcfId, advisory);
+      }
+    }
+
+    return [...latestByStorm.values()];
   }
 
   /**
@@ -101,7 +108,7 @@ export class AdvisoriesService {
    * @returns The advisory including forecast points and warning relations.
    * @throws NotFoundException when no advisory matches the supplied UUID.
    */
-  async findOne(id: string): Promise<AdvisoryDetail> {
+  async findOne(id: string): Promise<AdvisoryDetailDto> {
     const advisory = await this.advisoriesRepository.findOne({
       where: { id },
       relations: {
@@ -114,7 +121,7 @@ export class AdvisoriesService {
       throw new NotFoundException(`Advisory ${id} not found`);
     }
 
-    return advisory as AdvisoryDetail;
+    return advisory as AdvisoryDetailDto;
   }
 
   /**

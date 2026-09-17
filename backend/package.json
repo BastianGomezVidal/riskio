@@ -73,6 +73,12 @@
     "supertest": "^7.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.2",
+    "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.2"
+  },
+  "overrides": {
+    "tsconfck": {
+      "typescript": "$typescript"
+    }
   }
 }

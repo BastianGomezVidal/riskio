@@ -1,16 +1,3 @@
-export interface PageMeta {
-  total: number;
-  page: number;
-  limit: number;
-  pageCount: number;
-  hasNextPage: boolean;
-}
-
-export interface Paginated<T> {
-  meta: PageMeta;
-  data: T[];
-}
-
 export interface Storm {
   atcfId: string;
   name: string | null;
@@ -70,6 +57,29 @@ async function get<T>(baseUrl: string, path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+async function post<T>(
+  baseUrl: string,
+  path: string,
+  apiKey: string,
+): Promise<T> {
+  const res = await fetch(`${baseUrl}${path}`, {
+    method: 'POST',
+    headers: { 'x-api-key': apiKey },
+  });
+  if (!res.ok) {
+    throw new ApiError(res.status, await res.text());
+  }
+  return (await res.json()) as T;
+}
+
+/**
+ * API token the consumer presents on admin (ingestion) requests.
+ *
+ * The provider verification state handler seeds an admin account whose stored
+ * token hash matches this value, so the guarded endpoints authenticate.
+ */
+export const PACT_API_KEY = 'riskio_pact_consumer_token';
+
 export class ApiError extends Error {
   constructor(
     readonly statusCode: number,
@@ -85,14 +95,8 @@ export const riskioClient = {
     return get(baseUrl, '/health');
   },
 
-  listStorms(
-    baseUrl: string,
-    opts: { page?: number; limit?: number } = {},
-  ): Promise<Paginated<Storm>> {
-    const q = new URLSearchParams();
-    if (opts.page != null) q.set('page', String(opts.page));
-    if (opts.limit != null) q.set('limit', String(opts.limit));
-    return get(baseUrl, `/storms${q.size ? `?${q}` : ''}`);
+  listStorms(baseUrl: string): Promise<Storm[]> {
+    return get(baseUrl, '/storms');
   },
 
   getStorm(baseUrl: string, atcfId: string): Promise<StormDetail> {
@@ -102,15 +106,8 @@ export const riskioClient = {
   listAdvisories(
     baseUrl: string,
     atcfId: string,
-    opts: { page?: number; limit?: number } = {},
-  ): Promise<Paginated<AdvisorySummary>> {
-    const q = new URLSearchParams();
-    if (opts.page != null) q.set('page', String(opts.page));
-    if (opts.limit != null) q.set('limit', String(opts.limit));
-    return get(
-      baseUrl,
-      `/storms/${encodeURIComponent(atcfId)}/advisories${q.size ? `?${q}` : ''}`,
-    );
+  ): Promise<AdvisorySummary[]> {
+    return get(baseUrl, `/storms/${encodeURIComponent(atcfId)}/advisories`);
   },
 
   getAdvisory(baseUrl: string, advisoryId: string): Promise<AdvisoryDetail> {
@@ -120,26 +117,22 @@ export const riskioClient = {
   listForecastPoints(
     baseUrl: string,
     advisoryId: string,
-    opts: { page?: number; limit?: number } = {},
-  ): Promise<Paginated<ForecastPoint>> {
-    const q = new URLSearchParams();
-    if (opts.page != null) q.set('page', String(opts.page));
-    if (opts.limit != null) q.set('limit', String(opts.limit));
+  ): Promise<ForecastPoint[]> {
     return get(
       baseUrl,
-      `/advisories/${encodeURIComponent(advisoryId)}/forecast-points${q.size ? `?${q}` : ''}`,
+      `/advisories/${encodeURIComponent(advisoryId)}/forecast-points`,
     );
   },
 
   runBasinIngest(baseUrl: string, basin: string): Promise<IngestReport> {
-    return get(baseUrl, `/admin/ingest/run/${encodeURIComponent(basin)}`);
+    return post(
+      baseUrl,
+      `/admin/ingest/run/${encodeURIComponent(basin)}`,
+      PACT_API_KEY,
+    );
   },
 
-  async runAllIngest(baseUrl: string): Promise<IngestReport[]> {
-    const res = await fetch(`${baseUrl}/admin/ingest/run`, { method: 'POST' });
-    if (!res.ok) {
-      throw new ApiError(res.status, await res.text());
-    }
-    return (await res.json()) as IngestReport[];
+  runAllIngest(baseUrl: string): Promise<IngestReport[]> {
+    return post(baseUrl, '/admin/ingest/run', PACT_API_KEY);
   },
 };

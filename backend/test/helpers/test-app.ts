@@ -8,6 +8,7 @@ import { AdvisoriesModule } from '../../src/domain/weather/advisories/advisories
 import { ForecastPointsModule } from '../../src/domain/weather/forecast-points/forecast-points.module.js';
 import { IngestionModule } from '../../src/domain/feeds/ingestion/ingestion.module.js';
 import { AuthModule } from '../../src/domain/auth/auth.module.js';
+import { DashboardModule } from '../../src/domain/dashboard/dashboard.module.js';
 import { HealthModule } from '../../src/health/health.module.js';
 import { InitialSchema1789065155402 } from '../../src/database/migrations/1789065155402-InitialSchema.js';
 import { AddStormGeometry1888240000000 } from '../../src/database/migrations/1888240000000-AddStormGeometry.js';
@@ -59,6 +60,7 @@ export async function createTestApp(
       ForecastPointsModule,
       IngestionModule,
       AuthModule,
+      DashboardModule,
       HealthModule,
     ],
   });

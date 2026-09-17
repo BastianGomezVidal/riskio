@@ -8,10 +8,13 @@ import { Warning } from './entities/warning.entity.js';
 import { Storm } from '../storms/entities/storm.entity.js';
 
 /**
- * Creates a minimal mock of TypeORM's insert query-builder chain.
+ * Creates a minimal mock of TypeORM's query-builder chains used by the
+ * service.
  *
- * The service only uses:
- * insert -> into -> values -> orIgnore -> execute
+ * Covers both chains:
+ * - inserts: insert -> into -> values -> orIgnore -> execute
+ * - selects: innerJoinAndSelect / leftJoinAndSelect -> where -> orderBy ->
+ *   addOrderBy -> getMany
  */
 function makeInsertMock() {
   const chain = {
@@ -20,12 +23,23 @@ function makeInsertMock() {
     values: vi.fn(),
     orIgnore: vi.fn(),
     execute: vi.fn(),
+    innerJoinAndSelect: vi.fn(),
+    leftJoinAndSelect: vi.fn(),
+    where: vi.fn(),
+    orderBy: vi.fn(),
+    addOrderBy: vi.fn(),
+    getMany: vi.fn(),
   };
 
   chain.insert.mockReturnThis();
   chain.into.mockReturnThis();
   chain.values.mockReturnThis();
   chain.orIgnore.mockReturnThis();
+  chain.innerJoinAndSelect.mockReturnThis();
+  chain.leftJoinAndSelect.mockReturnThis();
+  chain.where.mockReturnThis();
+  chain.orderBy.mockReturnThis();
+  chain.addOrderBy.mockReturnThis();
 
   return chain;
 }
@@ -36,14 +50,14 @@ function makeInsertMock() {
 function makeRepository() {
   const insert = makeInsertMock();
 
-  const findAndCount = vi.fn();
+  const find = vi.fn();
   const findOne = vi.fn();
   const findOneOrFail = vi.fn();
   const update = vi.fn();
   const exists = vi.fn();
 
   const repo = {
-    findAndCount,
+    find,
     findOne,
     findOneOrFail,
     update,
@@ -54,7 +68,7 @@ function makeRepository() {
   return {
     repo,
     insert,
-    findAndCount,
+    find,
     findOne,
     findOneOrFail,
     update,
@@ -175,22 +189,10 @@ function makePolygon(): Polygon {
   };
 }
 
-/**
- * Creates a list of advisories with descending advisory numbers.
- */
-function makeAdvisories(count: number): Advisory[] {
-  return Array.from({ length: count }, (_, index) =>
-    makeAdvisory({
-      id: `adv-${index + 1}`,
-      advisoryNumber: count - index,
-    }),
-  );
-}
-
 describe('AdvisoriesService', () => {
   let repo: Repository<Advisory>;
   let insert: ReturnType<typeof makeInsertMock>;
-  let findAndCount: ReturnType<typeof vi.fn>;
+  let find: ReturnType<typeof vi.fn>;
   let findOne: ReturnType<typeof vi.fn>;
   let findOneOrFail: ReturnType<typeof vi.fn>;
   let update: ReturnType<typeof vi.fn>;
@@ -209,7 +211,7 @@ describe('AdvisoriesService', () => {
 
     repo = built.repo;
     insert = built.insert;
-    findAndCount = built.findAndCount;
+    find = built.find;
     findOne = built.findOne;
     findOneOrFail = built.findOneOrFail;
     update = built.update;
@@ -227,20 +229,17 @@ describe('AdvisoriesService', () => {
   });
 
   describe('findByStorm', () => {
-    it('returns paginated advisories for a storm, newest first', async () => {
+    it('returns advisories for a storm, newest first', async () => {
       const advisories = [
         makeAdvisory({ advisoryNumber: 5 }),
         makeAdvisory({ advisoryNumber: 4 }),
       ];
 
-      findAndCount.mockResolvedValue([advisories, 5]);
+      find.mockResolvedValue(advisories);
 
-      const result = await service.findByStorm('EP142026', {
-        page: 1,
-        limit: 2,
-      });
+      const result = await service.findByStorm('EP142026');
 
-      expect(findAndCount).toHaveBeenCalledWith({
+      expect(find).toHaveBeenCalledWith({
         where: {
           storm: {
             atcfId: 'EP142026',
@@ -249,163 +248,25 @@ describe('AdvisoriesService', () => {
         order: {
           advisoryNumber: 'DESC',
         },
-        skip: 0,
-        take: 2,
       });
 
-      expect(result.data).toEqual(advisories);
-      expect(result.meta.total).toBe(5);
-      expect(result.meta.page).toBe(1);
-      expect(result.meta.limit).toBe(2);
-      expect(result.meta.pageCount).toBe(3);
-      expect(result.meta.hasNextPage).toBe(true);
-    });
-
-    it('uses the correct skip offset for the second page', async () => {
-      const advisories = [makeAdvisory({ advisoryNumber: 1 })];
-
-      findAndCount.mockResolvedValue([advisories, 21]);
-
-      const result = await service.findByStorm('EP142026', {
-        page: 2,
-        limit: 20,
-      });
-
-      expect(findAndCount).toHaveBeenCalledWith({
-        where: {
-          storm: {
-            atcfId: 'EP142026',
-          },
-        },
-        order: {
-          advisoryNumber: 'DESC',
-        },
-        skip: 20,
-        take: 20,
-      });
-
-      expect(result.data).toEqual(advisories);
-      expect(result.meta.page).toBe(2);
-      expect(result.meta.limit).toBe(20);
-      expect(result.meta.total).toBe(21);
-      expect(result.meta.pageCount).toBe(2);
-      expect(result.meta.hasNextPage).toBe(false);
-    });
-
-    it('uses the correct skip offset for a later page', async () => {
-      findAndCount.mockResolvedValue([
-        [makeAdvisory({ advisoryNumber: 1 })],
-        101,
-      ]);
-
-      const result = await service.findByStorm('EP142026', {
-        page: 6,
-        limit: 20,
-      });
-
-      expect(findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({
-          skip: 100,
-          take: 20,
-        }),
-      );
-
-      expect(result.meta.page).toBe(6);
-      expect(result.meta.pageCount).toBe(6);
-      expect(result.meta.hasNextPage).toBe(false);
+      expect(result).toEqual(advisories);
     });
 
     it('returns an empty result when the storm has no advisories', async () => {
-      findAndCount.mockResolvedValue([[], 0]);
+      find.mockResolvedValue([]);
 
-      const result = await service.findByStorm('EP999999', {
-        page: 1,
-        limit: 20,
-      });
+      const result = await service.findByStorm('EP999999');
 
-      expect(result.data).toEqual([]);
-      expect(result.meta.total).toBe(0);
-      expect(result.meta.page).toBe(1);
-      expect(result.meta.limit).toBe(20);
-      expect(result.meta.pageCount).toBe(0);
-      expect(result.meta.hasNextPage).toBe(false);
-    });
-
-    it('does not report a next page when total equals page size', async () => {
-      const advisories = makeAdvisories(20);
-
-      findAndCount.mockResolvedValue([advisories, 20]);
-
-      const result = await service.findByStorm('EP142026', {
-        page: 1,
-        limit: 20,
-      });
-
-      expect(result.data).toHaveLength(20);
-      expect(result.meta.total).toBe(20);
-      expect(result.meta.pageCount).toBe(1);
-      expect(result.meta.hasNextPage).toBe(false);
-    });
-
-    it('reports a next page when exactly one item remains', async () => {
-      const advisories = makeAdvisories(20);
-
-      findAndCount.mockResolvedValue([advisories, 21]);
-
-      const result = await service.findByStorm('EP142026', {
-        page: 1,
-        limit: 20,
-      });
-
-      expect(result.meta.pageCount).toBe(2);
-      expect(result.meta.hasNextPage).toBe(true);
-    });
-
-    it('does not report a next page on the final partial page', async () => {
-      const advisories = [makeAdvisory({ advisoryNumber: 1 })];
-
-      findAndCount.mockResolvedValue([advisories, 21]);
-
-      const result = await service.findByStorm('EP142026', {
-        page: 2,
-        limit: 20,
-      });
-
-      expect(result.data).toHaveLength(1);
-      expect(result.meta.pageCount).toBe(2);
-      expect(result.meta.hasNextPage).toBe(false);
-    });
-
-    it('handles a single-item page size', async () => {
-      findAndCount.mockResolvedValue([[makeAdvisory()], 3]);
-
-      const result = await service.findByStorm('EP142026', {
-        page: 1,
-        limit: 1,
-      });
-
-      expect(findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({
-          skip: 0,
-          take: 1,
-        }),
-      );
-
-      expect(result.meta.pageCount).toBe(3);
-      expect(result.meta.hasNextPage).toBe(true);
+      expect(result).toEqual([]);
     });
 
     it('propagates repository errors', async () => {
       const error = new Error('database unavailable');
 
-      findAndCount.mockRejectedValue(error);
+      find.mockRejectedValue(error);
 
-      await expect(
-        service.findByStorm('EP142026', {
-          page: 1,
-          limit: 20,
-        }),
-      ).rejects.toBe(error);
+      await expect(service.findByStorm('EP142026')).rejects.toBe(error);
     });
   });
 
@@ -1166,6 +1027,124 @@ describe('AdvisoriesService', () => {
       );
 
       expect(insert.execute).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('findLatestPerStorm', () => {
+    function makeAdvisoryWithStorm(
+      advisoryNumber: number,
+      atcfId = 'EP142026',
+      pointIds: string[] = [],
+    ): Advisory {
+      return makeAdvisory({
+        id: `adv-${atcfId}-${advisoryNumber}`,
+        advisoryNumber,
+        storm: makeStorm({ atcfId }),
+        forecastPoints: pointIds.map((id) => ({ id }) as never),
+      });
+    }
+
+    const ATCF_IDS = ['EP142026', 'AL052026'];
+
+    it('short-circuits when no atcf ids are supplied', async () => {
+      const result = await service.findLatestPerStorm([]);
+
+      expect(result).toEqual([]);
+      expect(insert.where).not.toHaveBeenCalled();
+      expect(insert.getMany).not.toHaveBeenCalled();
+    });
+
+    it('builds the batched join query against the supplied atcf ids', async () => {
+      insert.getMany.mockResolvedValue([]);
+
+      await service.findLatestPerStorm(ATCF_IDS);
+
+      expect(insert.innerJoinAndSelect).toHaveBeenCalledWith(
+        'a.storm',
+        'storm',
+      );
+      expect(insert.leftJoinAndSelect).toHaveBeenCalledWith(
+        'a.forecastPoints',
+        'point',
+      );
+      expect(insert.where).toHaveBeenCalledWith(
+        'storm.atcfId IN (:...atcfIds)',
+        { atcfIds: ATCF_IDS },
+      );
+      expect(insert.orderBy).toHaveBeenCalledWith('storm.atcfId', 'ASC');
+      expect(insert.addOrderBy).toHaveBeenCalledWith(
+        'a.advisoryNumber',
+        'DESC',
+      );
+      expect(insert.addOrderBy).toHaveBeenCalledWith('point.validAt', 'ASC');
+    });
+
+    it('returns the newest advisory for a single storm', async () => {
+      insert.getMany.mockResolvedValue([
+        makeAdvisoryWithStorm(5),
+        makeAdvisoryWithStorm(4),
+        makeAdvisoryWithStorm(3),
+      ]);
+
+      const result = await service.findLatestPerStorm(['EP142026']);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].advisoryNumber).toBe(5);
+    });
+
+    it('returns one advisory per storm, newest for each', async () => {
+      // Rows come back sorted by atcfId ASC then advisoryNumber DESC, so the
+      // newest advisory of each storm appears first for that storm.
+      insert.getMany.mockResolvedValue([
+        makeAdvisoryWithStorm(9, 'AL052026'),
+        makeAdvisoryWithStorm(2, 'EP142026'),
+        makeAdvisoryWithStorm(1, 'EP142026'),
+      ]);
+
+      const result = await service.findLatestPerStorm(ATCF_IDS);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].storm.atcfId).toBe('AL052026');
+      expect(result[0].advisoryNumber).toBe(9);
+      expect(result[1].storm.atcfId).toBe('EP142026');
+      expect(result[1].advisoryNumber).toBe(2);
+    });
+
+    it('populates the forecast points of the latest advisory', async () => {
+      insert.getMany.mockResolvedValue([
+        makeAdvisoryWithStorm(7, 'EP142026', ['pt-1', 'pt-2']),
+      ]);
+
+      const result = await service.findLatestPerStorm(['EP142026']);
+
+      expect(
+        result[0].forecastPoints.map((p) => (p as { id: string }).id),
+      ).toEqual(['pt-1', 'pt-2']);
+    });
+
+    it('does not deduplicate distinct storms sharing no advisories', async () => {
+      insert.getMany.mockResolvedValue([makeAdvisoryWithStorm(1, 'EP142026')]);
+
+      const result = await service.findLatestPerStorm(['EP142026', 'CP062026']);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].storm.atcfId).toBe('EP142026');
+    });
+
+    it('returns an empty list when no storm has advisories', async () => {
+      insert.getMany.mockResolvedValue([]);
+
+      const result = await service.findLatestPerStorm(ATCF_IDS);
+
+      expect(result).toEqual([]);
+    });
+
+    it('propagates repository errors', async () => {
+      const error = new Error('database unavailable');
+
+      insert.getMany.mockRejectedValue(error);
+
+      await expect(service.findLatestPerStorm(ATCF_IDS)).rejects.toBe(error);
     });
   });
 });

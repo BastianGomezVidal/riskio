@@ -36,7 +36,7 @@ describe('Warnings endpoints (integration)', () => {
     const adv = await request(app.getHttpServer())
       .get('/storms/AL112017/advisories')
       .expect(200);
-    advisoryId = adv.body.data[0].id;
+    advisoryId = adv.body[0].id;
   });
 
   afterAll(async () => {
@@ -79,7 +79,7 @@ describe('Warnings endpoints (integration)', () => {
       .expect(200);
 
     const res = await request(app.getHttpServer())
-      .get(`/advisories/${adv.body.data[0].id}/warnings`)
+      .get(`/advisories/${adv.body[0].id}/warnings`)
       .expect(200);
 
     expect(res.body).toEqual({ type: 'FeatureCollection', features: [] });

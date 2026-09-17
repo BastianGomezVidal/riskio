@@ -2,15 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Storm } from './entities/storm.entity.js';
-import { PaginatedResultDto } from '../../../common/dto/paginated-result.dto.js';
-import { PageMetaDto } from '../../../common/dto/page-meta.dto.js';
-import { PageQueryDto } from '../../../common/dto/page-query.dto.js';
-import { Advisory } from '../advisories/entities/advisory.entity.js';
-
-/** A storm expanded with the advisories issued for it. */
-export interface StormDetail extends Storm {
-  advisories: Advisory[];
-}
+import { StormDetailDto } from './dto/storm-detail.dto.js';
 
 @Injectable()
 export class StormsService {
@@ -20,36 +12,27 @@ export class StormsService {
   ) {}
 
   /**
-   * List known storms ordered by most recently observed, paginated.
+   * List known storms ordered by most recently observed.
    *
-   * @param page 1-indexed pagination parameters (`page`, `limit`).
-   * @returns paginated storms ordered by `lastSeenAt` descending.
+   * @returns all storms ordered by `lastSeenAt` descending.
    */
-  async findAll(page: PageQueryDto): Promise<PaginatedResultDto<Storm>> {
-    const [data, total] = await this.stormsRepository.findAndCount({
+  async findAll(): Promise<Storm[]> {
+    return this.stormsRepository.find({
       order: { lastSeenAt: 'DESC' },
-      skip: (page.page - 1) * page.limit,
-      take: page.limit,
     });
-
-    const meta: PageMetaDto = {
-      total,
-      page: page.page,
-      limit: page.limit,
-      pageCount: Math.ceil(total / page.limit),
-      hasNextPage: page.page * page.limit < total,
-    };
-    return new PaginatedResultDto(meta, data);
   }
 
   /**
    * Fetch one storm by ATCF identifier with its advisories.
    *
+   * Advisories are loaded without their own relations (no forecastPoints,
+   * no warnings). That's the shape StormDetailDto advertises.
+   *
    * @param atcfId ATCF storm identifier, e.g. `EP142026`.
    * @returns the storm with its `advisories` relation loaded.
    * @throws NotFoundException when no storm matches.
    */
-  async findOne(atcfId: string): Promise<StormDetail> {
+  async findOne(atcfId: string): Promise<StormDetailDto> {
     const storm = await this.stormsRepository.findOne({
       where: { atcfId },
       relations: { advisories: true },
@@ -57,7 +40,7 @@ export class StormsService {
     if (!storm) {
       throw new NotFoundException(`Storm ${atcfId} not found`);
     }
-    return storm as StormDetail;
+    return storm as StormDetailDto;
   }
 
   /**

@@ -4,19 +4,47 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import request from 'supertest';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { createTestApp } from '../../../../test/helpers/test-app.js';
 import { NhcProvider } from '../providers/nhc/nhc.provider.js';
 import { StormsService } from '../../weather/storms/storms.service.js';
 import { Advisory } from '../../weather/advisories/entities/advisory.entity.js';
 import { ForecastPoint } from '../../weather/forecast-points/entities/forecast-point.entity.js';
+import { AuthService } from '../../auth/auth.service.js';
+import { User } from '../../auth/entities/user.entity.js';
 
 const FIXTURES_DIR = join(__dirname, '..', '..', '..', '..', 'test', 'fixtures');
 const fixture = (name: string) =>
   readFileSync(join(FIXTURES_DIR, name), 'utf8');
 
+/**
+ * Creates an admin account and returns a plaintext API token. The ingestion
+ * endpoints are guarded by `ApiKeyGuard` + `RolesGuard` requiring the `admin`
+ * role, so integration tests must present a valid `x-api-key`.
+ */
+async function createAdminApiKey(targetApp: INestApplication): Promise<string> {
+  const users = targetApp.get<Repository<User>>(getRepositoryToken(User));
+  const auth = targetApp.get(AuthService);
+
+  const admin = await users.save(
+    users.create({
+      email: 'admin@ingestion.test',
+      role: 'admin',
+      firstName: 'Admin',
+      lastName: 'Tester',
+      phone: null,
+      passwordHash: null,
+    }),
+  );
+
+  const { token } = await auth.createApiToken(admin.id, 'integration-test');
+  return token;
+}
+
 describe('Ingestion endpoints (integration)', () => {
   let app: INestApplication;
   let stormsService: StormsService;
+  let adminKey: string;
 
   const nhcMock = {
     fetchBasinSummary: (_basin: string) =>
@@ -29,6 +57,7 @@ describe('Ingestion endpoints (integration)', () => {
   beforeAll(async () => {
     app = await createTestApp([{ provide: NhcProvider, useValue: nhcMock }]);
     stormsService = app.get(StormsService);
+    adminKey = await createAdminApiKey(app);
   });
 
   afterAll(async () => {
@@ -48,9 +77,16 @@ describe('Ingestion endpoints (integration)', () => {
     });
   });
 
-  it('GET /admin/ingest/run/ep ingests storm + advisory + points', async () => {
+  it('rejects a request without an API key', async () => {
+    await request(app.getHttpServer())
+      .post('/admin/ingest/run/ep')
+      .expect(401);
+  });
+
+  it('POST /admin/ingest/run/ep ingests storm + advisory + points', async () => {
     const res = await request(app.getHttpServer())
-      .get('/admin/ingest/run/ep')
+      .post('/admin/ingest/run/ep')
+      .set('x-api-key', adminKey)
       .expect(200);
 
     expect(res.body).toMatchObject({
@@ -65,10 +101,14 @@ describe('Ingestion endpoints (integration)', () => {
   });
 
   it('is idempotent: re-running skips the same advisory', async () => {
-    await request(app.getHttpServer()).get('/admin/ingest/run/ep').expect(200);
+    await request(app.getHttpServer())
+      .post('/admin/ingest/run/ep')
+      .set('x-api-key', adminKey)
+      .expect(200);
 
     const second = await request(app.getHttpServer())
-      .get('/admin/ingest/run/ep')
+      .post('/admin/ingest/run/ep')
+      .set('x-api-key', adminKey)
       .expect(200);
 
     expect(second.body).toMatchObject({
@@ -82,6 +122,7 @@ describe('Ingestion endpoints (integration)', () => {
   it('POST /admin/ingest/run ingests all basins', async () => {
     const res = await request(app.getHttpServer())
       .post('/admin/ingest/run')
+      .set('x-api-key', adminKey)
       .expect(200);
 
     expect(res.body).toHaveLength(3);
@@ -132,7 +173,8 @@ describe('Ingestion endpoints (integration)', () => {
     ]);
     try {
       const res = await request(kmzApp.getHttpServer())
-        .get('/admin/ingest/run/ep')
+        .post('/admin/ingest/run/ep')
+        .set('x-api-key', adminKey)
         .expect(200);
 
       expect(res.body.geometriesUpdated).toBe(1);
@@ -142,11 +184,11 @@ describe('Ingestion endpoints (integration)', () => {
       const adv = await request(kmzApp.getHttpServer())
         .get('/storms/EP142026/advisories')
         .expect(200);
-      expect(adv.body.data[0].track).toMatchObject({ type: 'LineString' });
-      expect(adv.body.data[0].cone).toMatchObject({ type: 'Polygon' });
+      expect(adv.body[0].track).toMatchObject({ type: 'LineString' });
+      expect(adv.body[0].cone).toMatchObject({ type: 'Polygon' });
 
       const warnings = await request(kmzApp.getHttpServer())
-        .get(`/advisories/${adv.body.data[0].id}/warnings`)
+        .get(`/advisories/${adv.body[0].id}/warnings`)
         .expect(200);
       expect(warnings.body.type).toBe('FeatureCollection');
       expect(warnings.body.features.length).toBeGreaterThanOrEqual(1);
@@ -160,7 +202,8 @@ describe('Ingestion endpoints (integration)', () => {
 
   it('rejects an unknown basin', async () => {
     const res = await request(app.getHttpServer())
-      .get('/admin/ingest/run/xx')
+      .post('/admin/ingest/run/xx')
+      .set('x-api-key', adminKey)
       .expect(400);
 
     expect(res.body.message.length).toBeGreaterThan(0);

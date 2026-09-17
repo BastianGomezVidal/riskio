@@ -11,7 +11,10 @@ import { NhcProvider } from '../../src/domain/feeds/providers/nhc/nhc.provider.j
 import { Storm } from '../../src/domain/weather/storms/entities/storm.entity.js';
 import { Advisory } from '../../src/domain/weather/advisories/entities/advisory.entity.js';
 import { ForecastPoint } from '../../src/domain/weather/forecast-points/entities/forecast-point.entity.js';
-import { riskioClient } from './riskio-client.js';
+import { User } from '../../src/domain/auth/entities/user.entity.js';
+import { ApiToken } from '../../src/domain/auth/entities/api-token.entity.js';
+import { hashToken } from '../../src/domain/auth/auth.utils.js';
+import { riskioClient, PACT_API_KEY } from './riskio-client.js';
 
 const { PactV4, Matchers, SpecificationVersion, Verifier } = pactPkg;
 
@@ -64,17 +67,6 @@ const ingestReportBody = {
   errors: Matchers.like([]),
 };
 
-const paginated = (item: Record<string, unknown>) => ({
-  meta: {
-    total: Matchers.integer(1),
-    page: Matchers.integer(1),
-    limit: Matchers.integer(20),
-    pageCount: Matchers.integer(1),
-    hasNextPage: Matchers.boolean(false),
-  },
-  data: Matchers.eachLike(item),
-});
-
 const pact = new PactV4({
   consumer: CONSUMER,
   provider: PROVIDER,
@@ -118,16 +110,13 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
     await pact
       .addInteraction()
       .given('there are storms in the database')
-      .uponReceiving('a request for the first page of storms')
-      .withRequest('GET', '/storms', (b) => b.query({ page: '1', limit: '20' }))
-      .willRespondWith(200, (b) => b.jsonBody(paginated(stormBody)))
+      .uponReceiving('a request for the list of storms')
+      .withRequest('GET', '/storms')
+      .willRespondWith(200, (b) => b.jsonBody(Matchers.eachLike(stormBody)))
       .executeTest(async (mockServer) => {
-        const res = await riskioClient.listStorms(mockServer.url, {
-          page: 1,
-          limit: 20,
-        });
-        expect(res.meta.total).toBe(1);
-        expect(res.data[0]).toMatchObject({
+        const res = await riskioClient.listStorms(mockServer.url);
+        expect(res).toHaveLength(1);
+        expect(res[0]).toMatchObject({
           atcfId: STORM_ID,
           basin: 'EP',
         });
@@ -172,21 +161,15 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
     await pact
       .addInteraction()
       .given(`storm ${STORM_ID} exists with advisory 2`)
-      .uponReceiving('a request for a storm advisories page')
-      .withRequest('GET', `/storms/${STORM_ID}/advisories`, (b) =>
-        b.query({ page: '1', limit: '20' }),
-      )
-      .willRespondWith(200, (b) => b.jsonBody(paginated(advisoryBody)))
+      .uponReceiving('a request for a storm advisories list')
+      .withRequest('GET', `/storms/${STORM_ID}/advisories`)
+      .willRespondWith(200, (b) => b.jsonBody(Matchers.eachLike(advisoryBody)))
       .executeTest(async (mockServer) => {
         const res = await riskioClient.listAdvisories(
           mockServer.url,
           STORM_ID,
-          {
-            page: 1,
-            limit: 20,
-          },
         );
-        expect(res.data[0].advisoryNumber).toBe(2);
+        expect(res[0].advisoryNumber).toBe(2);
       });
   });
 
@@ -220,19 +203,18 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
     await pact
       .addInteraction()
       .given(`advisory ${ADVISORY_ID} has 2 forecast points`)
-      .uponReceiving('a request for the forecast points page')
-      .withRequest('GET', `/advisories/${ADVISORY_ID}/forecast-points`, (b) =>
-        b.query({ page: '1', limit: '20' }),
+      .uponReceiving('a request for the forecast points list')
+      .withRequest('GET', `/advisories/${ADVISORY_ID}/forecast-points`)
+      .willRespondWith(200, (b) =>
+        b.jsonBody(Matchers.eachLike(forecastPointBody)),
       )
-      .willRespondWith(200, (b) => b.jsonBody(paginated(forecastPointBody)))
       .executeTest(async (mockServer) => {
         const res = await riskioClient.listForecastPoints(
           mockServer.url,
           ADVISORY_ID,
-          { page: 1, limit: 20 },
         );
-        expect(res.data.length).toBeGreaterThanOrEqual(1);
-        expect(res.data[0]).toMatchObject({
+        expect(res.length).toBeGreaterThanOrEqual(1);
+        expect(res[0]).toMatchObject({
           latitude: 16.7,
           longitude: -118.5,
         });
@@ -261,7 +243,9 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
       .addInteraction()
       .given('NOAA reports the EP basin has one active storm')
       .uponReceiving('a request to ingest the ep basin')
-      .withRequest('GET', '/admin/ingest/run/ep')
+      .withRequest('POST', '/admin/ingest/run/ep', (b) =>
+        b.headers({ 'x-api-key': PACT_API_KEY }),
+      )
       .willRespondWith(200, (b) => b.jsonBody(ingestReportBody))
       .executeTest(async (mockServer) => {
         const report = await riskioClient.runBasinIngest(mockServer.url, 'ep');
@@ -276,7 +260,9 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
       .addInteraction()
       .given('NOAA reports the EP basin has one active storm')
       .uponReceiving('a request to ingest all basins')
-      .withRequest('POST', '/admin/ingest/run')
+      .withRequest('POST', '/admin/ingest/run', (b) =>
+        b.headers({ 'x-api-key': PACT_API_KEY }),
+      )
       .willRespondWith(200, (b) =>
         b.jsonBody(Matchers.eachLike(ingestReportBody)),
       )
@@ -294,7 +280,9 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
     await pact
       .addInteraction()
       .uponReceiving('a request to ingest an unknown basin')
-      .withRequest('GET', '/admin/ingest/run/xx')
+      .withRequest('POST', '/admin/ingest/run/xx', (b) =>
+        b.headers({ 'x-api-key': PACT_API_KEY }),
+      )
       .willRespondWith(400)
       .executeTest(async (mockServer) => {
         await expect(
@@ -325,6 +313,36 @@ describe('riskio-api provider verification', () => {
   const clearAllData = async () => {
     const storms = app.get(getRepositoryToken(Storm)) as Repository<Storm>;
     await storms.createQueryBuilder().delete().execute();
+  };
+
+  /*
+   * Seeds an admin account whose stored token hash matches the token the
+   * consumer sends in `x-api-key`, so the guarded ingestion endpoints
+   * authenticate during provider verification.
+   */
+  const seedPactAdminToken = async () => {
+    const users = app.get(getRepositoryToken(User)) as Repository<User>;
+    const tokens = app.get(getRepositoryToken(ApiToken)) as Repository<ApiToken>;
+
+    await users.delete({ email: 'pact-admin@test.local' });
+
+    const admin = await users.save(
+      users.create({
+        email: 'pact-admin@test.local',
+        role: 'admin',
+        firstName: 'Pact',
+        lastName: 'Admin',
+        phone: null,
+        passwordHash: null,
+      }),
+    );
+
+    await tokens.insert({
+      user: { id: admin.id } as User,
+      name: 'pact',
+      tokenHash: hashToken(PACT_API_KEY),
+      prefix: 'pact',
+    });
   };
 
   const seedStorm = async () => {
@@ -376,6 +394,7 @@ describe('riskio-api provider verification', () => {
 
   beforeAll(async () => {
     app = await createTestApp([{ provide: NhcProvider, useValue: nhcMock }]);
+    await seedPactAdminToken();
     await app.listen(0, '127.0.0.1');
     const address = app.getHttpServer().address() as { port: number };
     baseUrl = `http://127.0.0.1:${address.port}`;

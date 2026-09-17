@@ -50,27 +50,27 @@ describe('Advisories & forecast-points endpoints (integration)', () => {
     const adv = await request(app.getHttpServer())
       .get('/storms/EP142026/advisories')
       .expect(200);
-    advisoryId = adv.body.data[0].id;
+    advisoryId = adv.body[0].id;
 
     const pts = await request(app.getHttpServer())
       .get(`/advisories/${advisoryId}/forecast-points`)
       .expect(200);
-    forecastPointIds = pts.body.data.map((p: { id: string }) => p.id);
+    forecastPointIds = pts.body.map((p: { id: string }) => p.id);
   });
 
   afterAll(async () => {
     await app.close();
   });
 
-  it('lists advisories newest-first with pagination', async () => {
+  it('lists advisories newest-first', async () => {
     const res = await request(app.getHttpServer())
       .get('/storms/EP142026/advisories')
       .expect(200);
 
-    expect(res.body.meta.total).toBe(2);
+    expect(res.body).toHaveLength(2);
     // DESC order → advisory #2 first
-    expect(res.body.data[0].advisoryNumber).toBe(2);
-    expect(res.body.data[1].advisoryNumber).toBe(1);
+    expect(res.body[0].advisoryNumber).toBe(2);
+    expect(res.body[1].advisoryNumber).toBe(1);
   });
 
   it('returns an advisory with forecast points', async () => {
@@ -93,8 +93,8 @@ describe('Advisories & forecast-points endpoints (integration)', () => {
       .get(`/advisories/${advisoryId}/forecast-points`)
       .expect(200);
 
-    expect(res.body.data).toHaveLength(2);
-    expect(res.body.data[0].validAt).toMatch(/12:00:00/);
+    expect(res.body).toHaveLength(2);
+    expect(res.body[0].validAt).toMatch(/12:00:00/);
   });
 
   it('contains the correct fields group', async () => {
@@ -103,7 +103,7 @@ describe('Advisories & forecast-points endpoints (integration)', () => {
       .get(`/advisories/${advisoryId}/forecast-points`)
       .expect(200);
 
-    expect(res.body.data.map((p: { id: string }) => p.id)).toContain(id);
+    expect(res.body.map((p: { id: string }) => p.id)).toContain(id);
   });
 
   it('rejects an unknown advisory id', async () => {
@@ -147,12 +147,12 @@ describe('Advisories & forecast-points endpoints (integration)', () => {
       .get('/storms/AL012026/advisories')
       .expect(200);
 
-    expect(res.body.data[0]).toMatchObject({
+    expect(res.body[0]).toMatchObject({
       advisoryNumber: 3,
       track: expect.objectContaining({ type: 'LineString' }),
       cone: expect.objectContaining({ type: 'Polygon' }),
     });
-    expect(res.body.data[0].track.coordinates).toHaveLength(2);
-    expect(res.body.data[0].cone.coordinates[0]).toHaveLength(3);
+    expect(res.body[0].track.coordinates).toHaveLength(2);
+    expect(res.body[0].cone.coordinates[0]).toHaveLength(3);
   });
 });

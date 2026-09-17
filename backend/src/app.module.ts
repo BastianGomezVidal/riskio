@@ -9,6 +9,7 @@ import { ForecastPointsModule } from './domain/weather/forecast-points/forecast-
 import { IngestionModule } from './domain/feeds/ingestion/ingestion.module.js';
 import { AuthModule } from './domain/auth/auth.module.js';
 import { HealthModule } from './health/health.module.js';
+import { DashboardModule } from './domain/dashboard/dashboard.module.js';
 
 /**
  * Root application module.
@@ -43,6 +44,7 @@ import { HealthModule } from './health/health.module.js';
     IngestionModule,
     AuthModule,
     HealthModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}
