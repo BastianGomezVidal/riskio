@@ -31,6 +31,14 @@ export interface RssItem {
   link: string | null;
   guid: string | null;
   cyclone: CycloneInfo | null;
+  /**
+   * True when the item carried an `nhc:Cyclone` element, valid or not.
+   *
+   * Informational items (tropical weather outlooks, "no storms" notices)
+   * omit the element entirely. A present-but-invalid element therefore
+   * signals a payload/format change rather than a genuinely quiet basin.
+   */
+  hasCycloneElement: boolean;
 }
 
 /** A parsed RSS document: feed metadata plus its normalized items. */
@@ -180,6 +188,7 @@ export function parseRssFeed(xml: string): ParsedFeed {
             ? String(raw.guid)
             : null,
       cyclone,
+      hasCycloneElement: Boolean(nhcCyclone),
     };
   });
 

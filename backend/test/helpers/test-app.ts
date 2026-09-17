@@ -13,6 +13,7 @@ import { HealthModule } from '../../src/health/health.module.js';
 import { InitialSchema1789065155402 } from '../../src/database/migrations/1789065155402-InitialSchema.js';
 import { AddStormGeometry1888240000000 } from '../../src/database/migrations/1888240000000-AddStormGeometry.js';
 import { AddAuthTables1890000000000 } from '../../src/database/migrations/1890000000000-AddAuthTables.js';
+import { AddStormActivityFlags1891000000000 } from '../../src/database/migrations/1891000000000-AddStormActivityFlags.js';
 import { TEST_DATABASE_URL } from '../setup-integration.js';
 import { StormsService } from '../../src/domain/weather/storms/storms.service.js';
 import { AdvisoriesService } from '../../src/domain/weather/advisories/advisories.service.js';
@@ -50,6 +51,7 @@ export async function createTestApp(
           InitialSchema1789065155402,
           AddStormGeometry1888240000000,
           AddAuthTables1890000000000,
+          AddStormActivityFlags1891000000000,
         ],
         migrationsRun: true,
         logging: false,

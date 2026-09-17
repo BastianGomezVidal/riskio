@@ -89,11 +89,12 @@ export class IngestionService {
       errors: [],
     };
 
+    let feed;
     let summaries;
 
     try {
       const xml = await this.nhc.fetchBasinSummary(basin);
-      const feed = parseRssFeed(xml);
+      feed = parseRssFeed(xml);
       summaries = extractStormSummaries(feed);
     } catch (err) {
       const msg = `basin=${basin} fetch/parse failed: ${getErrorMessage(err)}`;
@@ -106,9 +107,67 @@ export class IngestionService {
 
     report.stormsSeen = summaries.length;
 
+    /*
+     * Tell "NOAA genuinely has no storms" apart from "the parser did not
+     * recognize what NOAA sent". The first authorizes marking everything
+     * inactive; the second would be silent data loss.
+     *
+     * A legitimately empty feed carries informational items (TWO, "no
+     * cyclones") that do NOT include `nhc:Cyclone`. The drift signal is
+     * an item that does include the element but from which no valid
+     * cyclone could be built (or which lacks a pubDate). In that case we
+     * prefer to leave the DB untouched and keep the previous state.
+     */
+    const failedStormItems = feed.items.filter(
+      (item) => item.hasCycloneElement && (!item.cyclone || !item.pubDate),
+    );
+
+    if (summaries.length === 0 && failedStormItems.length > 0) {
+      const msg =
+        `basin=${basin} feed has ${failedStormItems.length} cyclone ` +
+        `item(s) but parser extracted 0 storms — refusing to flip ` +
+        `activity flags`;
+
+      this.logger.error(msg);
+      report.errors.push(msg);
+
+      return report;
+    }
+
+    /*
+     * Reconcile activity flags before per-storm work. Only a cleanly
+     * parsed feed reaches this point — a fetch or parse failure above
+     * returned early and leaves the current active set untouched.
+     *
+     * A reconciliation failure leaves the basin in its prior state (the
+     * transaction rolls back), so aborting the rest of this pass is both
+     * safe and correct: without the flip, per-storm findOne() would fail
+     * for storms unknown to the DB and emit a cascade of noise.
+     */
+    try {
+      await this.storms.reconcileFromFeed(
+        basin,
+        summaries.map((s) => ({
+          atcfId: s.atcfId,
+          name: s.name,
+          basin: s.basin,
+        })),
+      );
+    } catch (err) {
+      const msg =
+        `basin=${basin} activity reconciliation failed: ` +
+        `${getErrorMessage(err)}`;
+
+      this.logger.error(msg, getErrorStack(err));
+      report.errors.push(msg);
+
+      return report;
+    }
+
     if (summaries.length === 0) {
       this.logger.log(
-        `ingest basin=${basin} no active storms (${Date.now() - started}ms)`,
+        `ingest basin=${basin} no active storms, all marked inactive ` +
+          `(${Date.now() - started}ms)`,
       );
 
       return report;
@@ -119,11 +178,9 @@ export class IngestionService {
       const ctx = `basin=${basin} atcfId=${summary.atcfId} wallet=${summary.wallet}`;
 
       try {
-        const storm = await this.storms.upsertFromIngestion({
-          atcfId: summary.atcfId,
-          name: summary.name,
-          basin: summary.basin,
-        });
+        // The storm was already inserted/updated by reconcileFromFeed.
+        // Here we only load it to hand it to the advisories.
+        const storm = await this.storms.findOne(summary.atcfId);
 
         report.stormsUpserted++;
 

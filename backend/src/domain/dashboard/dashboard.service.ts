@@ -28,7 +28,8 @@ export class DashboardService {
    */
   async getSummary(): Promise<DashboardSummaryDto> {
     const storms = await this.stormsRepository.find({
-      order: { lastSeenAt: 'DESC' },
+      where: { isActive: true },
+      order: { lastSeenInFeedAt: 'DESC' },
       take: 100,
     });
 

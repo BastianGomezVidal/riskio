@@ -10,7 +10,7 @@ import { Advisory } from '../../advisories/entities/advisory.entity.js';
  *
  * Intentionally does NOT extend `Storm`. The relation we add (`advisories`)
  * is a subset of the base class's `Relation<Advisory[]>`, and TS forbids
- * narrowing a property via inheritance. Flatten instead.
+ * narrowing a property via inheritance.
  */
 export class StormDetailDto {
   @ApiProperty({ description: 'ATCF storm identifier', example: 'EP142026' })
@@ -27,6 +27,16 @@ export class StormDetailDto {
 
   @ApiProperty({ description: 'When the storm was last seen' })
   lastSeenAt: Date;
+
+  @ApiProperty({
+    description: 'Whether the storm appears in the latest NOAA feed',
+  })
+  isActive: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Timestamp of the feed pass that last saw this storm',
+  })
+  lastSeenInFeedAt: Date | null;
 
   @ApiPropertyOptional({
     type: () => Advisory,

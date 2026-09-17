@@ -33,6 +33,18 @@ export class Storm {
   @UpdateDateColumn({ type: 'timestamp' })
   lastSeenAt: Date;
 
+  @ApiProperty({
+    description: 'Whether the storm appears in the latest NHC feed',
+  })
+  @Column({ type: 'boolean', default: false })
+  isActive: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Timestamp of the feed pass that last saw this storm',
+  })
+  @Column({ type: 'timestamptz', nullable: true })
+  lastSeenInFeedAt: Date | null;
+
   @ApiPropertyOptional({
     type: () => Advisory,
     isArray: true,
