@@ -5,7 +5,6 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { envValidationSchema } from './config/env.validation.js';
 import { StormsModule } from './domain/weather/storms/storms.module.js';
 import { AdvisoriesModule } from './domain/weather/advisories/advisories.module.js';
-import { ForecastPointsModule } from './domain/weather/forecast-points/forecast-points.module.js';
 import { IngestionModule } from './domain/feeds/ingestion/ingestion.module.js';
 import { AuthModule } from './domain/auth/auth.module.js';
 import { HealthModule } from './health/health.module.js';
@@ -16,7 +15,7 @@ import { DashboardModule } from './domain/dashboard/dashboard.module.js';
  *
  * Wires up environment validation, the Postgres connection (migrations run
  * automatically on boot), the ingestion scheduler and the feature modules:
- * storms, advisories, forecast-points, ingestion and health.
+ * storms, advisories, ingestion and health.
  */
 @Module({
   imports: [
@@ -40,7 +39,6 @@ import { DashboardModule } from './domain/dashboard/dashboard.module.js';
     ScheduleModule.forRoot(),
     StormsModule,
     AdvisoriesModule,
-    ForecastPointsModule,
     IngestionModule,
     AuthModule,
     HealthModule,

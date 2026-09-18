@@ -3,10 +3,9 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { createTestApp, seedStorm } from '../../../../test/helpers/test-app.js';
 
-describe('Advisories & forecast-points endpoints (integration)', () => {
+describe('Advisories endpoints (integration)', () => {
   let app: INestApplication;
   let advisoryId: string;
-  let forecastPointIds: string[];
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -51,11 +50,6 @@ describe('Advisories & forecast-points endpoints (integration)', () => {
       .get('/storms/EP142026/advisories')
       .expect(200);
     advisoryId = adv.body[0].id;
-
-    const pts = await request(app.getHttpServer())
-      .get(`/advisories/${advisoryId}/forecast-points`)
-      .expect(200);
-    forecastPointIds = pts.body.map((p: { id: string }) => p.id);
   });
 
   afterAll(async () => {
@@ -88,22 +82,13 @@ describe('Advisories & forecast-points endpoints (integration)', () => {
     });
   });
 
-  it('lists forecast points ordered by validAt ascending', async () => {
+  it('returns forecast points ordered by validAt ascending', async () => {
     const res = await request(app.getHttpServer())
-      .get(`/advisories/${advisoryId}/forecast-points`)
+      .get(`/advisories/${advisoryId}`)
       .expect(200);
 
-    expect(res.body).toHaveLength(2);
-    expect(res.body[0].validAt).toMatch(/12:00:00/);
-  });
-
-  it('contains the correct fields group', async () => {
-    const id = forecastPointIds[0];
-    const res = await request(app.getHttpServer())
-      .get(`/advisories/${advisoryId}/forecast-points`)
-      .expect(200);
-
-    expect(res.body.map((p: { id: string }) => p.id)).toContain(id);
+    expect(res.body.forecastPoints).toHaveLength(2);
+    expect(res.body.forecastPoints[0].validAt).toMatch(/12:00:00/);
   });
 
   it('rejects an unknown advisory id', async () => {

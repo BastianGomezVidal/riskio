@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ForecastPoint } from '../../forecast-points/entities/forecast-point.entity.js';
+import { ForecastPoint } from '../entities/forecast-point.entity.js';
 
 export class WarningRefDto {
   @ApiProperty({ description: 'Warning segment UUID' })

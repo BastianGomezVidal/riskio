@@ -41,7 +41,6 @@ async function bootstrap(): Promise<void> {
     .setVersion('0.1.0')
     .addTag('storms', 'Tropical cyclone storm records')
     .addTag('advisories', 'Per-storm forecast advisories')
-    .addTag('forecast-points', 'Time-indexed forecast track points')
     .addTag('ingestion', 'Manual ingestion triggers')
     .addTag('auth', 'Account registration, login and API tokens')
     .addTag('health', 'Liveness and readiness probes')

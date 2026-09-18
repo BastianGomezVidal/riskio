@@ -1,11 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import type { FeatureCollection, LineString, Polygon } from 'geojson';
+import type { LineString, Polygon } from 'geojson';
 import { Advisory } from './entities/advisory.entity.js';
 import { Warning } from './entities/warning.entity.js';
 import { Storm } from '../storms/entities/storm.entity.js';
 import { AdvisoryDetailDto } from './dto/advisory-detail.dto.js';
+import { ForecastPoint } from './entities/forecast-point.entity.js';
+import type { ForecastPointDto } from '../../feeds/parser/nhc-parser.js';
+import { categoryFromWindKt } from '../storms/storm-category.js';
 
 /**
  * A coastal watch/warning geometry received from the ingestion layer.
@@ -41,29 +44,10 @@ export class AdvisoriesService {
 
     @InjectRepository(Warning)
     private readonly warningsRepository: Repository<Warning>,
-  ) {}
 
-  /**
-   * List a storm's advisories newest-first.
-   *
-   * Advisories are ordered by advisory number descending so that the most
-   * recent advisory appears first.
-   *
-   * @param stormAtcfId ATCF identifier of the owning storm.
-   * @returns advisories for the storm, newest first.
-   */
-  async findByStorm(stormAtcfId: string): Promise<Advisory[]> {
-    return this.advisoriesRepository.find({
-      where: {
-        storm: {
-          atcfId: stormAtcfId,
-        },
-      },
-      order: {
-        advisoryNumber: 'DESC',
-      },
-    });
-  }
+    @InjectRepository(ForecastPoint)
+    private readonly forecastPointsRepository: Repository<ForecastPoint>,
+  ) {}
 
   /**
    * List the latest advisory for each of the supplied storms.
@@ -187,46 +171,6 @@ export class AdvisoriesService {
   }
 
   /**
-   * Fetch an advisory's coastal watch/warning segments as GeoJSON.
-   *
-   * The advisory existence check is performed separately so that an
-   * advisory with zero warnings can correctly return an empty
-   * FeatureCollection while an unknown advisory returns 404.
-   *
-   * @param id Advisory UUID.
-   * @returns GeoJSON FeatureCollection containing warning LineStrings.
-   * @throws NotFoundException when the advisory does not exist.
-   */
-  async findWarnings(id: string): Promise<FeatureCollection> {
-    const exists = await this.advisoriesRepository.exists({
-      where: { id },
-    });
-
-    if (!exists) {
-      throw new NotFoundException(`Advisory ${id} not found`);
-    }
-
-    const warnings = await this.warningsRepository.find({
-      where: {
-        advisory: {
-          id,
-        },
-      },
-    });
-
-    return {
-      type: 'FeatureCollection',
-      features: warnings.map((warning) => ({
-        type: 'Feature',
-        properties: {
-          warningType: warning.warningType,
-        },
-        geometry: warning.geometry,
-      })),
-    };
-  }
-
-  /**
    * Insert an advisory for a storm without creating duplicates.
    *
    * The database performs the conflict handling through
@@ -290,5 +234,31 @@ export class AdvisoriesService {
       advisory,
       inserted,
     };
+  }
+
+  async replaceForecastPoints(
+    advisory: Advisory,
+    points: ForecastPointDto[],
+  ): Promise<number> {
+    await this.forecastPointsRepository.delete({
+      advisory: { id: advisory.id },
+    });
+
+    if (points.length === 0) return 0;
+
+    const entities = this.forecastPointsRepository.create(
+      points.map((p) => ({
+        advisory,
+        validAt: p.validAt,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        windSpeedKt: p.windSpeedKt,
+        pressureMb: p.pressureMb,
+        category: categoryFromWindKt(p.windSpeedKt),
+      })),
+    );
+
+    await this.forecastPointsRepository.save(entities);
+    return entities.length;
   }
 }

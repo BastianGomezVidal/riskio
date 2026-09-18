@@ -4,6 +4,7 @@ import { Advisory } from './entities/advisory.entity.js';
 import { Warning } from './entities/warning.entity.js';
 import { AdvisoriesService } from './advisories.service.js';
 import { AdvisoriesController } from './advisories.controller.js';
+import { ForecastPoint } from './entities/forecast-point.entity.js';
 
 /**
  * Advisories feature module: numbered advisories, their track/cone geometry
@@ -14,7 +15,7 @@ import { AdvisoriesController } from './advisories.controller.js';
  * {@link AdvisoriesService} with the ingestion pipeline.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Advisory, Warning])],
+  imports: [TypeOrmModule.forFeature([Advisory, Warning, ForecastPoint])],
   controllers: [AdvisoriesController],
   providers: [AdvisoriesService],
   exports: [AdvisoriesService],

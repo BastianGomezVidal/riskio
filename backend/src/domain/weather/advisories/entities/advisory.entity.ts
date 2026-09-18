@@ -12,7 +12,7 @@ import type { Relation } from 'typeorm';
 import type { LineString, Polygon } from 'geojson';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Storm } from '../../storms/entities/storm.entity.js';
-import { ForecastPoint } from '../../forecast-points/entities/forecast-point.entity.js';
+import { ForecastPoint } from './forecast-point.entity.js';
 import { Warning } from './warning.entity.js';
 
 /** One numbered forecast/advisory issued for a storm. */

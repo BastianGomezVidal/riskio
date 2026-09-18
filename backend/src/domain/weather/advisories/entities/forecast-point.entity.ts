@@ -7,7 +7,7 @@ import {
 } from 'typeorm';
 import type { Relation } from 'typeorm';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Advisory } from '../../advisories/entities/advisory.entity.js';
+import { Advisory } from './advisory.entity.js';
 
 /** One time-indexed forecast track point of an advisory. */
 @Entity('forecast_points')

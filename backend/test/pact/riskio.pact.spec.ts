@@ -10,7 +10,7 @@ import { createTestApp } from '../helpers/test-app.js';
 import { NhcProvider } from '../../src/domain/feeds/providers/nhc/nhc.provider.js';
 import { Storm } from '../../src/domain/weather/storms/entities/storm.entity.js';
 import { Advisory } from '../../src/domain/weather/advisories/entities/advisory.entity.js';
-import { ForecastPoint } from '../../src/domain/weather/forecast-points/entities/forecast-point.entity.js';
+import { ForecastPoint } from '../../src/domain/weather/advisories/entities/forecast-point.entity.js';
 import { User } from '../../src/domain/auth/entities/user.entity.js';
 import { ApiToken } from '../../src/domain/auth/entities/api-token.entity.js';
 import { hashToken } from '../../src/domain/auth/auth.utils.js';
@@ -166,10 +166,7 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
       .withRequest('GET', `/storms/${STORM_ID}/advisories`)
       .willRespondWith(200, (b) => b.jsonBody(Matchers.eachLike(advisoryBody)))
       .executeTest(async (mockServer) => {
-        const res = await riskioClient.listAdvisories(
-          mockServer.url,
-          STORM_ID,
-        );
+        const res = await riskioClient.listAdvisories(mockServer.url, STORM_ID);
         expect(res[0].advisoryNumber).toBe(2);
       });
   });
@@ -323,7 +320,9 @@ describe('riskio-api provider verification', () => {
    */
   const seedPactAdminToken = async () => {
     const users = app.get(getRepositoryToken(User)) as Repository<User>;
-    const tokens = app.get(getRepositoryToken(ApiToken)) as Repository<ApiToken>;
+    const tokens = app.get(
+      getRepositoryToken(ApiToken),
+    ) as Repository<ApiToken>;
 
     await users.delete({ email: 'pact-admin@test.local' });
 

@@ -5,10 +5,10 @@ import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { StormsModule } from '../../src/domain/weather/storms/storms.module.js';
 import { AdvisoriesModule } from '../../src/domain/weather/advisories/advisories.module.js';
-import { ForecastPointsModule } from '../../src/domain/weather/forecast-points/forecast-points.module.js';
 import { IngestionModule } from '../../src/domain/feeds/ingestion/ingestion.module.js';
 import { AuthModule } from '../../src/domain/auth/auth.module.js';
 import { DashboardModule } from '../../src/domain/dashboard/dashboard.module.js';
+import { HistoryModule } from '../../src/domain/history/history.module.js';
 import { HealthModule } from '../../src/health/health.module.js';
 import { InitialSchema1789065155402 } from '../../src/database/migrations/1789065155402-InitialSchema.js';
 import { AddStormGeometry1888240000000 } from '../../src/database/migrations/1888240000000-AddStormGeometry.js';
@@ -17,7 +17,6 @@ import { AddStormActivityFlags1891000000000 } from '../../src/database/migration
 import { TEST_DATABASE_URL } from '../setup-integration.js';
 import { StormsService } from '../../src/domain/weather/storms/storms.service.js';
 import { AdvisoriesService } from '../../src/domain/weather/advisories/advisories.service.js';
-import { ForecastPointsService } from '../../src/domain/weather/forecast-points/forecast-points.service.js';
 
 export interface ProviderOverride<T> {
   provide: unknown;
@@ -59,10 +58,10 @@ export async function createTestApp(
       ScheduleModule.forRoot(),
       StormsModule,
       AdvisoriesModule,
-      ForecastPointsModule,
       IngestionModule,
       AuthModule,
       DashboardModule,
+      HistoryModule,
       HealthModule,
     ],
   });
@@ -115,6 +114,9 @@ export interface PointSeed {
 /**
  * Seeds a full chain (storm → advisory → forecast points) through the real
  * services so API tests exercise the real read path against Postgres.
+ *
+ * Forecast points are persisted via AdvisoriesService now that they are part
+ * of the advisories aggregate.
  */
 export async function seedStorm(
   app: INestApplication,
@@ -123,7 +125,6 @@ export async function seedStorm(
 ) {
   const stormsService = app.get(StormsService);
   const advisoriesService = app.get(AdvisoriesService);
-  const forecastPointsService = app.get(ForecastPointsService);
 
   const savedStorm = await stormsService.upsertFromIngestion(storm);
 
@@ -135,7 +136,9 @@ export async function seedStorm(
         issuedAt: advisory.issuedAt,
         rawText: advisory.rawText,
       });
-    await forecastPointsService.replaceForAdvisory(savedAdvisory, points);
+
+    await advisoriesService.replaceForecastPoints(savedAdvisory, points);
+
     if (advisory.track !== undefined || advisory.cone !== undefined) {
       await advisoriesService.setTrackCone(
         savedAdvisory.id,
@@ -143,6 +146,7 @@ export async function seedStorm(
         (advisory.cone as never) ?? null,
       );
     }
+
     if (advisory.warnings && advisory.warnings.length > 0) {
       await advisoriesService.replaceWarnings(
         savedAdvisory,

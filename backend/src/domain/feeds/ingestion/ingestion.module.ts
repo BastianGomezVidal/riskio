@@ -5,7 +5,6 @@ import { IngestionController } from './ingestion.controller.js';
 import { IngestionScheduler } from './scheduler/ingestion.scheduler.js';
 import { StormsModule } from '../../weather/storms/storms.module.js';
 import { AdvisoriesModule } from '../../weather/advisories/advisories.module.js';
-import { ForecastPointsModule } from '../../weather/forecast-points/forecast-points.module.js';
 import { AuthModule } from '../../auth/auth.module.js';
 
 /**
@@ -16,12 +15,7 @@ import { AuthModule } from '../../auth/auth.module.js';
  * {@link IngestionScheduler} around the shared {@link IngestionService}.
  */
 @Module({
-  imports: [
-    StormsModule,
-    AdvisoriesModule,
-    ForecastPointsModule,
-    AuthModule,
-  ],
+  imports: [StormsModule, AdvisoriesModule, AuthModule],
   controllers: [IngestionController],
   providers: [NhcProvider, IngestionService, IngestionScheduler],
   exports: [IngestionService],

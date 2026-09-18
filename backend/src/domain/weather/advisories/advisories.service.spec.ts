@@ -5,16 +5,12 @@ import type { LineString, Polygon } from 'geojson';
 import { AdvisoriesService } from './advisories.service.js';
 import { Advisory } from './entities/advisory.entity.js';
 import { Warning } from './entities/warning.entity.js';
+import { ForecastPoint } from './entities/forecast-point.entity.js';
 import { Storm } from '../storms/entities/storm.entity.js';
 
 /**
  * Creates a minimal mock of TypeORM's query-builder chains used by the
  * service.
- *
- * Covers both chains:
- * - inserts: insert -> into -> values -> orIgnore -> execute
- * - selects: innerJoinAndSelect / leftJoinAndSelect -> where -> orderBy ->
- *   addOrderBy -> getMany
  */
 function makeInsertMock() {
   const chain = {
@@ -50,29 +46,23 @@ function makeInsertMock() {
 function makeRepository() {
   const insert = makeInsertMock();
 
-  const find = vi.fn();
   const findOne = vi.fn();
   const findOneOrFail = vi.fn();
   const update = vi.fn();
-  const exists = vi.fn();
 
   const repo = {
-    find,
     findOne,
     findOneOrFail,
     update,
-    exists,
     createQueryBuilder: vi.fn(() => insert),
   } as unknown as Repository<Advisory>;
 
   return {
     repo,
     insert,
-    find,
     findOne,
     findOneOrFail,
     update,
-    exists,
   };
 }
 
@@ -83,13 +73,11 @@ function makeWarningsRepository() {
   const deleteFn = vi.fn();
   const create = vi.fn();
   const save = vi.fn();
-  const find = vi.fn();
 
   const warningsRepo = {
     delete: deleteFn,
     create,
     save,
-    find,
   } as unknown as Repository<Warning>;
 
   return {
@@ -97,7 +85,28 @@ function makeWarningsRepository() {
     deleteFn,
     create,
     save,
-    find,
+  };
+}
+
+/**
+ * Creates the forecast point repository mock used by the service tests.
+ */
+function makeForecastPointsRepository() {
+  const deleteFn = vi.fn();
+  const create = vi.fn();
+  const save = vi.fn();
+
+  const forecastPointsRepo = {
+    delete: deleteFn,
+    create,
+    save,
+  } as unknown as Repository<ForecastPoint>;
+
+  return {
+    forecastPointsRepo,
+    deleteFn,
+    create,
+    save,
   };
 }
 
@@ -111,6 +120,8 @@ function makeStorm(overrides: Partial<Storm> = {}): Storm {
     basin: 'EP',
     firstSeenAt: new Date('2026-09-10T00:00:00Z'),
     lastSeenAt: new Date('2026-09-10T01:00:00Z'),
+    isActive: true,
+    lastSeenInFeedAt: new Date('2026-09-10T01:00:00Z'),
     advisories: [],
     ...overrides,
   };
@@ -171,9 +182,6 @@ function makeLineString(
 
 /**
  * Creates a valid GeoJSON Polygon.
- *
- * The first and last positions are identical, as required for a
- * GeoJSON linear ring.
  */
 function makePolygon(): Polygon {
   return {
@@ -189,20 +197,36 @@ function makePolygon(): Polygon {
   };
 }
 
+/**
+ * Creates a minimal forecast point payload as the parser would emit.
+ */
+function makeForecastPointDto(overrides: Record<string, unknown> = {}) {
+  return {
+    validAt: new Date('2026-09-10T12:00:00Z'),
+    latitude: 16.7,
+    longitude: -118.5,
+    windSpeedKt: 35,
+    pressureMb: null,
+    ...overrides,
+  };
+}
+
 describe('AdvisoriesService', () => {
   let repo: Repository<Advisory>;
   let insert: ReturnType<typeof makeInsertMock>;
-  let find: ReturnType<typeof vi.fn>;
   let findOne: ReturnType<typeof vi.fn>;
   let findOneOrFail: ReturnType<typeof vi.fn>;
   let update: ReturnType<typeof vi.fn>;
-  let exists: ReturnType<typeof vi.fn>;
 
   let warningsRepo: Repository<Warning>;
   let deleteWarnings: ReturnType<typeof vi.fn>;
   let createWarnings: ReturnType<typeof vi.fn>;
   let saveWarnings: ReturnType<typeof vi.fn>;
-  let findWarnings: ReturnType<typeof vi.fn>;
+
+  let forecastPointsRepo: Repository<ForecastPoint>;
+  let deleteForecastPoints: ReturnType<typeof vi.fn>;
+  let createForecastPoints: ReturnType<typeof vi.fn>;
+  let saveForecastPoints: ReturnType<typeof vi.fn>;
 
   let service: AdvisoriesService;
 
@@ -211,11 +235,9 @@ describe('AdvisoriesService', () => {
 
     repo = built.repo;
     insert = built.insert;
-    find = built.find;
     findOne = built.findOne;
     findOneOrFail = built.findOneOrFail;
     update = built.update;
-    exists = built.exists;
 
     const warnings = makeWarningsRepository();
 
@@ -223,51 +245,15 @@ describe('AdvisoriesService', () => {
     deleteWarnings = warnings.deleteFn;
     createWarnings = warnings.create;
     saveWarnings = warnings.save;
-    findWarnings = warnings.find;
 
-    service = new AdvisoriesService(repo, warningsRepo);
-  });
+    const fps = makeForecastPointsRepository();
 
-  describe('findByStorm', () => {
-    it('returns advisories for a storm, newest first', async () => {
-      const advisories = [
-        makeAdvisory({ advisoryNumber: 5 }),
-        makeAdvisory({ advisoryNumber: 4 }),
-      ];
+    forecastPointsRepo = fps.forecastPointsRepo;
+    deleteForecastPoints = fps.deleteFn;
+    createForecastPoints = fps.create;
+    saveForecastPoints = fps.save;
 
-      find.mockResolvedValue(advisories);
-
-      const result = await service.findByStorm('EP142026');
-
-      expect(find).toHaveBeenCalledWith({
-        where: {
-          storm: {
-            atcfId: 'EP142026',
-          },
-        },
-        order: {
-          advisoryNumber: 'DESC',
-        },
-      });
-
-      expect(result).toEqual(advisories);
-    });
-
-    it('returns an empty result when the storm has no advisories', async () => {
-      find.mockResolvedValue([]);
-
-      const result = await service.findByStorm('EP999999');
-
-      expect(result).toEqual([]);
-    });
-
-    it('propagates repository errors', async () => {
-      const error = new Error('database unavailable');
-
-      find.mockRejectedValue(error);
-
-      await expect(service.findByStorm('EP142026')).rejects.toBe(error);
-    });
+    service = new AdvisoriesService(repo, warningsRepo, forecastPointsRepo);
   });
 
   describe('findOne', () => {
@@ -402,6 +388,91 @@ describe('AdvisoriesService', () => {
 
       await expect(
         service.setTrackCone('adv-1', makeLineString(), makePolygon()),
+      ).rejects.toBe(error);
+    });
+  });
+
+  describe('replaceForecastPoints', () => {
+    it('deletes existing points and inserts the new ones', async () => {
+      const advisory = makeAdvisory();
+      const points = [
+        makeForecastPointDto({ latitude: 16.7 }),
+        makeForecastPointDto({ latitude: 16.8 }),
+      ];
+
+      const entities = [{ id: 'pt-1' }, { id: 'pt-2' }];
+      createForecastPoints.mockReturnValue(entities);
+
+      const count = await service.replaceForecastPoints(
+        advisory,
+        points as never,
+      );
+
+      expect(deleteForecastPoints).toHaveBeenCalledWith({
+        advisory: { id: 'adv-1' },
+      });
+
+      expect(createForecastPoints).toHaveBeenCalledTimes(1);
+      expect(saveForecastPoints).toHaveBeenCalledWith(entities);
+      expect(count).toBe(2);
+    });
+
+    it('deletes existing points and returns zero when none are provided', async () => {
+      const count = await service.replaceForecastPoints(makeAdvisory(), []);
+
+      expect(deleteForecastPoints).toHaveBeenCalledWith({
+        advisory: { id: 'adv-1' },
+      });
+
+      expect(createForecastPoints).not.toHaveBeenCalled();
+      expect(saveForecastPoints).not.toHaveBeenCalled();
+      expect(count).toBe(0);
+    });
+
+    it('derives the Saffir-Simpson category from each point wind speed', async () => {
+      const advisory = makeAdvisory();
+
+      createForecastPoints.mockImplementation((values: unknown) => values);
+      saveForecastPoints.mockResolvedValue(undefined);
+
+      await service.replaceForecastPoints(advisory, [
+        makeForecastPointDto({ windSpeedKt: 30 }) as never,
+        makeForecastPointDto({ windSpeedKt: 70 }) as never,
+        makeForecastPointDto({ windSpeedKt: 120 }) as never,
+        makeForecastPointDto({ windSpeedKt: null }) as never,
+      ]);
+
+      const created = createForecastPoints.mock.calls[0][0] as Array<{
+        category: number | null;
+      }>;
+
+      expect(created.map((p) => p.category)).toEqual([null, 1, 4, null]);
+    });
+
+    it('propagates delete errors', async () => {
+      const error = new Error('delete failed');
+      deleteForecastPoints.mockRejectedValue(error);
+
+      await expect(
+        service.replaceForecastPoints(makeAdvisory(), [
+          makeForecastPointDto() as never,
+        ]),
+      ).rejects.toBe(error);
+
+      expect(createForecastPoints).not.toHaveBeenCalled();
+      expect(saveForecastPoints).not.toHaveBeenCalled();
+    });
+
+    it('propagates save errors', async () => {
+      const error = new Error('save failed');
+
+      createForecastPoints.mockReturnValue([{ id: 'pt-1' }]);
+      saveForecastPoints.mockRejectedValue(error);
+
+      await expect(
+        service.replaceForecastPoints(makeAdvisory(), [
+          makeForecastPointDto() as never,
+        ]),
       ).rejects.toBe(error);
     });
   });
@@ -607,155 +678,6 @@ describe('AdvisoriesService', () => {
           },
         ]),
       ).rejects.toThrow('database unavailable');
-    });
-  });
-
-  describe('findWarnings', () => {
-    it('returns a GeoJSON FeatureCollection of warning segments', async () => {
-      exists.mockResolvedValue(true);
-      findWarnings.mockResolvedValue([makeWarning()]);
-
-      const result = await service.findWarnings('adv-1');
-
-      expect(result).toEqual({
-        type: 'FeatureCollection',
-        features: [
-          {
-            type: 'Feature',
-            properties: {
-              warningType: 'Hurricane Watch',
-            },
-            geometry: {
-              type: 'LineString',
-              coordinates: [
-                [-80.5, 25.9],
-                [-80.4, 26.1],
-              ],
-            },
-          },
-        ],
-      });
-    });
-
-    it('returns an empty FeatureCollection when an advisory has no warnings', async () => {
-      exists.mockResolvedValue(true);
-      findWarnings.mockResolvedValue([]);
-
-      const result = await service.findWarnings('adv-1');
-
-      expect(result).toEqual({
-        type: 'FeatureCollection',
-        features: [],
-      });
-    });
-
-    it('maps multiple warnings independently', async () => {
-      exists.mockResolvedValue(true);
-
-      findWarnings.mockResolvedValue([
-        makeWarning({
-          id: 'w-1',
-          warningType: 'Hurricane Watch',
-        }),
-        makeWarning({
-          id: 'w-2',
-          warningType: 'Tropical Storm Warning',
-          geometry: {
-            type: 'LineString',
-            coordinates: [
-              [-79.5, 26.1],
-              [-79.2, 26.4],
-            ],
-          },
-        }),
-      ]);
-
-      const result = await service.findWarnings('adv-1');
-
-      expect(result.type).toBe('FeatureCollection');
-
-      expect(result.features).toHaveLength(2);
-
-      expect(result.features[0]).toEqual({
-        type: 'Feature',
-        properties: {
-          warningType: 'Hurricane Watch',
-        },
-        geometry: {
-          type: 'LineString',
-          coordinates: [
-            [-80.5, 25.9],
-            [-80.4, 26.1],
-          ],
-        },
-      });
-
-      expect(result.features[1]).toEqual({
-        type: 'Feature',
-        properties: {
-          warningType: 'Tropical Storm Warning',
-        },
-        geometry: {
-          type: 'LineString',
-          coordinates: [
-            [-79.5, 26.1],
-            [-79.2, 26.4],
-          ],
-        },
-      });
-    });
-
-    it('checks advisory existence before querying warnings', async () => {
-      exists.mockResolvedValue(false);
-
-      await expect(service.findWarnings('missing')).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
-
-      expect(findWarnings).not.toHaveBeenCalled();
-    });
-
-    it('throws NotFoundException for an unknown advisory', async () => {
-      exists.mockResolvedValue(false);
-
-      await expect(service.findWarnings('missing')).rejects.toThrow(
-        'Advisory missing not found',
-      );
-    });
-
-    it('queries warnings by advisory id', async () => {
-      exists.mockResolvedValue(true);
-      findWarnings.mockResolvedValue([]);
-
-      await service.findWarnings('adv-123');
-
-      expect(findWarnings).toHaveBeenCalledWith({
-        where: {
-          advisory: {
-            id: 'adv-123',
-          },
-        },
-      });
-    });
-
-    it('propagates advisory existence-check errors', async () => {
-      const error = new Error('existence check failed');
-
-      exists.mockRejectedValue(error);
-
-      await expect(service.findWarnings('adv-1')).rejects.toBe(error);
-
-      expect(findWarnings).not.toHaveBeenCalled();
-    });
-
-    it('propagates warning query errors', async () => {
-      exists.mockResolvedValue(true);
-
-      const error = new Error('warning query failed');
-
-      findWarnings.mockRejectedValue(error);
-
-      await expect(service.findWarnings('adv-1')).rejects.toBe(error);
     });
   });
 
@@ -1093,8 +1015,6 @@ describe('AdvisoriesService', () => {
     });
 
     it('returns one advisory per storm, newest for each', async () => {
-      // Rows come back sorted by atcfId ASC then advisoryNumber DESC, so the
-      // newest advisory of each storm appears first for that storm.
       insert.getMany.mockResolvedValue([
         makeAdvisoryWithStorm(9, 'AL052026'),
         makeAdvisoryWithStorm(2, 'EP142026'),

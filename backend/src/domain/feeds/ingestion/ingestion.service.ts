@@ -14,7 +14,6 @@ import {
 } from '../parser/kml-parser.js';
 import { StormsService } from '../../weather/storms/storms.service.js';
 import { AdvisoriesService } from '../../weather/advisories/advisories.service.js';
-import { ForecastPointsService } from '../../weather/forecast-points/forecast-points.service.js';
 
 /**
  * Counters describing the outcome of one ingestion run for a basin.
@@ -61,7 +60,6 @@ export class IngestionService {
     private readonly nhc: NhcProvider,
     private readonly storms: StormsService,
     private readonly advisories: AdvisoriesService,
-    private readonly forecastPoints: ForecastPointsService,
   ) {}
 
   /**
@@ -141,7 +139,7 @@ export class IngestionService {
      *
      * A reconciliation failure leaves the basin in its prior state (the
      * transaction rolls back), so aborting the rest of this pass is both
-     * safe and correct: without the flip, per-storm findOne() would fail
+     * safe and correct: without the flip, per-storm findOneRaw() would fail
      * for storms unknown to the DB and emit a cascade of noise.
      */
     try {
@@ -180,7 +178,7 @@ export class IngestionService {
       try {
         // The storm was already inserted/updated by reconcileFromFeed.
         // Here we only load it to hand it to the advisories.
-        const storm = await this.storms.findOne(summary.atcfId);
+        const storm = await this.storms.findOneRaw(summary.atcfId);
 
         report.stormsUpserted++;
 
@@ -263,7 +261,7 @@ export class IngestionService {
         if (rawText) {
           const points = parseForecastPoints(rawText, issuedAt);
 
-          const n = await this.forecastPoints.replaceForAdvisory(
+          const n = await this.advisories.replaceForecastPoints(
             advisory,
             points,
           );

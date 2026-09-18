@@ -9,11 +9,19 @@ import { createTestApp } from '../../../../test/helpers/test-app.js';
 import { NhcProvider } from '../providers/nhc/nhc.provider.js';
 import { StormsService } from '../../weather/storms/storms.service.js';
 import { Advisory } from '../../weather/advisories/entities/advisory.entity.js';
-import { ForecastPoint } from '../../weather/forecast-points/entities/forecast-point.entity.js';
+import { ForecastPoint } from '../../weather/advisories/entities/forecast-point.entity.js';
 import { AuthService } from '../../auth/auth.service.js';
 import { User } from '../../auth/entities/user.entity.js';
 
-const FIXTURES_DIR = join(__dirname, '..', '..', '..', '..', 'test', 'fixtures');
+const FIXTURES_DIR = join(
+  __dirname,
+  '..',
+  '..',
+  '..',
+  '..',
+  'test',
+  'fixtures',
+);
 const fixture = (name: string) =>
   readFileSync(join(FIXTURES_DIR, name), 'utf8');
 
@@ -78,9 +86,7 @@ describe('Ingestion endpoints (integration)', () => {
   });
 
   it('rejects a request without an API key', async () => {
-    await request(app.getHttpServer())
-      .post('/admin/ingest/run/ep')
-      .expect(401);
+    await request(app.getHttpServer()).post('/admin/ingest/run/ep').expect(401);
   });
 
   it('POST /admin/ingest/run/ep ingests storm + advisory + points', async () => {

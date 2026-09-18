@@ -129,7 +129,7 @@ describe('IngestionScheduler', () => {
 
     await scheduler.pollAllBasins();
 
-    const completionLog = logSpy.mock.calls
+    const completionLog = (logSpy.mock.calls as unknown[][])
       .map(([message]) => String(message))
       .find((message) => message.includes('scheduled-ingest done'));
 
@@ -156,7 +156,7 @@ describe('IngestionScheduler', () => {
     expect(ingestAllBasins).toHaveBeenCalledTimes(1);
     expect(warnSpy).not.toHaveBeenCalled();
 
-    const completionLog = logSpy.mock.calls
+    const completionLog = (logSpy.mock.calls as unknown[][])
       .map(([message]) => String(message))
       .find((message) => message.includes('scheduled-ingest done'));
 
@@ -232,7 +232,7 @@ describe('IngestionScheduler', () => {
 
     await scheduler.pollAllBasins();
 
-    const completionLog = logSpy.mock.calls
+    const completionLog = (logSpy.mock.calls as unknown[][])
       .map(([message]) => String(message))
       .find((message) => message.includes('scheduled-ingest done'));
 

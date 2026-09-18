@@ -5,7 +5,6 @@ import { NhcProvider } from '../providers/nhc/nhc.provider.js';
 import { IngestionService } from './ingestion.service.js';
 import { StormsService } from '../../weather/storms/storms.service.js';
 import { AdvisoriesService } from '../../weather/advisories/advisories.service.js';
-import { ForecastPointsService } from '../../weather/forecast-points/forecast-points.service.js';
 
 const FIXTURES_DIR = join(
   __dirname,
@@ -31,7 +30,7 @@ function makeServices() {
   const reconcileFromFeed = vi.fn();
   const findStorm = vi.fn();
   const upsertAdvisory = vi.fn();
-  const replaceForAdvisory = vi.fn();
+  const replaceForecastPoints = vi.fn();
   const setTrackCone = vi.fn();
   const replaceWarnings = vi.fn();
 
@@ -43,28 +42,25 @@ function makeServices() {
 
   const storms = {
     reconcileFromFeed,
-    findOne: findStorm,
+    findOneRaw: findStorm,
   } as unknown as StormsService;
 
   const advisories = {
     upsertFromIngestion: upsertAdvisory,
+    replaceForecastPoints,
     setTrackCone,
     replaceWarnings,
   } as unknown as AdvisoriesService;
 
-  const forecastPoints = {
-    replaceForAdvisory,
-  } as unknown as ForecastPointsService;
-
   return {
-    service: new IngestionService(nhc, storms, advisories, forecastPoints),
+    service: new IngestionService(nhc, storms, advisories),
     fetchBasinSummary,
     fetchForecastAdvisory,
     fetchAdvisoryProduct,
     reconcileFromFeed,
     findStorm,
     upsertAdvisory,
-    replaceForAdvisory,
+    replaceForecastPoints,
     setTrackCone,
     replaceWarnings,
   };
@@ -78,7 +74,7 @@ describe('IngestionService', () => {
   let reconcileFromFeed: ReturnType<typeof vi.fn>;
   let findStorm: ReturnType<typeof vi.fn>;
   let upsertAdvisory: ReturnType<typeof vi.fn>;
-  let replaceForAdvisory: ReturnType<typeof vi.fn>;
+  let replaceForecastPoints: ReturnType<typeof vi.fn>;
   let setTrackCone: ReturnType<typeof vi.fn>;
   let replaceWarnings: ReturnType<typeof vi.fn>;
 
@@ -92,7 +88,7 @@ describe('IngestionService', () => {
     reconcileFromFeed = built.reconcileFromFeed;
     findStorm = built.findStorm;
     upsertAdvisory = built.upsertAdvisory;
-    replaceForAdvisory = built.replaceForAdvisory;
+    replaceForecastPoints = built.replaceForecastPoints;
     setTrackCone = built.setTrackCone;
     replaceWarnings = built.replaceWarnings;
   });
@@ -125,7 +121,7 @@ describe('IngestionService', () => {
         inserted: true,
       });
 
-      replaceForAdvisory.mockResolvedValue(8);
+      replaceForecastPoints.mockResolvedValue(8);
       setTrackCone.mockResolvedValue(undefined);
       replaceWarnings.mockResolvedValue(0);
 
@@ -186,7 +182,7 @@ describe('IngestionService', () => {
         inserted: false,
       });
 
-      replaceForAdvisory.mockResolvedValue(8);
+      replaceForecastPoints.mockResolvedValue(8);
       fetchAdvisoryProduct.mockResolvedValue(null);
       setTrackCone.mockResolvedValue(undefined);
       replaceWarnings.mockResolvedValue(0);
@@ -216,8 +212,6 @@ describe('IngestionService', () => {
         errors: [],
       });
 
-      // An empty but cleanly parsed feed authorizes flipping the basin
-      // inactive before the early return.
       expect(reconcileFromFeed).toHaveBeenCalledWith('at', []);
 
       expect(findStorm).not.toHaveBeenCalled();
@@ -245,9 +239,6 @@ describe('IngestionService', () => {
 
       const report = await service.ingestBasin('ep');
 
-      // One item carries an nhc:Cyclone element but is missing the ATCF id
-      // and wallet, so no storm was extracted. That is format drift, not a
-      // genuinely quiet basin, so state must stay untouched.
       expect(report.stormsSeen).toBe(0);
       expect(report.errors).toHaveLength(1);
       expect(report.errors[0]).toContain('refusing to flip activity flags');
@@ -401,7 +392,7 @@ describe('IngestionService', () => {
       expect(report.advisoriesSkipped).toBe(1);
       expect(report.forecastPointsInserted).toBe(0);
 
-      expect(replaceForAdvisory).not.toHaveBeenCalled();
+      expect(replaceForecastPoints).not.toHaveBeenCalled();
 
       expect(upsertAdvisory).toHaveBeenCalledWith({
         storm: expect.objectContaining({
@@ -436,7 +427,7 @@ describe('IngestionService', () => {
 
       expect(report.errors[0]).toContain('database unavailable');
 
-      expect(replaceForAdvisory).not.toHaveBeenCalled();
+      expect(replaceForecastPoints).not.toHaveBeenCalled();
       expect(fetchAdvisoryProduct).not.toHaveBeenCalled();
     });
 
@@ -460,7 +451,7 @@ describe('IngestionService', () => {
         inserted: true,
       });
 
-      replaceForAdvisory.mockRejectedValue(
+      replaceForecastPoints.mockRejectedValue(
         new Error('forecast point insert failed'),
       );
 
@@ -500,7 +491,7 @@ describe('IngestionService', () => {
         inserted: true,
       });
 
-      replaceForAdvisory.mockResolvedValue(0);
+      replaceForecastPoints.mockResolvedValue(0);
 
       const report = await service.ingestBasin('ep');
 
@@ -532,7 +523,7 @@ describe('IngestionService', () => {
         inserted: true,
       });
 
-      replaceForAdvisory.mockResolvedValue(8);
+      replaceForecastPoints.mockResolvedValue(8);
 
       fetchAdvisoryProduct.mockImplementation(
         (_atcfId: string, _number: number, kind: string) => {
@@ -625,7 +616,7 @@ describe('IngestionService', () => {
         inserted: true,
       });
 
-      replaceForAdvisory.mockResolvedValue(8);
+      replaceForecastPoints.mockResolvedValue(8);
 
       fetchAdvisoryProduct.mockImplementation(
         (_atcfId: string, _number: number, kind: string) => {
@@ -680,7 +671,7 @@ describe('IngestionService', () => {
         inserted: true,
       });
 
-      replaceForAdvisory.mockResolvedValue(8);
+      replaceForecastPoints.mockResolvedValue(8);
 
       fetchAdvisoryProduct.mockImplementation(
         (_atcfId: string, _number: number, kind: string) => {
@@ -723,7 +714,6 @@ describe('IngestionService', () => {
       expect(report.errors[0]).toContain('activity reconciliation failed');
       expect(report.errors[0]).toContain('db lock');
 
-      // The basin is left in its prior state, so no per-storm work runs.
       expect(findStorm).not.toHaveBeenCalled();
       expect(fetchForecastAdvisory).not.toHaveBeenCalled();
     });
@@ -751,13 +741,6 @@ describe('IngestionService', () => {
         };
       });
 
-      /*
-       * Both storms are reconciled in a single batch. The first storm
-       * then fails inside the per-storm loop when findOne() loads it.
-       *
-       * The second fixture storm uses EP5, so the service should
-       * request EP5 here.
-       */
       fetchForecastAdvisory.mockImplementation(async (wallet: string) => {
         expect(wallet).toBe('EP5');
 
@@ -772,7 +755,7 @@ describe('IngestionService', () => {
         inserted: true,
       });
 
-      replaceForAdvisory.mockResolvedValue(8);
+      replaceForecastPoints.mockResolvedValue(8);
 
       fetchAdvisoryProduct.mockResolvedValue(null);
       setTrackCone.mockResolvedValue(undefined);
@@ -782,10 +765,8 @@ describe('IngestionService', () => {
 
       expect(report.stormsSeen).toBe(2);
 
-      // First storm failed, second storm succeeded.
       expect(report.stormsUpserted).toBe(1);
 
-      // Only the successful second storm should create an advisory.
       expect(report.advisoriesInserted).toBe(1);
       expect(report.advisoriesSkipped).toBe(0);
 
@@ -796,7 +777,6 @@ describe('IngestionService', () => {
       expect(report.errors).toHaveLength(1);
       expect(report.errors[0]).toContain('first storm failed');
 
-      // Reconciliation is a single batch call for the whole basin.
       expect(reconcileFromFeed).toHaveBeenCalledTimes(1);
       expect(reconcileFromFeed).toHaveBeenCalledWith('ep', [
         { atcfId: 'EP142026', name: 'Lowell', basin: 'EP' },
@@ -805,17 +785,13 @@ describe('IngestionService', () => {
 
       expect(findStorm).toHaveBeenCalledTimes(2);
 
-      /*
-       * The failed first storm must not continue into TCM
-       * processing.
-       */
       expect(fetchForecastAdvisory).toHaveBeenCalledTimes(1);
 
       expect(fetchForecastAdvisory).toHaveBeenCalledWith('EP5');
 
       expect(upsertAdvisory).toHaveBeenCalledTimes(1);
 
-      expect(replaceForAdvisory).toHaveBeenCalledTimes(1);
+      expect(replaceForecastPoints).toHaveBeenCalledTimes(1);
     });
   });
 
