@@ -1,5 +1,6 @@
 import { Outlet } from "react-router-dom";
 import { SiteHeader } from "@/components/SiteHeader/SiteHeader";
+import { BackButton } from "@/components/BackButton/BackButton";
 
 export function AppLayout() {
   return (
@@ -15,6 +16,7 @@ export function AppLayout() {
 
       <main id="main" className="flex-1">
         <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+          <BackButton />
           <Outlet />
         </div>
       </main>
