@@ -9,13 +9,14 @@ import { IngestionModule } from './domain/feeds/ingestion/ingestion.module.js';
 import { AuthModule } from './domain/auth/auth.module.js';
 import { HealthModule } from './health/health.module.js';
 import { DashboardModule } from './domain/dashboard/dashboard.module.js';
+import { HistoryModule } from './domain/history/history.module.js';
 
 /**
  * Root application module.
  *
  * Wires up environment validation, the Postgres connection (migrations run
  * automatically on boot), the ingestion scheduler and the feature modules:
- * storms, advisories, ingestion and health.
+ * storms, advisories, ingestion, dashboard and history.
  */
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { DashboardModule } from './domain/dashboard/dashboard.module.js';
     AuthModule,
     HealthModule,
     DashboardModule,
+    HistoryModule,
   ],
 })
 export class AppModule {}
