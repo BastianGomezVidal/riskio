@@ -12,6 +12,11 @@ export const semantic = {
     secondary: primitives.colors.gray[100],
     error: primitives.colors.red[600],
     success: primitives.colors.green[600],
+    headerBackground: primitives.colors.blue[600],
+    headerText: primitives.colors.white,
+    headerTextMuted: "rgba(255, 255, 255, 0.75)",
+    headerHover: "rgba(255, 255, 255, 0.12)",
+    headerActive: "rgba(255, 255, 255, 0.18)",
   },
 
   typography: {

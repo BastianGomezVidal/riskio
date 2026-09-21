@@ -1,9 +1,15 @@
-import { Suspense, useEffect, useRef } from "react";
-import { use } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card, Skeleton, Tag, Typography } from "antd";
-import { preloadAdvisory } from "@/data/promises";
-import { ForecastTable } from "@/components/ForecastTable/ForecastTable";
+import { Suspense, use, useEffect, useRef, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { Card, Skeleton, Tag, Typography } from "antd";
+import { preloadAdvisory, resetAdvisory } from "@/data/promises";
+import {
+  ErrorEmpty,
+  NotFoundEmpty,
+  OfflineEmpty,
+} from "@/global_components/StatusEmpty/StatusEmpty";
+import type { AdvisoryDetail } from "@/domain/storm";
+import { ForecastTable } from "@/global_components/ForecastTable/ForecastTable";
+import { formatUTC } from "@/domain/format/datetime";
 
 const { Title, Text } = Typography;
 
@@ -19,43 +25,47 @@ export function AdvisoryDetailPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl">
-      <BackButton />
-      <Suspense fallback={<AdvisoryDetailFallback />}>
-        <AdvisoryDetailContent id={id} />
-      </Suspense>
-    </div>
+    <Suspense fallback={<Skeleton active paragraph={{ rows: 8 }} />}>
+      <AdvisoryDetailLoader id={id} />
+    </Suspense>
   );
 }
 
-function BackButton() {
-  const navigate = useNavigate();
-  return (
-    <Button
-      type="link"
-      style={{ paddingLeft: 0, marginBottom: 8 }}
-      onClick={() => navigate(-1)}
-    >
-      ← Back
-    </Button>
-  );
+function AdvisoryDetailLoader({ id }: { id: string }) {
+  const result = use(preloadAdvisory(id));
+  const [retryToken, setRetryToken] = useState(0);
+
+  const retry = () => {
+    resetAdvisory(id);
+    setRetryToken((n) => n + 1);
+  };
+
+  if (result.status === "not-found") {
+    return (
+      <NotFoundEmpty
+        message="Advisory not found."
+        action={<Link to="/history">Back to history</Link>}
+      />
+    );
+  }
+
+  if (result.status === "offline") {
+    return <OfflineEmpty onRetry={retry} />;
+  }
+
+  if (result.status === "error") {
+    return <ErrorEmpty message={result.message} onRetry={retry} />;
+  }
+
+  return <AdvisoryDetailView key={retryToken} advisory={result.data} />;
 }
 
-function AdvisoryDetailFallback() {
-  return (
-    <div aria-busy="true">
-      <Skeleton active paragraph={{ rows: 8 }} />
-    </div>
-  );
-}
-
-function AdvisoryDetailContent({ id }: { id: string }) {
-  const advisory = use(preloadAdvisory(id));
+function AdvisoryDetailView({ advisory }: { advisory: AdvisoryDetail }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     headingRef.current?.focus();
-  }, [id]);
+  }, [advisory.id]);
 
   return (
     <>
@@ -70,12 +80,7 @@ function AdvisoryDetailContent({ id }: { id: string }) {
 
       <Text type="secondary">
         Issued{" "}
-        <time dateTime={advisory.issuedAt}>
-          {new Intl.DateTimeFormat("en", {
-            dateStyle: "medium",
-            timeStyle: "short",
-          }).format(new Date(advisory.issuedAt))}
-        </time>
+        <time dateTime={advisory.issuedAt}>{formatUTC(advisory.issuedAt)}</time>
         {advisory.storm && (
           <>
             {" · "}

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useSession } from "@/auth/session-context";
 import { storeAccessToken } from "@/auth/session";
 
-export default function OAuthCallback() {
+export default function OAuthCallbackPage() {
   const navigate = useNavigate();
   const { restoreFromStoredToken } = useSession();
   const [message, setMessage] = useState("Finishing sign-in…");

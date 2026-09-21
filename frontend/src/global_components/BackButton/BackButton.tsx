@@ -16,7 +16,6 @@ import { useLocation, useNavigate } from "react-router-dom";
  */
 const FALLBACKS: Array<{ prefix: string; fallback: string }> = [
   { prefix: "/storms/", fallback: "/history" },
-  { prefix: "/advisories/", fallback: "/history" },
   { prefix: "/history", fallback: "/dashboard" },
   { prefix: "/settings", fallback: "/dashboard" },
 ];

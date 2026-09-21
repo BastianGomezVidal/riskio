@@ -1,9 +1,10 @@
 import { Modal, Skeleton } from "antd";
 import { Suspense, use, useCallback, useEffect, useRef, useState } from "react";
 import { CloseOutlined } from "@ant-design/icons";
-import { preloadAdvisory } from "@/data/promises";
+import { preloadAdvisory, resetAdvisory } from "@/data/promises";
 import { semantic } from "@/design-system/tokens/semantic";
-import { StormMap } from "@/components/StormMap";
+import { StormMap } from "@/global_components/StormMap";
+import { formatUTC } from "@/domain/format/datetime";
 
 interface Props {
   open: boolean;
@@ -45,11 +46,6 @@ export function MapModal({ open, onClose, advisoryId, stormName }: Props) {
         },
       }}
     >
-      {/*
-        antd 6 doesn't expose the modal's content slot through `styles`, so
-        we override its internal class via a scoped rule. The rule is local
-        to this modal (.riskio-map-modal), which prevents it from leaking.
-      */}
       <style>{`
         .riskio-map-modal .ant-modal-content {
           padding: 0;
@@ -61,7 +57,7 @@ export function MapModal({ open, onClose, advisoryId, stormName }: Props) {
 
       {advisoryId ? (
         <Suspense fallback={<MapFallback />}>
-          <MapModalContent
+          <MapModalLoader
             advisoryId={advisoryId}
             stormName={stormName}
             onClose={onClose}
@@ -84,15 +80,57 @@ interface ContentProps {
   setOffset: (o: { x: number; y: number }) => void;
 }
 
-function MapModalContent({
+function MapModalLoader({
   advisoryId,
   stormName,
   onClose,
   offset,
   setOffset,
 }: ContentProps) {
-  const advisory = use(preloadAdvisory(advisoryId));
+  const result = use(preloadAdvisory(advisoryId));
+  const [retryToken, setRetryToken] = useState(0);
 
+  const retry = () => {
+    resetAdvisory(advisoryId);
+    setRetryToken((n) => n + 1);
+  };
+
+  if (result.status !== "ok") {
+    const message =
+      result.status === "offline"
+        ? "You're offline."
+        : result.status === "not-found"
+          ? "Advisory not found."
+          : result.message;
+
+    return <ModalMessage message={message} onRetry={retry} onClose={onClose} />;
+  }
+
+  return (
+    <MapModalView
+      key={retryToken}
+      advisory={result.data}
+      stormName={stormName}
+      onClose={onClose}
+      offset={offset}
+      setOffset={setOffset}
+    />
+  );
+}
+
+function MapModalView({
+  advisory,
+  stormName,
+  onClose,
+  offset,
+  setOffset,
+}: {
+  advisory: import("@/domain/storm").AdvisoryDetail;
+  stormName: string;
+  onClose: () => void;
+  offset: { x: number; y: number };
+  setOffset: (o: { x: number; y: number }) => void;
+}) {
   const dragState = useRef<{
     active: boolean;
     startX: number;
@@ -143,7 +181,7 @@ function MapModalContent({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         role="presentation"
-        className="flex items-start justify-between gap-4 px-5 pb-4 pt-5"
+        className="flex items-start justify-between gap-4 px-5 pt-5 pb-4"
         style={{
           background: semantic.colors.background,
           color: semantic.colors.textPrimary,
@@ -174,19 +212,16 @@ function MapModalContent({
             <span
               className="inline-flex items-center rounded px-2 py-0.5"
               style={{
-                background: "rgba(255, 255, 255, 0.18)",
-                color: semantic.colors.secondary,
+                background: semantic.surface.raised,
+                color: semantic.colors.textPrimary,
                 fontWeight: semantic.typography.fontWeight.medium,
               }}
             >
               Advisory #{advisory.advisoryNumber}
             </span>
-            <span style={{ color: "rgba(255, 255, 255, 0.85)" }}>
+            <span style={{ color: semantic.colors.textSecondary }}>
               <time dateTime={advisory.issuedAt}>
-                {new Intl.DateTimeFormat("en", {
-                  dateStyle: "medium",
-                  timeStyle: "short",
-                }).format(new Date(advisory.issuedAt))}
+                {formatUTC(advisory.issuedAt)}
               </time>
             </span>
           </div>
@@ -226,14 +261,48 @@ function CloseButton({ onClose }: { onClose: () => void }) {
       type="button"
       onClick={onClose}
       aria-label="Close map"
-      className="inline-flex size-10 shrink-0 items-center justify-center rounded transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white hover:bg-white/25"
+      className="inline-flex size-10 shrink-0 items-center justify-center rounded transition-colors hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
       style={{
-        background: "rgba(255, 255, 255, 0.12)",
-        color: semantic.colors.background,
+        background: "transparent",
+        color: semantic.colors.textSecondary,
+        border: "none",
+        cursor: "pointer",
       }}
     >
       <CloseOutlined style={{ fontSize: 16 }} aria-hidden />
     </button>
+  );
+}
+
+function ModalMessage({
+  message,
+  onRetry,
+  onClose,
+}: {
+  message: string;
+  onRetry: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 p-8 text-center">
+      <p className="text-sm font-medium">{message}</p>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onRetry}
+          className="rounded border px-3 py-1 text-sm hover:bg-gray-50"
+        >
+          Try again
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded border px-3 py-1 text-sm hover:bg-gray-50"
+        >
+          Close
+        </button>
+      </div>
+    </div>
   );
 }
 

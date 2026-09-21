@@ -1,13 +1,13 @@
 import { Suspense } from "react";
 import { Skeleton } from "antd";
-import { DashboardData } from "../DashboardData";
+import { DashboardContent } from "../components/dashboard/DashboardContent/DashboardContent";
 
 export function DashboardPage() {
   // No <main> here — AppLayout owns the main landmark.
   return (
     <div className="mx-auto w-full max-w-4xl">
       <Suspense fallback={<DashboardFallback />}>
-        <DashboardData />
+        <DashboardContent />
       </Suspense>
     </div>
   );
