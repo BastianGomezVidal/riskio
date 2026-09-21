@@ -3,9 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Storm } from './entities/storm.entity.js';
 import { StormDetailDto } from './dto/storm-detail.dto.js';
-import { PageQueryDto } from '../../../common/dto/page-query.dto.js';
-import { PaginatedResultDto } from '../../../common/dto/paginated-result.dto.js';
-import { PageMetaDto } from '../../../common/dto/page-meta.dto.js';
 
 interface FeedStormSummary {
   atcfId: string;
@@ -21,63 +18,62 @@ export class StormsService {
   ) {}
 
   /**
-   * Active storms, ordered by the most recent feed pass that saw them.
-   * No pagination — the active set is bounded by what NOAA is tracking.
-   */
-  async findActive(): Promise<Storm[]> {
-    return this.stormsRepository.find({
-      where: { isActive: true },
-      order: { lastSeenInFeedAt: 'DESC' },
-    });
-  }
-
-  /**
-   * Paginated list of historical (non-active) storms, newest-first by
-   * the feed pass that last saw them.
-   */
-  async findHistory(page: PageQueryDto): Promise<PaginatedResultDto<Storm>> {
-    const [data, total] = await this.stormsRepository.findAndCount({
-      where: { isActive: false },
-      order: { lastSeenInFeedAt: 'DESC' },
-      skip: (page.page - 1) * page.limit,
-      take: page.limit,
-    });
-
-    const meta: PageMetaDto = {
-      total,
-      page: page.page,
-      limit: page.limit,
-      pageCount: Math.ceil(total / page.limit),
-      hasNextPage: page.page * page.limit < total,
-    };
-    return new PaginatedResultDto(meta, data);
-  }
-
-  /**
-   * Fetch one storm by ATCF identifier with its advisories relation.
+   * Fetch one storm by ATCF identifier with its lightweight advisory
+   * references.
+   *
+   * The advisories are loaded as plain rows reduced to their identity
+   * fields (id, advisoryNumber, issuedAt). ForecastPoints, warnings,
+   * track and cone are NOT loaded here — fetch GET /advisories/:id for
+   * the full advisory.
    */
   async findOne(atcfId: string): Promise<StormDetailDto> {
     const storm = await this.stormsRepository.findOne({
       where: { atcfId },
       relations: { advisories: true },
+      select: {
+        atcfId: true,
+        name: true,
+        basin: true,
+        firstSeenAt: true,
+        lastSeenAt: true,
+        isActive: true,
+        lastSeenInFeedAt: true,
+        advisories: {
+          id: true,
+          advisoryNumber: true,
+          issuedAt: true,
+        },
+      },
+      order: {
+        advisories: {
+          advisoryNumber: 'DESC',
+        },
+      },
     });
+
     if (!storm) {
       throw new NotFoundException(`Storm ${atcfId} not found`);
     }
+
     return storm as StormDetailDto;
   }
 
   /**
-   * Reconciles the activity state of all storms in a basin against the
-   * authoritative list returned by the latest NOAA feed.
+   * Fetch the raw Storm row without loading relations.
    *
-   * Runs inside a transaction so a partial failure cannot leave the
-   * basin half-flipped. A network error never reaches this method —
-   * only a cleanly parsed feed does.
-   *
-   * @param basin The basin whose storms are being reconciled.
-   * @param summaries Storms currently listed in the feed for `basin`.
+   * Used by the ingestion pipeline, which needs the entity to attach new
+   * advisories but does not need the advisories relation loaded.
    */
+  async findOneRaw(atcfId: string): Promise<Storm> {
+    const storm = await this.stormsRepository.findOne({
+      where: { atcfId },
+    });
+    if (!storm) {
+      throw new NotFoundException(`Storm ${atcfId} not found`);
+    }
+    return storm;
+  }
+
   async reconcileFromFeed(
     basin: string,
     summaries: FeedStormSummary[],
@@ -85,11 +81,8 @@ export class StormsService {
     const now = new Date();
 
     await this.stormsRepository.manager.transaction(async (manager) => {
-      // 1. Everything in this basin is inactive unless proven otherwise
-      //    by the current feed.
       await manager.update(Storm, { basin }, { isActive: false });
 
-      // 2. Upsert the storms the feed is currently reporting.
       for (const s of summaries) {
         await manager.upsert(
           Storm,
@@ -106,11 +99,6 @@ export class StormsService {
     });
   }
 
-  /**
-   * Legacy ingestion helper. Kept for compatibility with code paths
-   * that still call it directly. Prefer `reconcileFromFeed` for new
-   * ingestion work — it handles the active-set flip atomically.
-   */
   async upsertFromIngestion(input: {
     atcfId: string;
     name: string | null;

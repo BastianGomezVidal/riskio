@@ -3,7 +3,6 @@ import { NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { StormsService } from './storms.service.js';
 import { Storm } from './entities/storm.entity.js';
-import { PageQueryDto } from '../../../common/dto/page-query.dto.js';
 
 /**
  * Creates a minimal valid Storm entity for storms service tests.
@@ -20,13 +19,6 @@ function makeStorm(overrides: Partial<Storm> = {}): Storm {
     advisories: [],
     ...overrides,
   };
-}
-
-/**
- * Builds a pagination DTO with explicit values, bypassing the HTTP layer.
- */
-function makePage(page = 1, limit = 20): PageQueryDto {
-  return { page, limit } as PageQueryDto;
 }
 
 describe('StormsService', () => {
@@ -68,78 +60,6 @@ describe('StormsService', () => {
     service = new StormsService(repository);
   });
 
-  describe('findActive', () => {
-    it('queries active storms, newest feed appearance first', async () => {
-      const storms = [makeStorm()];
-      find.mockResolvedValue(storms);
-
-      await expect(service.findActive()).resolves.toBe(storms);
-
-      expect(find).toHaveBeenCalledWith({
-        where: { isActive: true },
-        order: { lastSeenInFeedAt: 'DESC' },
-      });
-    });
-  });
-
-  describe('findHistory', () => {
-    it('paginates inactive storms and reports page metadata', async () => {
-      const data = [makeStorm({ isActive: false })];
-      findAndCount.mockResolvedValue([data, 45]);
-
-      const result = await service.findHistory(makePage(1, 20));
-
-      expect(findAndCount).toHaveBeenCalledWith({
-        where: { isActive: false },
-        order: { lastSeenInFeedAt: 'DESC' },
-        skip: 0,
-        take: 20,
-      });
-
-      expect(result.data).toBe(data);
-      expect(result.meta).toEqual({
-        total: 45,
-        page: 1,
-        limit: 20,
-        pageCount: 3,
-        hasNextPage: true,
-      });
-    });
-
-    it('derives the offset from the requested page', async () => {
-      findAndCount.mockResolvedValue([[], 45]);
-
-      await service.findHistory(makePage(3, 10));
-
-      expect(findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({ skip: 20, take: 10 }),
-      );
-    });
-
-    it('reports no next page on the last exact page', async () => {
-      findAndCount.mockResolvedValue([[], 20]);
-
-      const result = await service.findHistory(makePage(2, 10));
-
-      expect(result.meta).toEqual({
-        total: 20,
-        page: 2,
-        limit: 10,
-        pageCount: 2,
-        hasNextPage: false,
-      });
-    });
-
-    it('reports zero pages when there is no history', async () => {
-      findAndCount.mockResolvedValue([[], 0]);
-
-      const result = await service.findHistory(makePage());
-
-      expect(result.meta.pageCount).toBe(0);
-      expect(result.meta.hasNextPage).toBe(false);
-    });
-  });
-
   describe('findOne', () => {
     it('loads the storm together with its advisories relation', async () => {
       const storm = makeStorm();
@@ -150,6 +70,21 @@ describe('StormsService', () => {
       expect(findOne).toHaveBeenCalledWith({
         where: { atcfId: 'EP142026' },
         relations: { advisories: true },
+        select: {
+          atcfId: true,
+          name: true,
+          basin: true,
+          firstSeenAt: true,
+          lastSeenAt: true,
+          isActive: true,
+          lastSeenInFeedAt: true,
+          advisories: {
+            id: true,
+            advisoryNumber: true,
+            issuedAt: true,
+          },
+        },
+        order: { advisories: { advisoryNumber: 'DESC' } },
       });
     });
 

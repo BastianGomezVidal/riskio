@@ -3,7 +3,7 @@ import { Repository } from 'typeorm';
 import { DashboardService } from './dashboard.service.js';
 import { Storm } from '../weather/storms/entities/storm.entity.js';
 import { Advisory } from '../weather/advisories/entities/advisory.entity.js';
-import { ForecastPoint } from '../weather/forecast-points/entities/forecast-point.entity.js';
+import { ForecastPoint } from '../weather/advisories/entities/forecast-point.entity.js';
 import { AdvisoriesService } from '../weather/advisories/advisories.service.js';
 
 /**

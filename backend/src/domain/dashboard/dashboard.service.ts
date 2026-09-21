@@ -2,10 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import {
-  DashboardSummaryDto,
-  StormSummaryDto,
-} from './dto/dashboard-summary.dto.js';
+import { DashboardSummaryDto } from './dto/dashboard-summary.dto.js';
+import { StormSummaryDto } from '../weather/storms/dto/storm-summary.dto.js';
 import { Storm } from '../weather/storms/entities/storm.entity.js';
 import { AdvisoriesService } from '../weather/advisories/advisories.service.js';
 

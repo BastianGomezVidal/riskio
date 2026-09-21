@@ -10,10 +10,11 @@ import { Storm } from './entities/storm.entity.js';
 /**
  * Storms endpoints (integration).
  *
- * Covers the active/history split introduced with the storm activity flags:
- * `GET /storms` only returns the current NOAA active set, while
- * `GET /storms/history` paginates the rest. A `NhcProvider` override keeps
- * the scheduler from touching the database with real feeds during the run.
+ * Covers the active/detail surface introduced with the storm activity flags:
+ * `GET /storms` only returns the current NOAA active set. The historical
+ * complement lives in the history module (`GET /history`). A `NhcProvider`
+ * override keeps the scheduler from touching the database with real feeds
+ * during the run.
  */
 
 const ACTIVE_NEW = 'EP902026';
@@ -87,68 +88,6 @@ describe('Storms endpoints (integration)', () => {
 
     // ACTIVE_NEW was seen in a later feed pass than ACTIVE_OLD.
     expect(ids.indexOf(ACTIVE_NEW)).toBeLessThan(ids.indexOf(ACTIVE_OLD));
-  });
-
-  it('GET /storms/history returns only inactive storms', async () => {
-    const res = await request(app.getHttpServer())
-      .get('/storms/history')
-      .query({ limit: 100 })
-      .expect(200);
-
-    const ids = res.body.data.map((s: { atcfId: string }) => s.atcfId);
-
-    expect(ids).toContain(INACTIVE_NEW);
-    expect(ids).toContain(INACTIVE_MID);
-    expect(ids).toContain(INACTIVE_OLD);
-
-    expect(ids).not.toContain(ACTIVE_NEW);
-    expect(ids).not.toContain(ACTIVE_OLD);
-
-    expect(
-      res.body.data.every((s: { isActive: boolean }) => !s.isActive),
-    ).toBe(true);
-  });
-
-  it('orders history by the feed pass that last saw each storm', async () => {
-    const res = await request(app.getHttpServer())
-      .get('/storms/history')
-      .query({ limit: 100 })
-      .expect(200);
-
-    const ids = res.body.data.map((s: { atcfId: string }) => s.atcfId);
-
-    expect(ids.indexOf(INACTIVE_OLD)).toBeLessThan(ids.indexOf(INACTIVE_NEW));
-  });
-
-  it('paginates history and reports internally consistent metadata', async () => {
-    const res = await request(app.getHttpServer())
-      .get('/storms/history')
-      .query({ page: 1, limit: 2 })
-      .expect(200);
-
-    const { meta, data } = res.body;
-
-    expect(meta.page).toBe(1);
-    expect(meta.limit).toBe(2);
-    expect(meta.total).toBeGreaterThanOrEqual(3);
-    expect(meta.pageCount).toBe(Math.ceil(meta.total / meta.limit));
-    expect(meta.hasNextPage).toBe(meta.page * meta.limit < meta.total);
-
-    expect(data).toHaveLength(2);
-  });
-
-  it('rejects an out-of-range limit', async () => {
-    await request(app.getHttpServer())
-      .get('/storms/history')
-      .query({ limit: 101 })
-      .expect(400);
-  });
-
-  it('rejects a non-positive page', async () => {
-    await request(app.getHttpServer())
-      .get('/storms/history')
-      .query({ page: 0 })
-      .expect(400);
   });
 
   it('GET /storms/:atcfId exposes the activity flags', async () => {

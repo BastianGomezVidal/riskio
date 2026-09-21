@@ -5,11 +5,9 @@ import { StormsService } from './storms.service.js';
 import { StormsController } from './storms.controller.js';
 
 /**
- * Storms feature module: known tropical cyclones.
- *
- * Registers the {@link Storm} entity, exposes the
- * {@link StormsController} HTTP surface and shares
- * {@link StormsService} with the ingestion pipeline.
+ * Storms feature module: the storm aggregate and its ingestion-side
+ * operations. Read models (dashboard, history) live in their own modules
+ * and consume this one through TypeORM's feature registration.
  */
 @Module({
   imports: [TypeOrmModule.forFeature([Storm])],

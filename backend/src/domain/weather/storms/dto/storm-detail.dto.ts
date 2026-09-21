@@ -1,16 +1,33 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Advisory } from '../../advisories/entities/advisory.entity.js';
+
+/**
+ * Lightweight advisory reference used in the storm detail listing.
+ *
+ * Contains only the fields needed to render the advisory card header. The
+ * full advisory (forecastPoints, warnings, track, cone, rawText) is
+ * fetched on demand from GET /advisories/:id.
+ */
+export class AdvisoryRefDto {
+  @ApiProperty({ description: 'Advisory UUID' })
+  id: string;
+
+  @ApiProperty({ description: 'NHC advisory number', example: 22 })
+  advisoryNumber: number;
+
+  @ApiProperty({ description: 'Issue timestamp' })
+  issuedAt: Date;
+}
 
 /**
  * A storm expanded with its advisories relation.
  *
- * The advisories returned here are the plain rows — their forecastPoints
- * and warnings relations are NOT loaded. Fetch an individual advisory
- * (GET /advisories/:id) to get the expanded version.
+ * Advisories are the plain rows reduced to their identity fields; the
+ * forecastPoints, warnings, track and cone are NOT loaded here. Fetch an
+ * individual advisory (GET /advisories/:id) for the full content.
  *
- * Intentionally does NOT extend `Storm`. The relation we add (`advisories`)
- * is a subset of the base class's `Relation<Advisory[]>`, and TS forbids
- * narrowing a property via inheritance.
+ * Intentionally does NOT extend `Storm`. The relation we add
+ * (`advisories`) is a subset of the base class's `Relation<Advisory[]>`,
+ * and TS forbids narrowing a property via inheritance.
  */
 export class StormDetailDto {
   @ApiProperty({ description: 'ATCF storm identifier', example: 'EP142026' })
@@ -35,14 +52,15 @@ export class StormDetailDto {
 
   @ApiPropertyOptional({
     description: 'Timestamp of the feed pass that last saw this storm',
+    nullable: true,
   })
   lastSeenInFeedAt: Date | null;
 
   @ApiPropertyOptional({
-    type: () => Advisory,
+    type: () => AdvisoryRefDto,
     isArray: true,
     description:
-      'Advisories issued for this storm, without forecastPoints or warnings',
+      'Lightweight advisory references (id, number, issuedAt) ordered newest-first. ForecastPoints, warnings, track and cone are NOT loaded here.',
   })
-  advisories: Advisory[];
+  advisories: AdvisoryRefDto[];
 }
