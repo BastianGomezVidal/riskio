@@ -1,17 +1,10 @@
-import type {
-  AdvisoryDetail,
-  StormDetail,
-} from "@/domain/storm";
-import type {
-  ForgotPasswordResult,
-  Session,
-} from "@/domain/auth";
-import type { DashboardSummary } from "@/domain/dashboard";
+import type { AdvisoryDetail, StormDetail } from "@/domain/storm";
+import type { ForgotPasswordResult, Session } from "@/domain/auth";
+import type { DashboardSummary, StormHistoryItem } from "@/domain/dashboard";
+import type { Paginated } from "@/domain/common/types";
 
-/** Base URL of the Riskio backend API. */
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
-/** Tiny typed fetch wrapper; the web app never shares code with the backend. */
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -40,7 +33,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-/** Maps API/network errors to a friendly, short message for non-technical users. */
 export function authErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 401) {
@@ -68,7 +60,6 @@ function extractError(body: string): string | null {
   return null;
 }
 
-/** OAuth provider consent URL that starts a Google/Outlook sign-in. */
 export function oauthAuthorizeUrl(provider: "google" | "outlook"): string {
   return `${API_URL}/auth/oauth/${provider}`;
 }
@@ -110,4 +101,9 @@ export const api = {
     request<{ id: string; name: string; prefix: string }[]>("/auth/tokens"),
 
   dashboardSummary: () => request<DashboardSummary>("/dashboard/summary"),
+
+  stormHistory: (page = 1, limit = 50) =>
+    request<Paginated<StormHistoryItem>>(
+      `/history?page=${page}&limit=${limit}`,
+    ),
 };

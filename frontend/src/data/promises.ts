@@ -1,6 +1,8 @@
 import { api } from "@/api/client";
 import type { AdvisoryDetail, StormDetail } from "@/domain/storm";
-import type { DashboardSummary } from "@/domain/dashboard";
+import type { DashboardSummary, StormHistoryItem } from "@/domain/dashboard";
+import type { Paginated } from "@/domain/common/types";
+import { toPreloadResult, type PreloadResult } from "./preload-result";
 
 /* ------------------------------------------------------------------ */
 /* Generic cache helper                                                */
@@ -8,77 +10,154 @@ import type { DashboardSummary } from "@/domain/dashboard";
 
 const MAX_CACHE = 200;
 
+interface CacheEntry<V> {
+  promise: Promise<V>;
+  cachedAt: number;
+}
+
 function cachedFetch<K, V>(
-  map: Map<K, Promise<V>>,
+  map: Map<K, CacheEntry<V>>,
   key: K,
   fetch: () => Promise<V>,
+  ttlMs: number,
 ): Promise<V> {
-  let promise = map.get(key);
-  if (!promise) {
-    promise = fetch().catch((err) => {
-      map.delete(key); // allow retry on failure
-      throw err;
-    });
-    map.set(key, promise);
-    if (map.size > MAX_CACHE) {
-      const oldest = map.keys().next().value;
-      if (oldest !== undefined) map.delete(oldest);
-    }
+  const now = Date.now();
+  const entry = map.get(key);
+
+  if (entry && now - entry.cachedAt < ttlMs) {
+    return entry.promise;
   }
+
+  const promise = fetch().catch((err) => {
+    map.delete(key); // allow retry on failure
+    throw err;
+  });
+
+  map.set(key, { promise, cachedAt: now });
+
+  // LRU eviction: Map preserves insertion order, so the first key is
+  // the oldest entry.
+  if (map.size > MAX_CACHE) {
+    const oldest = map.keys().next().value;
+    if (oldest !== undefined) map.delete(oldest);
+  }
+
   return promise;
 }
+
+/* ------------------------------------------------------------------ */
+/* TTL constants                                                       */
+/* ------------------------------------------------------------------ */
+
+const HEALTH_TTL_MS = 30_000;
+const DASHBOARD_TTL_MS = 2 * 60_000;
+const HISTORY_TTL_MS = 10 * 60_000;
+const STORM_TTL_MS = 5 * 60_000;
+const ADVISORY_TTL_MS = Number.POSITIVE_INFINITY;
 
 /* ------------------------------------------------------------------ */
 /* Health                                                              */
 /* ------------------------------------------------------------------ */
 
-let healthPromise: Promise<{ status: string }> | null = null;
-let healthFetchedAt = 0;
-const HEALTH_TTL_MS = 30_000;
+let healthState: {
+  promise: Promise<{ status: string }>;
+  cachedAt: number;
+} | null = null;
 
 export function preloadHealth(): Promise<{ status: string }> {
   const now = Date.now();
-  if (!healthPromise || now - healthFetchedAt > HEALTH_TTL_MS) {
-    healthPromise = api.health().catch((err) => {
-      healthPromise = null;
-      throw err;
-    });
-    healthFetchedAt = now;
+
+  if (!healthState || now - healthState.cachedAt > HEALTH_TTL_MS) {
+    healthState = {
+      promise: api.health().catch((err) => {
+        healthState = null;
+        throw err;
+      }),
+      cachedAt: now,
+    };
   }
-  return healthPromise;
+
+  return healthState.promise;
 }
 
 export function resetHealth(): void {
-  healthPromise = null;
-  healthFetchedAt = 0;
+  healthState = null;
 }
 
 /* ------------------------------------------------------------------ */
 /* Dashboard summary                                                   */
 /* ------------------------------------------------------------------ */
 
-let dashboardSummaryPromise: Promise<DashboardSummary> | null = null;
+let dashboardSummaryState: {
+  promise: Promise<PreloadResult<DashboardSummary>>;
+  cachedAt: number;
+} | null = null;
 
-export function preloadDashboardSummary(): Promise<DashboardSummary> {
-  dashboardSummaryPromise ??= api.dashboardSummary().catch((err) => {
-    dashboardSummaryPromise = null;
-    throw err;
-  });
-  return dashboardSummaryPromise;
+export function preloadDashboardSummary(): Promise<
+  PreloadResult<DashboardSummary>
+> {
+  const now = Date.now();
+
+  if (
+    dashboardSummaryState &&
+    now - dashboardSummaryState.cachedAt < DASHBOARD_TTL_MS
+  ) {
+    return dashboardSummaryState.promise;
+  }
+
+  const promise = toPreloadResult(() => api.dashboardSummary());
+  dashboardSummaryState = { promise, cachedAt: now };
+  return promise;
 }
 
 export function resetDashboardSummary(): void {
-  dashboardSummaryPromise = null;
+  dashboardSummaryState = null;
+}
+
+/* ------------------------------------------------------------------ */
+/* History                                                             */
+/* ------------------------------------------------------------------ */
+
+interface HistoryState {
+  promise: Promise<PreloadResult<Paginated<StormHistoryItem>>>;
+  cachedAt: number;
+}
+
+let historyState: HistoryState | null = null;
+
+export function preloadHistory(): Promise<
+  PreloadResult<Paginated<StormHistoryItem>>
+> {
+  const now = Date.now();
+
+  if (historyState && now - historyState.cachedAt < HISTORY_TTL_MS) {
+    return historyState.promise;
+  }
+
+  const promise = toPreloadResult(() => api.stormHistory());
+  historyState = { promise, cachedAt: now };
+  return promise;
+}
+
+export function resetHistory(): void {
+  historyState = null;
 }
 
 /* ------------------------------------------------------------------ */
 /* Storm detail (per atcfId)                                           */
 /* ------------------------------------------------------------------ */
 
-const stormCache = new Map<string, Promise<StormDetail>>();
+const stormCache = new Map<string, CacheEntry<PreloadResult<StormDetail>>>();
 
-export function preloadStorm(atcfId: string): Promise<StormDetail> {
-  return cachedFetch(stormCache, atcfId, () => api.storm(atcfId));
+export function preloadStorm(
+  atcfId: string,
+): Promise<PreloadResult<StormDetail>> {
+  return cachedFetch(
+    stormCache,
+    atcfId,
+    () => toPreloadResult(() => api.storm(atcfId)),
+    STORM_TTL_MS,
+  );
 }
 
 export function resetStorm(atcfId?: string): void {
@@ -90,10 +169,20 @@ export function resetStorm(atcfId?: string): void {
 /* Advisory detail (per UUID)                                          */
 /* ------------------------------------------------------------------ */
 
-const advisoryCache = new Map<string, Promise<AdvisoryDetail>>();
+const advisoryCache = new Map<
+  string,
+  CacheEntry<PreloadResult<AdvisoryDetail>>
+>();
 
-export function preloadAdvisory(id: string): Promise<AdvisoryDetail> {
-  return cachedFetch(advisoryCache, id, () => api.advisory(id));
+export function preloadAdvisory(
+  id: string,
+): Promise<PreloadResult<AdvisoryDetail>> {
+  return cachedFetch(
+    advisoryCache,
+    id,
+    () => toPreloadResult(() => api.advisory(id)),
+    ADVISORY_TTL_MS,
+  );
 }
 
 export function resetAdvisory(id?: string): void {
@@ -108,6 +197,7 @@ export function resetAdvisory(id?: string): void {
 export function resetAllCaches(): void {
   resetHealth();
   resetDashboardSummary();
+  resetHistory();
   stormCache.clear();
   advisoryCache.clear();
 }

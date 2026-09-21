@@ -1,4 +1,4 @@
-import type { ForecastPoint, Storm } from "@/domain/storm";
+import type { Storm, ForecastPoint } from "@/domain/storm";
 
 export interface DashboardTotals {
   events: number;
@@ -16,6 +16,7 @@ export interface LatestAdvisory {
 
 export interface StormSummary {
   storm: Storm;
+  advisoryCount: number;
   latestAdvisory: LatestAdvisory | null;
 }
 
@@ -23,4 +24,10 @@ export interface DashboardSummary {
   generatedAt: string;
   totals: DashboardTotals;
   storms: StormSummary[];
+}
+
+export interface StormHistoryItem {
+  storm: Storm;
+  advisoryCount: number;
+  lastSeenInFeedAt: string | null;
 }
