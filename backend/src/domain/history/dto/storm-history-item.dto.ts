@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Storm } from '../../../weather/storms/entities/storm.entity.js';
+import { Storm } from '../../weather/storms/entities/storm.entity.js';
 
 /**
  * One item in the history list.
