@@ -1,29 +1,26 @@
 import { Link, NavLink } from "react-router-dom";
-import {
-  DashboardOutlined,
-  HistoryOutlined,
-  SettingOutlined,
-  LogoutOutlined,
-} from "@ant-design/icons";
-import { useSession } from "@/auth/session-context";
+import { DashboardOutlined, CloudOutlined } from "@ant-design/icons";
+import { UserMenu } from "../UserMenu/UserMenu";
 import { semantic } from "@/design-system/tokens/semantic";
 
 interface NavItem {
   to: string;
   label: string;
   Icon: React.ComponentType;
-  end?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", Icon: DashboardOutlined, end: true },
-  { to: "/history", label: "History", Icon: HistoryOutlined },
-  { to: "/settings", label: "Settings", Icon: SettingOutlined },
+  { to: "/dashboard", label: "Dashboard", Icon: DashboardOutlined },
+  { to: "/storms", label: "Storms", Icon: CloudOutlined },
 ];
 
-export function SiteHeader() {
-  const { signOut } = useSession();
-
+/**
+ * Global header: logo on the left, nav + user menu on the right.
+ *
+ * Desktop: logo + nav + vertical divider + user menu.
+ * Mobile:  logo + user menu only. The nav moves to the footer.
+ */
+export function AppHeader() {
   return (
     <header
       className="sticky top-0 z-30 w-full border-b"
@@ -35,20 +32,23 @@ export function SiteHeader() {
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center px-4 sm:px-6 lg:px-8">
         <Link
           to="/dashboard"
-          aria-label="Rikio home"
+          aria-label="Riskio home"
           className="flex shrink-0 items-center rounded-md focus-visible:outline focus-visible:outline-offset-4 focus-visible:outline-white"
           style={{ color: semantic.colors.headerText }}
         >
           <span className="text-base font-semibold tracking-tight">Riskio</span>
         </Link>
 
-        <div className="ml-auto flex items-center gap-1">
-          <nav aria-label="Primary" className="flex items-center gap-1">
-            {NAV_ITEMS.map(({ to, label, Icon, end }) => (
+        <div className="ml-auto flex items-center gap-2">
+          {/* Desktop nav — hidden below md */}
+          <nav
+            aria-label="Primary"
+            className="hidden items-center gap-1 md:flex"
+          >
+            {NAV_ITEMS.map(({ to, label, Icon }) => (
               <NavLink
                 key={to}
                 to={to}
-                end={end}
                 className={({ isActive }) =>
                   [
                     "inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm",
@@ -86,29 +86,14 @@ export function SiteHeader() {
             ))}
           </nav>
 
+          {/* Vertical divider — desktop only */}
           <div
             aria-hidden
-            className="mx-2 h-5 w-px"
+            className="mx-2 hidden h-5 w-px md:block"
             style={{ background: semantic.colors.headerActive }}
           />
 
-          <button
-            type="button"
-            onClick={signOut}
-            className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-            style={{ color: semantic.colors.headerTextMuted }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = semantic.colors.headerHover;
-              e.currentTarget.style.color = semantic.colors.headerText;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = semantic.colors.headerTextMuted;
-            }}
-          >
-            <LogoutOutlined aria-hidden />
-            <span>Sign out</span>
-          </button>
+          <UserMenu />
         </div>
       </div>
     </header>
