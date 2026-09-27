@@ -32,6 +32,11 @@
     "migration:show": "npm run typeorm -- migration:show -d src/database/data-source.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1141.0",
+    "@aws-sdk/client-sqs": "^3.1141.0",
+    "@aws-sdk/s3-request-presigner": "^3.1141.0",
+    "@keyv/redis": "^5.1.6",
+    "@nestjs/cache-manager": "^12.0.0",
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.0.0",
     "@nestjs/core": "^12.0.1",
@@ -45,11 +50,15 @@
     "@types/geojson": "^7946.0.16",
     "adm-zip": "^0.6.0",
     "bcryptjs": "^3.0.3",
+    "cache-manager": "^7.2.9",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "fast-xml-parser": "^5.11.1",
     "joi": "^18.2.8",
+    "kafkajs": "^2.2.4",
+    "keyv": "^5.6.0",
     "pg": "^8.23.0",
+    "redis": "^6.2.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "typeorm": "^1.1.1"
@@ -62,6 +71,7 @@
     "@pact-foundation/pact": "^17.1.4",
     "@types/bcryptjs": "^2.4.6",
     "@types/express": "^5.0.0",
+    "@types/multer": "^2.2.0",
     "@types/node": "^24.13.4",
     "@types/pg": "^8.23.1",
     "@types/supertest": "^7.0.0",
@@ -80,5 +90,8 @@
     "tsconfck": {
       "typescript": "$typescript"
     }
+  },
+  "allowScripts": {
+    "@scarf/scarf@1.4.0": true
   }
 }
