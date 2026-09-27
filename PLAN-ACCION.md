@@ -75,6 +75,106 @@ Reglas:
 
 Solo si el usuario lo pide explícitamente. Rama y remoto se confirman antes.
 
+### Paso 0.5 — ✅ Ejecutado (2026-09-26)
+
+**Resultado: 20 commits, working tree limpio** (solo queda `contexto.txt` sin trackear,
+que son notas de trabajo y no código).
+
+| # | Commit | Alcance |
+|---|---|---|
+| 1 | `81c015d chore(api)` | deps AWS SDK, cache, messaging, multer types |
+| 2 | `7384787 feat(migrations)` | columna `avatarUrl` |
+| 3 | `065f3cc feat(api)` | `S3StorageService` + bootstrap de bucket |
+| 4 | `13a2e9f feat(api)` | `CacheService` (memory/Redis) |
+| 5 | `e10a983 feat(api)` | brokers memory/SQS/Kafka + orphan cleanup |
+| 6 | `e56e0fa refactor(api)` | `history/` → `storm-history/` |
+| 7 | `4875dd9 feat(api)` | `JwtAuthGuard` global + `@Public()` |
+| 8 | `87d5c9e chore(api)` | `/health` público |
+| 9 | `7244d00 feat(api)` | `UsersModule` (perfil, avatar) |
+| 10 | `ab31a18 refactor(api)` | DTOs: `StormDto` aggregate + advisory por número |
+| 11 | `4e425ae feat(api)` | totales por cuenca en dashboard |
+| 12 | `bd9f8a4 feat(api)` | invalidación de cache tras ingest |
+| 13 | `9aa2716 chore(api)` | wiring en `AppModule` + test harness |
+| 14 | `e2a5722 refactor(web)` | auth → `pages/public/` + `layout/public/` |
+| 15 | `d51947b refactor(web)` | weather → `pages/protected/` + `layout/protected/` |
+| 16 | `cdd3ecc refactor(web)` | `domain/` (tipos) vs `helpers/` (runtime) + users domain |
+| 17 | `9186d63 feat(web)` | inactividad, `useMediaQuery`, `useScrollToTop` |
+| 18 | `a41e748 refactor(web)` | `global_components/` + fix typo `PageFAllBack` |
+| 19 | `6a4cda4 feat(web)` | layout de settings |
+| 20 | `697abb4 feat(web)` | layout del directorio de tormentas |
+| 21 | `49f5f6d feat(web)` | endpoints en `api/client.ts` |
+| 22 | `7ad571a feat(web)` | preloaders storms/storm/profile |
+| 23 | `9116fb2 refactor(web)` | rutas `/storms` en vez de `/history` |
+| 24 | `c03047c chore(infra)` | SeaweedFS + Redis |
+| 25 | `a41465e docs(infra)` | diagramas + plan |
+
+Git detectó **20 renombres**, así que el historial muestra los movimientos como
+`viejo => nuevo` y no como borrado+creado.
+
+**Estado de verificación tras la Fase 0:**
+- Backend `build`: 0 ✅
+- Backend `lint`: 0 ✅
+- Frontend `build`: 0 ✅
+- Backend `test`: ❌ **3 failed | 171 passed | 1 skipped (175)** → ver Deuda D1
+
+---
+
+## Deuda técnica registrada
+
+> Todo lo que se decidió **no** arreglar en esta fase, para no mezclar un commit
+> con un refactor grande. Cada punto tiene su paso en la fase correspondiente.
+
+### D1 — Specs de backend con tests comentados (🔴 prioritaria)
+
+**Estado actual:** `npm test` → **3 failed | 171 passed | 1 skipped (175)**.
+Antes de la Fase 0 la suite estaba en **209/209**.
+
+**Causa:** al agrupar los cambios se preservó tal cual un bloque de tests que ya estaba
+comentado en el working tree. No lo introdujo el agrupado.
+
+| Archivo | Problema | Efecto |
+|---|---|---|
+| `backend/src/domain/weather/storms/storms.service.spec.ts:78` | `/*service = new StormsService(repository);` abre un bloque que comenta **hasta el final del archivo** | Vitest: "No test found in suite". De 6 tests a **0** ejecutados |
+| `backend/src/domain/dashboard/dashboard.service.spec.ts` | 8 bloques comentados, entre ellos `//service = new DashboardService(...)` y `it.skip` en el primer test | El `service` nunca se instancia → aserciones fallan |
+| `backend/src/domain/dashboard/dashboard.service.spec.ts:168` | Un `it()` quedó **anidado dentro de otro `it()`** (por el `/*` mal cerrado) | Error: "Calling the test function inside another test function is not allowed" |
+
+**Impacto:** `findOne` de storms y `getSummary` de dashboard **no tienen cobertura
+ejecutable**. El refactor de DTOs (`ab31a18`) no está protegido por tests.
+
+**Alcance del arreglo:** ~34 tests por reactivar (209 − 175). Requiere:
+1. Cerrar bien el `/*` de `storms.service.spec.ts` y descomentar el `beforeEach`.
+2. Reinstaurar `new DashboardService(...)` y quitar el `it.skip`; añadir `pacific`/`atlantic`
+   a la aserción de `totals` (el servicio ya las devuelve desde `4e425ae`).
+3. Reubicar el `it()` anidado de la línea 168 al nivel de `describe`.
+
+**Explicación:** un test comentado no es cobertura: es la *impresión* de cobertura. Deja el
+`describe` en verde mientras la función puede romperse sin que nadie lo note. Un `it.skip`
+es legítimo como deuda declarada; un bloque `/* */` que se traga el archivo entero es un
+accidente, y por eso el síntoma es "No test found in suite" en vez de un fallo claro.
+
+→ Ver **Paso 4.4**
+
+### D2 — Código duplicado en backend
+
+`domain/history/`, `domain/storm-history/` y `domain/weather/storms/` conviven;
+`StormHistoryController` sigue montado en `/storm-history`. → **Paso 4.1**
+
+### D3 — Código duplicado en frontend
+
+`helpers/` vs `domain/`; `global_components/StormCard|StormList` vs
+`features/weather/components/dashboard/`; `pages/protected/*` vs `features/weather/pages/*`.
+→ **Paso 4.2**
+
+### D4 — Otras observaciones
+
+- `contexto.txt` sin trackear en la raíz (notas personales, no código). Decidir si se
+  commitea, se añade a `.gitignore` o se borra.
+- `npm run lint` del frontend es un alias de `npm run build` (`"lint": "vite build"`):
+  no hay linter real. El build sí ejecuta `tsc -b`, así que hay type-checking.
+- Bundle inicial del frontend: **1.063 kB** (gzip 337 kB) con un chunk que dispara el
+  aviso de Vite (>500 kB). → se ataca en **Paso 2.6**.
+
+
 ---
 
 ## Fase 1 — Compose: mejoras de mantenibilidad (sin cambiar comportamiento)
@@ -199,22 +299,42 @@ carpeta duplicada también confunde: no se sabe cuál es la fuente de verdad.
 Las mejoras de Fase 2 (Error Boundaries, TanStack Query, Zod, React 19) se aplican primero al código
 "vivo" (el que los routers importan). Al resolver 4.2, verificar que las features nuevas heredan los patrones.
 
+### Paso 4.4 — Reactivar los tests comentados del backend (🔴 D1, antes que 4.1)
+
+Es lo primero de esta fase: mientras `npm test` falle, cualquier refactor posterior
+(4.1–4.3) se hace sin red de seguridad.
+
+1. `storms.service.spec.ts` — cerrar el `/*` de la línea 78, descomentar el `beforeEach`
+   y el cuerpo de los 6 tests. Actualizar la aserción de `findOne` al `StormDto` actual
+   (`latestAdvisoryIssuedAt` en lugar de `riskLevel`).
+2. `dashboard.service.spec.ts` — reinstaurar `new DashboardService(stormsRepo, advisoriesService)`,
+   quitar el `it.skip` y añadir `pacific: 0, atlantic: 0` a la aserción de `totals`.
+3. Mover a nivel de `describe` el `it()` anidado en la línea 168.
+4. `npm test` debe volver a **209/209** antes de seguir.
+
+Meta: 209 tests verdes, cubriendo el refactor de DTOs de `ab31a18` y los totales por
+cuenca de `4e425ae`.
+
 ---
 
 ## Resumen de entregables por fase
 
 | Fase | Entregable | Riesgo |
 |---|---|---|
-| 0 | Cambios agrupados en commits atómicos | Bajo |
+| 0 | ✅ 20 commits atómicos, árbol limpio | Bajo |
 | 1 | Compose con anchors + config por `.env` | Bajo |
 | 2 | Frontend con Error Boundaries, TanStack Query, Zod, colocation, React 19, splitting | Medio (refactor de data layer) |
 | 3 | Informe de a11y + Web Vitals con acciones priorizadas | Bajo (auditoría) |
-| 4 | Código duplicado eliminado (backend history, frontend helpers/pages) | Medio (toca imports) |
+| 4 | **D1 primero:** 209/209 tests verdes, duplicados eliminados (backend history, frontend helpers/pages) | Medio (toca imports) |
 
-## Cómo lo ejecutamos
+## Orden de ejecución
 
-1. Empezamos por **Fase 0** (commits). Revisamos el diff del grupo antes de commitear.
-2. Cada commit lleva su explicación (qué/porqué), para que quede documentado.
-3. Avanzamos a **Fase 1** solo cuando Fase 0 esté limpia.
-4. **Fase 2** es la más grande: la hacemos feature por feature, no de golpe.
-5. **Fase 3** al final, con informe de hallazgos y prioridades.
+1. **Fase 4.4** (D1) — reactivar los tests. Es bloqueante: nada más se hace con `npm test` en rojo.
+2. **Fase 1** — compose: anchors, credenciales a `.env`, red dedicada (opcional).
+3. **Fase 4.1–4.3** — unificar duplicados de backend y frontend.
+4. **Fase 2** — React 19: Error Boundaries, TanStack Query, Zod, colocation, splitting.
+5. **Fase 3** — auditorías de a11y y Web Vitals, con informe de prioridades.
+
+Cada paso se ejecuta y se revisa antes de pasar al siguiente. Nada se commitea sin
+revisar el diff.
+
