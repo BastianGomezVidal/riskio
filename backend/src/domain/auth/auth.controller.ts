@@ -34,6 +34,8 @@ import {
 import {
   ForgotPasswordDto,
   ForgotPasswordResponseDto,
+  ResetPasswordDto,
+  ResetPasswordResponseDto,
 } from './dto/forgot-password.dto.js';
 import {
   CreateApiTokenDto,
@@ -97,7 +99,24 @@ export class AuthController {
   forgotPassword(
     @Body() body: ForgotPasswordDto,
   ): Promise<ForgotPasswordResponseDto> {
-    return this.auth.resetPassword(body.email);
+    return this.auth.requestPasswordReset(body.email);
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set a new password using a reset link' })
+  @ApiOkResponse({
+    description: 'The token was accepted and the password was replaced',
+    type: ResetPasswordResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'Unknown, already-used or expired token',
+  })
+  resetPassword(
+    @Body() body: ResetPasswordDto,
+  ): Promise<ResetPasswordResponseDto> {
+    return this.auth.resetPasswordWithToken(body.token, body.newPassword);
   }
 
   @Public()

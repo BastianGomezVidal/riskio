@@ -2,17 +2,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 /**
- * Delivers temporary passwords to users.
+ * Delivers password reset links to users.
  *
- * Development implementation: logs to the backend console so the developer
- * can pick up the password locally. Swap in a real mailer (nodemailer,
- * SendGrid, Resend...) for production.
+ * Development implementation: writes to the backend console so the link can be
+ * followed locally. Swap in a real transport (nodemailer, Resend, SES) for
+ * production — the interface is one method precisely so that substitution is
+ * the only change needed.
  */
 @Injectable()
 export class MailerService {
   private readonly logger = new Logger(MailerService.name);
 
-  async sendTemporaryPassword(to: string, password: string): Promise<void> {
-    this.logger.log(`[MAIL] to=${to} temporaryPassword=${password}`);
+  async sendPasswordResetLink(to: string, link: string): Promise<void> {
+    this.logger.warn(
+      `[MAIL] no transport configured. Password reset link for ${to}: ${link}`,
+    );
   }
 }

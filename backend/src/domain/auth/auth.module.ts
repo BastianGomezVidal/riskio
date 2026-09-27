@@ -5,6 +5,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entities/user.entity.js';
 import { ApiToken } from './entities/api-token.entity.js';
+import { PasswordResetToken } from './entities/password-reset-token.entity.js';
 import { AuthService } from './auth.service.js';
 import { AuthController } from './auth.controller.js';
 import { MailerService } from './mailer.service.js';
@@ -16,7 +17,7 @@ import { parseDurationToSeconds } from './auth.utils.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, ApiToken]),
+    TypeOrmModule.forFeature([User, ApiToken, PasswordResetToken]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

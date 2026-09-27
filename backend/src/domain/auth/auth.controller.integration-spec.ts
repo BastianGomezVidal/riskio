@@ -7,15 +7,15 @@ import { MailerService } from './mailer.service.js';
 describe('Auth controller (integration)', () => {
   let app: INestApplication;
   const email = 'forgot@test.local';
-  const sentMails: Array<{ to: string; password: string }> = [];
+  const sentMails: Array<{ to: string; link: string }> = [];
 
   beforeAll(async () => {
     app = await createTestApp([
       {
         provide: MailerService,
         useValue: {
-          sendTemporaryPassword: (to: string, password: string) => {
-            sentMails.push({ to, password });
+          sendPasswordResetLink: (to: string, link: string) => {
+            sentMails.push({ to, link });
             return Promise.resolve();
           },
         },
@@ -55,33 +55,65 @@ describe('Auth controller (integration)', () => {
     expect(sentMails).toHaveLength(0);
   });
 
-  it('resets the password and emails a temporary one that can log in', async () => {
+  it('emails a reset link without touching the current password', async () => {
     const res = await request(app.getHttpServer())
       .post('/auth/forgot-password')
       .send({ email })
       .expect(200);
 
-    // The temporary password is delivered out of band, never in the body.
-    expect(res.body).not.toHaveProperty('temporaryPassword');
+    // The link is delivered out of band, never in the body.
+    expect(res.body).not.toHaveProperty('token');
     expect(res.body.message).toEqual(expect.any(String));
 
     expect(sentMails).toHaveLength(1);
     expect(sentMails[0].to).toBe(email);
-    const temporaryPassword = sentMails[0].password;
-    expect(temporaryPassword).toEqual(expect.any(String));
+    expect(sentMails[0].link).toContain('/reset-password?token=');
 
-    // Old password must no longer work…
+    // Requesting a link must not invalidate the password the user has now.
+    // This is what the previous temporary-password flow got wrong: it
+    // replaced the password on the spot and only logged the new one.
+    await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password: 'original-password' })
+      .expect(200);
+  });
+
+  it('sets a new password from the link, and refuses to reuse it', async () => {
+    const token = new URL(sentMails[0].link).searchParams.get('token')!;
+
+    const res = await request(app.getHttpServer())
+      .post('/auth/reset-password')
+      .send({ token, newPassword: 'brand-new-password' })
+      .expect(200);
+
+    expect(res.body.message).toEqual(expect.any(String));
+
+    // The chosen password is the one that now works…
     await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email, password: 'original-password' })
       .expect(401);
 
-    // …and the temporary password must.
     const login = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ email, password: temporaryPassword })
+      .send({ email, password: 'brand-new-password' })
       .expect(200);
 
     expect(login.body.accessToken).toEqual(expect.any(String));
+
+    // …and the link is spent, so a copy in a mailbox cannot reset again.
+    await request(app.getHttpServer())
+      .post('/auth/reset-password')
+      .send({ token, newPassword: 'attacker-password' })
+      .expect(400);
+  });
+
+  it('rejects an unknown token without saying why', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/auth/reset-password')
+      .send({ token: 'not-a-real-token', newPassword: 'whatever-password' })
+      .expect(400);
+
+    expect(res.body.message).toEqual(expect.any(String));
   });
 });

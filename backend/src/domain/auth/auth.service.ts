@@ -1,6 +1,7 @@
 // src/auth/auth.service.ts
 import {
   Injectable,
+  BadRequestException,
   ConflictException,
   UnauthorizedException,
   NotFoundException,
@@ -13,21 +14,28 @@ import { Repository, IsNull } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from './entities/user.entity.js';
 import { ApiToken } from './entities/api-token.entity.js';
-import {
-  generateApiToken,
-  generateTemporaryPassword,
-  hashToken,
-} from './auth.utils.js';
+import { PasswordResetToken } from './entities/password-reset-token.entity.js';
+import { generateApiToken, hashToken } from './auth.utils.js';
 import { AuthResponseDto } from './dto/credentials.dto.js';
-import { ForgotPasswordResponseDto } from './dto/forgot-password.dto.js';
+import {
+  ForgotPasswordResponseDto,
+  ResetPasswordResponseDto,
+} from './dto/forgot-password.dto.js';
 import { CreatedApiTokenDto } from './dto/create-api-token.dto.js';
 import { Role, AuthPrincipal, resolveRole } from './auth.roles.js';
 import { OAuthService, OAuthProviderName } from './oauth/oauth.service.js';
 import { MailerService } from './mailer.service.js';
-import { randomUUID } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import { parseUserAgent } from './user-agent.util.js';
 
 const BCRYPT_ROUNDS = 12;
+
+/**
+ * How long a reset link stays redeemable. Long enough to survive a trip to
+ * the inbox, short enough that a link found in a compromised mailbox has a
+ * narrow window.
+ */
+const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 
 /** Account with only the fields safe to expose to clients. */
 export type PublicUser = AuthPrincipal & {
@@ -53,6 +61,8 @@ export class AuthService {
     private readonly usersRepository: Repository<User>,
     @InjectRepository(ApiToken)
     private readonly tokensRepository: Repository<ApiToken>,
+    @InjectRepository(PasswordResetToken)
+    private readonly resetTokensRepository: Repository<PasswordResetToken>,
     private readonly jwt: JwtService,
     config: ConfigService,
     private readonly oauth: OAuthService,
@@ -142,21 +152,27 @@ export class AuthService {
   }
 
   /**
-   * Reset an account password to a freshly generated temporary one.
+   * Issue a single-use link that lets the account owner choose a new password.
    *
-   * This method never reveals whether an email exists: the response is
-   * identical for unknown emails, OAuth-only accounts, and valid accounts
-   * with a password. The temporary password is delivered out of band by
-   * the mailer and never returned in the HTTP body.
+   * Nothing about the account changes here. The previous version generated a
+   * temporary password and saved it immediately, so a request from anyone who
+   * knew an email invalidated the real password while the replacement was
+   * only ever written to a log.
+   *
+   * The response never reveals whether an email exists: it is identical for
+   * unknown emails, OAuth-only accounts, and valid accounts with a password.
+   * The link is delivered out of band and never returned in the HTTP body.
    *
    * @param email the login email of the account to reset.
    * @returns a neutral confirmation message.
    */
-  async resetPassword(email: string): Promise<ForgotPasswordResponseDto> {
+  async requestPasswordReset(
+    email: string,
+  ): Promise<ForgotPasswordResponseDto> {
     const normalized = this.normalizeEmail(email);
 
     const NEUTRAL_MESSAGE =
-      'If an account exists for that email, a temporary password has been sent.';
+      'If that account exists, a link to set a new password has been sent.';
 
     const user = await this.usersRepository.findOne({
       where: { email: normalized },
@@ -171,13 +187,69 @@ export class AuthService {
       return { message: NEUTRAL_MESSAGE };
     }
 
-    const temporaryPassword = generateTemporaryPassword();
-    user.passwordHash = await bcrypt.hash(temporaryPassword, BCRYPT_ROUNDS);
-    await this.usersRepository.save(user);
+    // Only one live link per account: issuing a new one retires the old, so a
+    // link that leaked earlier stops working.
+    await this.resetTokensRepository.update(
+      { user: { id: user.id }, usedAt: IsNull() },
+      { usedAt: new Date() },
+    );
 
-    await this.mailer.sendTemporaryPassword(user.email, temporaryPassword);
+    const token = randomBytes(32).toString('base64url');
+    await this.resetTokensRepository.save(
+      this.resetTokensRepository.create({
+        user,
+        tokenHash: hashToken(token),
+        expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+        usedAt: null,
+      }),
+    );
+
+    await this.mailer.sendPasswordResetLink(
+      user.email,
+      `${this.frontendBase}/reset-password?token=${token}`,
+    );
 
     return { message: NEUTRAL_MESSAGE };
+  }
+
+  /**
+   * Redeem a reset link and store the password the user chose.
+   *
+   * Expired, already-used and unknown tokens are all reported the same way, so
+   * a caller cannot probe which tokens once existed.
+   *
+   * @param token the plaintext token from the emailed link.
+   * @param newPassword the password to store from now on.
+   * @returns a neutral confirmation message.
+   * @throws BadRequestException when the token is unknown, spent or expired.
+   */
+  async resetPasswordWithToken(
+    token: string,
+    newPassword: string,
+  ): Promise<ResetPasswordResponseDto> {
+    const INVALID =
+      'That reset link is no longer valid. Request a new one and try again.';
+
+    const record = await this.resetTokensRepository.findOne({
+      where: { tokenHash: hashToken(token) },
+      relations: { user: true },
+    });
+
+    if (!record || record.usedAt !== null) {
+      throw new BadRequestException(INVALID);
+    }
+
+    if (record.expiresAt.getTime() <= Date.now()) {
+      throw new BadRequestException(INVALID);
+    }
+
+    record.user.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await this.usersRepository.save(record.user);
+
+    record.usedAt = new Date();
+    await this.resetTokensRepository.save(record);
+
+    return { message: 'Password updated. You can sign in now.' };
   }
 
   /** Whether an OAuth provider is available (credentials configured). */
