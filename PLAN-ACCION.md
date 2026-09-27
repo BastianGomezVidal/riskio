@@ -123,6 +123,10 @@ Git detectó **20 renombres**, así que el historial muestra los movimientos com
 
 > Todo lo que se decidió **no** arreglar en esta fase, para no mezclar un commit
 > con un refactor grande. Cada punto tiene su paso en la fase correspondiente.
+>
+> D1–D5 se recogieron al agrupar el trabajo previo. **D6–D9 aparecieron al ejecutar las
+> Fases 1 y 2** y aún no tienen paso asignado: son de las que se encontraron buscando, no
+> previstas en el plan.
 
 ### D1 — Specs de backend con tests comentados (🔴 prioritaria)
 
@@ -177,6 +181,79 @@ accidente, y por eso el síntoma es "No test found in suite" en vez de un fallo 
   repartido en chunks de vendor que sobreviven a un deploy. El límite de aviso se subió a
   600 kB con el motivo escrito en `vite.config.ts` (antd y `@rc-component` no se pueden
   separar sin romper la app al cargar).
+
+### D6 — `forgot-password` resetea la contraseña pero nunca entrega la nueva (🔴 prioritaria)
+
+**Síntoma**: un usuario pide recuperar su contraseña, la UI confirma "If that address has an
+account, sign in with the temporary password", y no puede iniciar sesión con ninguna
+contraseña. La antigua dejó de funcionar y la nueva no se la conoce.
+
+**Causa**: `AuthService.resetPassword()` (`backend/src/domain/auth/auth.service.ts:174-178`)
+genera la contraseña temporal, la hashea, **guarda el usuario** y luego llama a
+`MailerService.sendTemporaryPassword()`. Ese mailer es un placeholder que solo escribe en el
+log del backend (`backend/src/domain/auth/mailer.service.ts:19`):
+
+```ts
+this.logger.log(`[MAIL] to=${to} temporaryPassword=${password}`);
+```
+
+**Por qué es peor que D5**: D5 es un silencio (se acumulan avatares huérfanos). Aquí el
+endpoint es **destructivo y sin salida**: invalida la credencial vigente del usuario y no le
+da ninguna forma de conocer la nueva, salvo acceso al log del contenedor. Cualquier
+intento de recuperación acaba en un password reset manual desde la base de datos.
+
+**Agravante**: el mensaje neutro de la API ("has been sent") describe un envío que no ocurre.
+El frontend ya no puede corregirlo — la respuesta solo trae `message` — porque el
+contrato es correcto y lo que falta es la entrega.
+
+**Arreglo**: implementar un mailer real (nodemailer/Resend) con configuración SMTP por
+entorno. Mientras no exista, la UI no debería prometer un envío.
+
+### D7 — `VITE_API_URL` es un build arg muerto: la URL de la API funciona por casualidad
+
+**Síntoma**: el build de la imagen del frontend emite
+`one or more build args were not consumed: [VITE_API_URL]`, y aun así la app funciona.
+
+**Causa**: `docker-compose.yml:162` pasa `VITE_API_URL` como `build.args`, pero
+`frontend/Dockerfile` no declara ningún `ARG VITE_API_URL` ni lo usa en ninguna capa. La
+URL real sale del fallback in-code de `frontend/src/api/client.ts:17`:
+
+```ts
+export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+```
+
+**Impacto**: en el stack actual funciona porque el navegador y la API comparten host. En
+cualquier despliegue donde el frontend se sirva en otro origen, `API_URL` queda fijado a
+`localhost:3000` y apunta al navegador del usuario, no al servidor. El fallo no aparece en
+build ni en CI.
+
+**Arreglo**: declarar `ARG VITE_API_URL` en la etapa de build y escribirlo en el stage, o
+sacar la URL del runtime (config inyectada en `index.html`) en vez de compilarla.
+
+### D8 — `api.health()` y `api.tokens()` son código muerto
+
+**Causa**: al añadir los schemas Zod (Paso 2.3) se contractuaron también `healthSchema` y
+`apiTokenListSchema`, pero no hay ningún consumidor: `rg 'api\.(tokens|health)\(' src` no
+devuelve nada. Son restos de un health check que se retiró.
+
+**Arreglo**: borrarlos (cliente y schema), o bien documentar para qué se conservan. Hoy
+mantienen ~40 líneas de contrato que nada valida.
+
+### D9 — Trampa en `manualChunks`: el build pasa y la app muere al cargar
+
+**No es un bug activo**, sino una disarmadiza para quien retoque `vite.config.ts`.
+
+Separar `@rc-component` de `antd` en chunks distintos **compila limpio** y rompe la
+aplicación en runtime con `ReferenceError: Cannot access 'bi' before initialization`: los
+componentes de rc se referencian entre sí y con el contexto de antd de forma cíclica, y al
+repartirlos Rollup pierde el orden de inicialización.
+
+**Por qué importa**: `npm run build` da 0 errores en el caso que rompe la app. Solo se
+detecta navigating en un navegador. Si alguien "optimiza" el chunk de antd para bajar de
+600 kB, va a tener un build verde y una app en blanco.
+
+**Mitigación aplicada**: el motivo está escrito en `vite.config.ts` junto al
+`chunkSizeWarningLimit`. Si alguien lo sube o lo cambia, que lea ese comentario antes.
 
 ### D5 — `InMemoryBroker` no cruza procesos: los avatares huérfanos nunca se limpian
 
@@ -393,18 +470,26 @@ cuenca de `4e425ae`.
 | Fase | Entregable | Riesgo |
 |---|---|---|
 | 0 | ✅ 20 commits atómicos, árbol limpio | Bajo |
-| 1 | Compose con anchors + config por `.env` | Bajo |
-| 2 | Frontend con Error Boundaries, TanStack Query, Zod, colocation, React 19, splitting | Medio (refactor de data layer) |
+| 1 | ✅ Compose con anchors + config por `.env` | Bajo |
+| 2 | ✅ Frontend con Error Boundaries, TanStack Query, Zod, colocation, splitting | Medio (refactor de data layer) |
 | 3 | Informe de a11y + Web Vitals con acciones priorizadas | Bajo (auditoría) |
 | 4 | **D1 primero:** 209/209 tests verdes, duplicados eliminados (backend history, frontend helpers/pages) | Medio (toca imports) |
 
+Fases 0, 1 y 2 ejecutadas (2026-09-26). La 2 dejó el bundle de entrada en 25 kB y el
+comportamiento verificado contra el stack en ejecución.
+
 ## Orden de ejecución
 
-1. **Fase 4.4** (D1) — reactivar los tests. Es bloqueante: nada más se hace con `npm test` en rojo.
-2. **Fase 1** — compose: anchors, credenciales a `.env`, red dedicada (opcional).
-3. **Fase 4.1–4.3** — unificar duplicados de backend y frontend.
-4. **Fase 2** — React 19: Error Boundaries, TanStack Query, Zod, colocation, splitting.
+1. ~~**Fase 4.4** (D1) — reactivar los tests.~~ **Aplazado por decisión del usuario** ("por
+   ahora"). Sigue siendo bloqueante para cualquier otra cosa que toque el backend con tests.
+2. ~~**Fase 1** — compose: anchors, credenciales a `.env`, red dedicada.~~ ✅
+3. ~~**Fase 4.1–4.3** — unificar duplicados de backend y frontend.~~ Pendiente.
+4. ~~**Fase 2** — React 19: Error Boundaries, TanStack Query, Zod, colocation, splitting.~~ ✅
 5. **Fase 3** — auditorías de a11y y Web Vitals, con informe de prioridades.
+
+**Entre lo pendiente, lo primero por impacto de usuario es D6** (recuperación de contraseña
+que deja al usuario sin acceso) y **D7** (URL de la API que solo funciona en local). Ambos
+son cortos y no dependen de D1.
 
 Cada paso se ejecuta y se revisa antes de pasar al siguiente. Nada se commitea sin
 revisar el diff.
