@@ -1,31 +1,27 @@
 import { lazy } from "react";
 import { Route, Routes } from "react-router-dom";
 import { PublicOnlyRoute, ProtectedRoute } from "./guards";
-import { SignInPage } from "@/features/auth/pages/SignInPage";
-import { SignUpPage } from "@/features/auth/pages/SignUpPage";
-import { ForgotPasswordPage } from "@/features/auth/pages/ForgotPasswordPage";
-import { StormDetailPage } from "@/features/weather/pages/StormDetailsPage";
+import { SignInPage } from "@/pages/public/SignInPage";
+import { SignUpPage } from "@/pages/public/SignUpPage";
+import { ForgotPasswordPage } from "@/pages/public/ForgotPasswordPage";
+import { StormDetailPage } from "@/pages/protected/StormDetailsPage";
 import { AppLayout } from "@/global_components/AppLayout/AppLayout";
+import { SettingsPage } from "@/pages/protected/SettingsPage";
+import { StormsPage } from "@/pages/protected/StormsPage";
 
 const NotFoundPage = lazy(() =>
-  import("@/features/weather/pages/NotFoundPage").then((m) => ({
+  import("@/pages/protected/NotFoundPage").then((m) => ({
     default: m.NotFoundPage,
   })),
 );
 
 const OAuthCallbackPage = lazy(
-  () => import("@/features/auth/pages/OAuthCallbackPage"),
+  () => import("@/pages/public/OAuthCallbackPage"),
 );
 
 const DashboardPage = lazy(() =>
-  import("@/features/weather/pages/DashboardPage").then((module) => ({
+  import("@/pages/protected/DashboardPage").then((module) => ({
     default: module.DashboardPage,
-  })),
-);
-
-const HistoryPage = lazy(() =>
-  import("@/features/weather/pages/HistoryPage").then((m) => ({
-    default: m.HistoryPage,
   })),
 );
 
@@ -43,8 +39,13 @@ export function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/history" element={<HistoryPage />} />
-          <Route path="storms/:atcfId" element={<StormDetailPage />} />
+          <Route path="/storms" element={<StormsPage />} />
+          <Route path="/storms/:atcfId" element={<StormDetailPage />} />
+          <Route
+            path="/storms/:atcfId/advisories/:n"
+            element={<StormDetailPage />}
+          />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>
