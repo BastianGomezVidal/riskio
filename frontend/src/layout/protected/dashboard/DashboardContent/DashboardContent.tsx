@@ -7,10 +7,11 @@ import {
   ErrorEmpty,
   OfflineEmpty,
 } from "@/global_components/StatusEmpty/StatusEmpty";
-import { formatUTC } from "@/domain/format/datetime";
+import { formatUTC } from "@/helpers/format-time/datetime";
+import type { DashboardStorm } from "@/domain/storm";
 import { StatGrid } from "../StatGrid/StatGrid";
-import { StormList } from "../StormList/StormList";
 import { DashboardEmpty } from "../DashboadEmpty/DashBoardEmpty";
+import { StormList } from "@/global_components/StormList/StormList";
 
 export function DashboardContent() {
   const result = use(preloadDashboardSummary());
@@ -37,6 +38,17 @@ export function DashboardContent() {
 
   const summary = result.data;
 
+  const storms: DashboardStorm[] = summary.storms.map((s) => ({
+    ...s.storm,
+    riskLevel: s.riskLevel,
+  }));
+
+  const latestAdvisoryIssuedAtMap: Record<string, string | null> = {};
+  for (const s of summary.storms) {
+    latestAdvisoryIssuedAtMap[s.storm.atcfId] =
+      s.latestAdvisory?.issuedAt ?? null;
+  }
+
   return (
     <div key={retryToken}>
       <StatGrid totals={summary.totals} />
@@ -46,10 +58,14 @@ export function DashboardContent() {
           Active storms
         </h2>
         <div className="mt-3">
-          {summary.storms.length === 0 ? (
+          {storms.length === 0 ? (
             <DashboardEmpty />
           ) : (
-            <StormList storms={summary.storms} />
+            <StormList
+              storms={storms}
+              latestAdvisoryIssuedAtMap={latestAdvisoryIssuedAtMap}
+              showRisk
+            />
           )}
         </div>
       </section>

@@ -19,10 +19,10 @@ export function DashboardEmpty() {
           <p className="mt-1 text-sm text-(--ant-color-text-secondary)">
             Check{" "}
             <Link
-              to="/history"
+              to="/storms"
               className="text-blue-600 underline-offset-2 hover:underline"
             >
-              History
+              Storms
             </Link>{" "}
             for past storms.
           </p>

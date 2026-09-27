@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { Skeleton } from "antd";
-import { DashboardContent } from "../components/dashboard/DashboardContent/DashboardContent";
+import { DashboardContent } from "@/layout/protected/dashboard/DashboardContent/DashboardContent";
 
 export function DashboardPage() {
   // No <main> here — AppLayout owns the main landmark.
