@@ -1,3 +1,32 @@
+# Shared environment blocks.
+#
+# Anchors (the `&name` / `*name` syntax) let backend-api and backend-worker
+# share one definition instead of repeating it. Compose merges them with the
+# YAML merge key `<<`, so a change to the S3 config can never drift between the
+# two services. The `x-` prefix marks these as extension fields: Compose skips
+# them as services.
+x-storage-env: &storage-env
+  STORAGE_DRIVER: s3
+  # Internal address: resolved by Docker/Podman DNS, never by the browser.
+  STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://storage:8333}
+  STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
+  STORAGE_BUCKET: ${STORAGE_BUCKET:-riskio-avatars}
+  # SeaweedFS accepts any credentials by default. Override both in .env when
+  # pointing at a real S3 (AWS, MinIO) so the compose file stays provider-agnostic.
+  STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-any}
+  STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-any}
+  # Public address: what the browser uses to render an avatar. Different from
+  # STORAGE_ENDPOINT on purpose, and the only one that needs a host-visible port.
+  STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:-http://localhost:${STORAGE_PORT:-8333}/${STORAGE_BUCKET:-riskio-avatars}}
+
+x-backend-env: &backend-env
+  DATABASE_URL: ${DATABASE_URL}
+  CACHE_DRIVER: ${CACHE_DRIVER:-redis}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+  # The broker is only used to hand off avatar cleanup (see PLAN-ACCION.md,
+  # deuda D5). Ingestion does not use it: it is a plain @Cron poll.
+  BROKER_DRIVER: ${BROKER_DRIVER:-memory}
+
 services:
   db:
     image: postgis/postgis:16-3.4
@@ -9,7 +38,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
+      # Loopback only: reachable from the host for psql, not from the network.
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - core
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +54,13 @@ services:
     image: docker.io/chrislusf/seaweedfs
     runtime: runc
     restart: unless-stopped
-    command: server -s3 -s3.port=8333 -volume.max=100
+    # -ip.bind=0.0.0.0 is required: without it SeaweedFS binds a single
+    # interface (whichever it detects last) instead of 0.0.0.0, so a service
+    # attached only to the `core` network — the worker — gets ECONNREFUSED
+    # while the API, on both networks, appears to work. -ip is left on
+    # autodetect because that is the address SeaweedFS advertises to its own
+    # master/volume/filer peers.
+    command: server -s3 -s3.port=8333 -volume.max=100 -ip.bind=0.0.0.0
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8333/"]
       interval: 10s
@@ -30,7 +68,14 @@ services:
       retries: 5
       start_period: 10s
     ports:
+      # Published on all interfaces on purpose: this is the only storage
+      # address the browser can reach (STORAGE_PUBLIC_URL).
       - "${STORAGE_PORT:-8333}:8333"
+    networks:
+      # core so the API can talk to it by DNS, edge so it is reachable
+      # from outside the host.
+      - core
+      - edge
     volumes:
       - storage_data:/data
 
@@ -39,7 +84,10 @@ services:
     runtime: runc
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      # Loopback only: no auth on a dev Redis, so never expose it broadly.
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    networks:
+      - core
     volumes:
       - redis_data:/data
     healthcheck:
@@ -57,20 +105,13 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      <<: [*storage-env, *backend-env]
       PORT: 3000
-      STORAGE_DRIVER: s3
-      STORAGE_ENDPOINT: http://storage:8333
-      STORAGE_REGION: us-east-1
-      STORAGE_BUCKET: riskio-avatars
-      STORAGE_ACCESS_KEY: any
-      STORAGE_SECRET_KEY: any
-      STORAGE_PUBLIC_URL: http://localhost:${STORAGE_PORT:-8333}/riskio-avatars
-      BROKER_DRIVER: memory
-      CACHE_DRIVER: redis
-      REDIS_URL: redis://redis:6379
     ports:
       - "${BACKEND_API_PORT:-3000}:3000"
+    networks:
+      - core
+      - edge
     healthcheck:
       test:
         [
@@ -100,17 +141,12 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      STORAGE_DRIVER: s3
-      STORAGE_ENDPOINT: http://storage:8333
-      STORAGE_REGION: us-east-1
-      STORAGE_BUCKET: riskio-avatars
-      STORAGE_ACCESS_KEY: any
-      STORAGE_SECRET_KEY: any
-      STORAGE_PUBLIC_URL: http://localhost:${STORAGE_PORT:-8333}/riskio-avatars
+      <<: [*storage-env, *backend-env]
       IS_WORKER: "true"
-      CACHE_DRIVER: redis
-      REDIS_URL: redis://redis:6379
+    networks:
+      # core only: the worker has no HTTP listener, so nothing outside needs
+      # to reach it.
+      - core
     depends_on:
       db:
         condition: service_healthy
@@ -128,9 +164,18 @@ services:
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-8080}:80"
+    networks:
+      # edge only: the SPA can reach the API, never the database or Redis.
+      - edge
     depends_on:
       backend-api:
         condition: service_healthy
+
+networks:
+  # Data tier. Only the API and the worker sit here alongside it.
+  core:
+  # Anything a browser may talk to.
+  edge:
 
 volumes:
   pgdata:

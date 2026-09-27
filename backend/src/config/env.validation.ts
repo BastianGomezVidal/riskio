@@ -36,4 +36,44 @@ export const envValidationSchema = Joi.object({
   /** Optional Microsoft identity client credentials (enables Outlook sign-in). */
   MICROSOFT_CLIENT_ID: Joi.string().allow('').default(''),
   MICROSOFT_CLIENT_SECRET: Joi.string().allow('').default(''),
+
+  /**
+   * Object storage. STORAGE_ENDPOINT is empty when using the real AWS S3
+   * endpoints, which S3StorageService detects to skip the local bucket
+   * bootstrap.
+   *
+   * S3StorageService always passes explicit credentials to the client, so
+   * there is no ambient credential chain to fall back on: these default to the
+   * values SeaweedFS accepts. Pointing at MinIO or AWS means overriding both in
+   * .env, and leaving them at `any` against a real S3 surfaces as a 403 on the
+   * first upload rather than at boot.
+   */
+  STORAGE_DRIVER: Joi.string().default('s3'),
+  STORAGE_ENDPOINT: Joi.string().allow('').default(''),
+  STORAGE_REGION: Joi.string().default('us-east-1'),
+  STORAGE_BUCKET: Joi.string().default('riskio-avatars'),
+  STORAGE_ACCESS_KEY: Joi.string().default('any'),
+  STORAGE_SECRET_KEY: Joi.string().default('any'),
+  /**
+   * Browser-facing base URL for stored objects. Must be reachable from the
+   * browser, so it usually differs from STORAGE_ENDPOINT (which is only
+   * resolvable inside the container network).
+   */
+  STORAGE_PUBLIC_URL: Joi.string()
+    .uri()
+    .default('http://localhost:8333/riskio-avatars'),
+
+  /** Cache backend: `memory` (per-process) or `redis` (shared). */
+  CACHE_DRIVER: Joi.string().valid('memory', 'redis').default('redis'),
+  REDIS_URL: Joi.string()
+    .uri({ scheme: ['redis', 'rediss'] })
+    .default('redis://redis:6379'),
+
+  /**
+   * Message queue backend. Only `memory` is wired up: the broker is used solely to
+   * hand off avatar cleanup, and `InMemoryBroker` does not cross processes anyway
+   * (D5 in PLAN-ACCION.md). `redis` stays valid so a `.env` carrying it fails loudly
+   * at that documented gap rather than at an unrelated startup assert.
+   */
+  BROKER_DRIVER: Joi.string().valid('memory', 'redis').default('memory'),
 });
