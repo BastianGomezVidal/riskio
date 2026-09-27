@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { LoginCard } from "./LoginCard/LoginCard";
+import { RouteErrorBoundary } from "@/global_components/ErrorBoundary/RouteErrorBoundary";
 
 import stormBackground from "@/assets/pictures/Kate_Storm.jpg";
 
@@ -21,7 +22,7 @@ export function AuthLayout({ children, footer }: AuthLayoutProps) {
         <div className="w-full max-w-sm">
           <LoginCard>
             <h1 className="mb-6 text-center text-xl font-semibold">Riskio</h1>
-            {children}
+            <RouteErrorBoundary compact>{children}</RouteErrorBoundary>
           </LoginCard>
         </div>
       </div>
