@@ -1,7 +1,12 @@
 import { api } from "@/api/client";
-import type { AdvisoryDetail, StormDetail } from "@/domain/storm";
-import type { DashboardSummary, StormHistoryItem } from "@/domain/dashboard";
-import type { Paginated } from "@/domain/common/types";
+import type {
+  StormAdvisoryDetail,
+  StormDetail,
+  StormListItem,
+  StormsQuery,
+} from "@/domain/storm";
+import type { DashboardSummary } from "@/domain/dashboard";
+import type { User } from "@/domain/users";
 import { toPreloadResult, type PreloadResult } from "./preload-result";
 
 /* ------------------------------------------------------------------ */
@@ -29,14 +34,12 @@ function cachedFetch<K, V>(
   }
 
   const promise = fetch().catch((err) => {
-    map.delete(key); // allow retry on failure
+    map.delete(key);
     throw err;
   });
 
   map.set(key, { promise, cachedAt: now });
 
-  // LRU eviction: Map preserves insertion order, so the first key is
-  // the oldest entry.
   if (map.size > MAX_CACHE) {
     const oldest = map.keys().next().value;
     if (oldest !== undefined) map.delete(oldest);
@@ -51,8 +54,9 @@ function cachedFetch<K, V>(
 
 const HEALTH_TTL_MS = 30_000;
 const DASHBOARD_TTL_MS = 2 * 60_000;
-const HISTORY_TTL_MS = 10 * 60_000;
+const STORMS_TTL_MS = 2 * 60_000;
 const STORM_TTL_MS = 5 * 60_000;
+const ME_TTL_MS = 5 * 60_000;
 const ADVISORY_TTL_MS = Number.POSITIVE_INFINITY;
 
 /* ------------------------------------------------------------------ */
@@ -115,32 +119,33 @@ export function resetDashboardSummary(): void {
 }
 
 /* ------------------------------------------------------------------ */
-/* History                                                             */
+/* Storms directory (filters-aware)                                    */
 /* ------------------------------------------------------------------ */
 
-interface HistoryState {
-  promise: Promise<PreloadResult<Paginated<StormHistoryItem>>>;
-  cachedAt: number;
+const stormsCache = new Map<
+  string,
+  CacheEntry<PreloadResult<StormListItem[]>>
+>();
+
+function stormsKey(query: StormsQuery): string {
+  return JSON.stringify(query);
 }
 
-let historyState: HistoryState | null = null;
-
-export function preloadHistory(): Promise<
-  PreloadResult<Paginated<StormHistoryItem>>
-> {
-  const now = Date.now();
-
-  if (historyState && now - historyState.cachedAt < HISTORY_TTL_MS) {
-    return historyState.promise;
-  }
-
-  const promise = toPreloadResult(() => api.stormHistory());
-  historyState = { promise, cachedAt: now };
-  return promise;
+export function preloadStorms(
+  query: StormsQuery,
+): Promise<PreloadResult<StormListItem[]>> {
+  const key = stormsKey(query);
+  return cachedFetch(
+    stormsCache,
+    key,
+    () => toPreloadResult(() => api.storms(query)),
+    STORMS_TTL_MS,
+  );
 }
 
-export function resetHistory(): void {
-  historyState = null;
+export function resetStorms(query?: StormsQuery): void {
+  if (query) stormsCache.delete(stormsKey(query));
+  else stormsCache.clear();
 }
 
 /* ------------------------------------------------------------------ */
@@ -166,28 +171,61 @@ export function resetStorm(atcfId?: string): void {
 }
 
 /* ------------------------------------------------------------------ */
-/* Advisory detail (per UUID)                                          */
+/* Storm + advisory composite (per atcfId + number)                    */
 /* ------------------------------------------------------------------ */
 
-const advisoryCache = new Map<
+const stormAdvisoryCache = new Map<
   string,
-  CacheEntry<PreloadResult<AdvisoryDetail>>
+  CacheEntry<PreloadResult<StormAdvisoryDetail>>
 >();
 
-export function preloadAdvisory(
-  id: string,
-): Promise<PreloadResult<AdvisoryDetail>> {
+export function preloadStormAdvisory(
+  atcfId: string,
+  advisoryNumber: string,
+): Promise<PreloadResult<StormAdvisoryDetail>> {
+  const key = `${atcfId}:${advisoryNumber}`;
   return cachedFetch(
-    advisoryCache,
-    id,
-    () => toPreloadResult(() => api.advisory(id)),
+    stormAdvisoryCache,
+    key,
+    () => toPreloadResult(() => api.stormAdvisory(atcfId, advisoryNumber)),
     ADVISORY_TTL_MS,
   );
 }
 
-export function resetAdvisory(id?: string): void {
-  if (id) advisoryCache.delete(id);
-  else advisoryCache.clear();
+export function resetStormAdvisory(
+  atcfId?: string,
+  advisoryNumber?: string,
+): void {
+  if (atcfId && advisoryNumber) {
+    stormAdvisoryCache.delete(`${atcfId}:${advisoryNumber}`);
+  } else {
+    stormAdvisoryCache.clear();
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Current user profile                                                */
+/* ------------------------------------------------------------------ */
+
+let meState: {
+  promise: Promise<PreloadResult<User>>;
+  cachedAt: number;
+} | null = null;
+
+export function preloadMe(): Promise<PreloadResult<User>> {
+  const now = Date.now();
+
+  if (meState && now - meState.cachedAt < ME_TTL_MS) {
+    return meState.promise;
+  }
+
+  const promise = toPreloadResult(() => api.me());
+  meState = { promise, cachedAt: now };
+  return promise;
+}
+
+export function resetMe(): void {
+  meState = null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -197,7 +235,8 @@ export function resetAdvisory(id?: string): void {
 export function resetAllCaches(): void {
   resetHealth();
   resetDashboardSummary();
-  resetHistory();
+  resetMe();
   stormCache.clear();
-  advisoryCache.clear();
+  stormsCache.clear();
+  stormAdvisoryCache.clear();
 }
