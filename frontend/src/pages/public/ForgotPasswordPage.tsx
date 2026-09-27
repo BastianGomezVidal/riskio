@@ -4,8 +4,8 @@ import { Button, Input } from "antd";
 import { api, authErrorMessage } from "@/api/client";
 import type { ForgotPasswordResult } from "@/domain/auth";
 import { EMAIL_PATTERN } from "@/auth/validation";
-import { FieldError, FormError } from "../components/AuthError/AuthError";
-import { AuthLayout } from "./AuthLayout";
+import { FieldError, FormError } from "@/layout/public/AuthError/AuthError";
+import { AuthLayout } from "@/layout/public/AuthLayout";
 
 interface ForgotErrors {
   form: string | null;

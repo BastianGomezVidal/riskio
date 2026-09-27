@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { LoginCard } from "../components/LoginCard/LoginCard";
+import { LoginCard } from "./LoginCard/LoginCard";
 
 import stormBackground from "@/assets/pictures/Kate_Storm.jpg";
 
