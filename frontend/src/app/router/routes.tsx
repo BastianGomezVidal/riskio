@@ -1,28 +1,47 @@
-import { lazy } from "react";
 import { Route, Routes } from "react-router-dom";
 import { PublicOnlyRoute, ProtectedRoute } from "./guards";
-import { SignInPage } from "@/pages/public/SignInPage";
-import { SignUpPage } from "@/pages/public/SignUpPage";
-import { ForgotPasswordPage } from "@/pages/public/ForgotPasswordPage";
-import { StormDetailPage } from "@/pages/protected/StormDetailsPage";
+import { lazyPage } from "./lazyPage";
 import { AppLayout } from "@/global_components/AppLayout/AppLayout";
-import { SettingsPage } from "@/pages/protected/SettingsPage";
-import { StormsPage } from "@/pages/protected/StormsPage";
 
-const NotFoundPage = lazy(() =>
-  import("@/pages/protected/NotFoundPage").then((m) => ({
-    default: m.NotFoundPage,
-  })),
+// Every route is loaded on demand. Keeping these imports inside lazy() is what
+// keeps leaflet and the per-page component trees out of the initial chunk: the
+// sign-in screen should not pay for the storm map.
+const SignInPage = lazyPage(
+  () => import("@/pages/public/SignInPage"),
+  "SignInPage",
 );
-
-const OAuthCallbackPage = lazy(
+const SignUpPage = lazyPage(
+  () => import("@/pages/public/SignUpPage"),
+  "SignUpPage",
+);
+const ForgotPasswordPage = lazyPage(
+  () => import("@/pages/public/ForgotPasswordPage"),
+  "ForgotPasswordPage",
+);
+const OAuthCallbackPage = lazyPage(
   () => import("@/pages/public/OAuthCallbackPage"),
+  "default",
 );
 
-const DashboardPage = lazy(() =>
-  import("@/pages/protected/DashboardPage").then((module) => ({
-    default: module.DashboardPage,
-  })),
+const DashboardPage = lazyPage(
+  () => import("@/pages/protected/DashboardPage"),
+  "DashboardPage",
+);
+const StormsPage = lazyPage(
+  () => import("@/pages/protected/StormsPage"),
+  "StormsPage",
+);
+const StormDetailPage = lazyPage(
+  () => import("@/pages/protected/StormDetailsPage"),
+  "StormDetailPage",
+);
+const SettingsPage = lazyPage(
+  () => import("@/pages/protected/SettingsPage"),
+  "SettingsPage",
+);
+const NotFoundPage = lazyPage(
+  () => import("@/pages/protected/NotFoundPage"),
+  "NotFoundPage",
 );
 
 export function AppRoutes() {
