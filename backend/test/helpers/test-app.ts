@@ -10,10 +10,14 @@ import { AuthModule } from '../../src/domain/auth/auth.module.js';
 import { DashboardModule } from '../../src/domain/dashboard/dashboard.module.js';
 import { HistoryModule } from '../../src/domain/storm-history/storm-history.module.js';
 import { HealthModule } from '../../src/health/health.module.js';
+import { AppCacheModule } from '../../src/domain/cache/cache.module.js';
 import { InitialSchema1789065155402 } from '../../src/database/migrations/1789065155402-InitialSchema.js';
 import { AddStormGeometry1888240000000 } from '../../src/database/migrations/1888240000000-AddStormGeometry.js';
 import { AddAuthTables1890000000000 } from '../../src/database/migrations/1890000000000-AddAuthTables.js';
 import { AddStormActivityFlags1891000000000 } from '../../src/database/migrations/1891000000000-AddStormActivityFlags.js';
+import { AddUserAvatarUrl1892000000000 } from '../../src/database/migrations/1892000000000-AddUserAvatarUrl.js';
+import { AddPasswordResetTokens1893000000000 } from '../../src/database/migrations/1893000000000-AddPasswordResetTokens.js';
+import { AddSessionTrackingColumns1893500000000 } from '../../src/database/migrations/1893500000000-AddSessionTrackingColumns.js';
 import { TEST_DATABASE_URL } from '../setup-integration.js';
 import { StormsService } from '../../src/domain/weather/storms/storms.service.js';
 import { AdvisoriesService } from '../../src/domain/weather/advisories/advisories.service.js';
@@ -51,11 +55,15 @@ export async function createTestApp(
           AddStormGeometry1888240000000,
           AddAuthTables1890000000000,
           AddStormActivityFlags1891000000000,
+          AddUserAvatarUrl1892000000000,
+          AddPasswordResetTokens1893000000000,
+          AddSessionTrackingColumns1893500000000,
         ],
         migrationsRun: true,
         logging: false,
       }),
       ScheduleModule.forRoot(),
+      AppCacheModule,
       StormsModule,
       AdvisoriesModule,
       IngestionModule,
