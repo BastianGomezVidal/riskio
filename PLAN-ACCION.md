@@ -122,11 +122,23 @@ Git detectó **20 renombres**, así que el historial muestra los movimientos com
 ## Deuda técnica registrada
 
 > Todo lo que se decidió **no** arreglar en esta fase, para no mezclar un commit
-> con un refactor grande. Cada punto tiene su paso en la fase correspondiente.
+> con un refactor grande.
 >
-> D1–D5 se recogieron al agrupar el trabajo previo. **D6–D9 aparecieron al ejecutar las
-> Fases 1 y 2** y aún no tienen paso asignado: son de las que se encontraron buscando, no
-> previstas en el plan.
+> D1–D5 se recogieron al agrupar el trabajo previo; D6–D9 aparecieron al ejecutar las Fases 1
+y 2, buscando y no previstas en el plan. No todas las entradas son deuda: D9 es una
+precaución y varios puntos ya están resueltos. La tabla es el índice; debajo está el detalle.
+
+| # | Qué es | Impacto | Dónde se arregla | Estado |
+|---|---|---|---|---|
+| **D6** | `forgot-password` resetea la contraseña y no la entrega | 🔴 Usuario sin acceso a su cuenta | 4.7 *(propuesto)* | Abierta, sin paso |
+| **D1** | Specs de backend comentados (3 suites, ~34 tests) | 🔴 Sin red de seguridad | 4.4 | **Aplazada** por decisión |
+| **D7** | `VITE_API_URL` es un build arg muerto | 🟠 Solo funciona en local | 4.8 *(propuesto)* | **En curso** |
+| **D5** | `InMemoryBroker` no cruza procesos: avatares huérfanos | 🟠 Silencioso, crece sin límite | 4.5 *(propuesto)* | Abierta, sin paso |
+| **D2** | Carpetas duplicadas en backend | 🟡 Mantenimiento doble | 4.1 | Abierta |
+| **D3** | Carpetas duplicadas en frontend | 🟡 Una de las dos queda vieja | 4.2 | Parcialmente cerrada en 2.4 |
+| **D8** | `api.health()` / `api.tokens()` sin uso | 🟡 Contrato que nada valida | 4.6 *(propuesto)* | Abierta, sin paso |
+| D4 | Observaciones sueltas | — | — | 2 de 3 resueltos |
+| D9 | `manualChunks` compila verde y mata la app | — No hay bug activo | — | Precaución, no deuda |
 
 ### D1 — Specs de backend con tests comentados (⏸ aplazado por decisión)
 
@@ -188,7 +200,50 @@ accidente, y por eso el síntoma es "No test found in suite" en vez de un fallo 
   600 kB con el motivo escrito en `vite.config.ts` (antd y `@rc-component` no se pueden
   separar sin romper la app al cargar).
 
+### D5 — `InMemoryBroker` no cruza procesos: los avatares huérfanos nunca se limpian
+
+> **Sin paso asignado.** Registrado con la recomendación (llamar a `STORAGE_SERVICE`
+> directamente desde `UsersService`) pero nunca convertido en fase. → **Paso 4.5** (propuesto,
+> requiere tu visto bueno)
+
+**Síntoma**: al borrar un usuario, la API publica `orphan-cleanup`; el worker se suscribe a
+ese evento. Pero la limpieza no ocurre.
+
+**Causa**: `InMemoryBroker` guarda la cola en la memoria del proceso que la usa. La API
+(publica) y el worker (suscribe) son **procesos distintos**, cada uno con su propia
+instancia y su propio mapa en memoria. El evento se publica en el mapa de la API, donde
+nadie lo escucha. Confirmado en runtime: el log `[InMemoryBroker] Subscribed to
+orphan-cleanup` aparece en el worker, y el API tiene su propia instancia sin suscriptores.
+
+**Consecuencia**: cada usuario eliminado deja su avatar huérfano en el bucket
+`riskio-avatars`. No grows sin límite, porque el mismo bug deja huérfano cualquier otro
+objeto pendiente de limpieza, pero no se notó en desarrollo porque el síntoma es
+silencioso.
+
+**Por qué NO se arregla con Redis**: activar `BROKER_DRIVER=redis` sin escribir el adapter
+`redis.broker.ts` no arregla nada, solo cambia el modo de fallo. Con `redis` aceptado por el
+esquema de validación y sin implementarlo, se pierde el evento igual. Además, Redis para un
+único evento de baja latencia y baja frecuencia es sobreingeniería.
+
+**Opciones**:
+
+1. **Llamada directa al `STORAGE_SERVICE` desde `UsersService`** (recomendada). Elimina la
+   indirección, el canal y el contrato del evento para un único caso de uso. Un avatar
+   huérfano es barato de aceptar de forma puntual; lo que no conviene es un canal de
+   eventos roto y silencioso.
+2. Implementar `redis.broker.ts` de verdad, si en el futuro hay trabajo asíncrono real
+   (notificaciones, exports, ingesta) que justifique un broker durable.
+
+→ **Paso 1.4** (rediseñado)
+
+
+---
+
 ### D6 — `forgot-password` resetea la contraseña pero nunca entrega la nueva (🔴 prioritaria)
+
+> **Sin paso asignado**, y es lo más urgente de la lista: deja usuarios sin acceso a su
+> cuenta. El arreglo es una decisión de producto (mailer real vs. link con token), así que
+> necesita tu criterio antes de escribir código. → **Paso 4.7** (propuesto)
 
 **Síntoma**: un usuario pide recuperar su contraseña, la UI confirma "If that address has an
 account, sign in with the temporary password", y no puede iniciar sesión con ninguna
@@ -238,6 +293,8 @@ sacar la URL del runtime (config inyectada en `index.html`) en vez de compilarla
 
 ### D8 — `api.health()` y `api.tokens()` son código muerto
 
+> **Sin paso asignado.** Es un borrado de ~40 líneas, sin dependents. → **Paso 4.6** (propuesto)
+
 **Causa**: al añadir los schemas Zod (Paso 2.3) se contractuaron también `healthSchema` y
 `apiTokenListSchema`, pero no hay ningún consumidor: `rg 'api\.(tokens|health)\(' src` no
 devuelve nada. Son restos de un health check que se retiró.
@@ -245,9 +302,13 @@ devuelve nada. Son restos de un health check que se retiró.
 **Arreglo**: borrarlos (cliente y schema), o bien documentar para qué se conservan. Hoy
 mantienen ~40 líneas de contrato que nada valida.
 
-### D9 — Trampa en `manualChunks`: el build pasa y la app muere al cargar
+### D9 — Precaución, no deuda: `manualChunks` compila verde y mata la app al cargar
 
-**No es un bug activo**, sino una disarmadiza para quien retoque `vite.config.ts`.
+> **Clasificación: no es deuda.** No hay ningún bug activo. Se registra aparte porque,
+> junto a D10, es de la clase de cosas que el build no detecta y que conviene no
+> perder al reordenar este documento.
+
+Es una disarmadiza para quien retoque `vite.config.ts`.
 
 Separar `@rc-component` de `antd` en chunks distintos **compila limpio** y rompe la
 aplicación en runtime con `ReferenceError: Cannot access 'bi' before initialization`: los
@@ -260,41 +321,6 @@ detecta navigating en un navegador. Si alguien "optimiza" el chunk de antd para 
 
 **Mitigación aplicada**: el motivo está escrito en `vite.config.ts` junto al
 `chunkSizeWarningLimit`. Si alguien lo sube o lo cambia, que lea ese comentario antes.
-
-### D5 — `InMemoryBroker` no cruza procesos: los avatares huérfanos nunca se limpian
-
-**Síntoma**: al borrar un usuario, la API publica `orphan-cleanup`; el worker se suscribe a
-ese evento. Pero la limpieza no ocurre.
-
-**Causa**: `InMemoryBroker` guarda la cola en la memoria del proceso que la usa. La API
-(publica) y el worker (suscribe) son **procesos distintos**, cada uno con su propia
-instancia y su propio mapa en memoria. El evento se publica en el mapa de la API, donde
-nadie lo escucha. Confirmado en runtime: el log `[InMemoryBroker] Subscribed to
-orphan-cleanup` aparece en el worker, y el API tiene su propia instancia sin suscriptores.
-
-**Consecuencia**: cada usuario eliminado deja su avatar huérfano en el bucket
-`riskio-avatars`. No grows sin límite, porque el mismo bug deja huérfano cualquier otro
-objeto pendiente de limpieza, pero no se notó en desarrollo porque el síntoma es
-silencioso.
-
-**Por qué NO se arregla con Redis**: activar `BROKER_DRIVER=redis` sin escribir el adapter
-`redis.broker.ts` no arregla nada, solo cambia el modo de fallo. Con `redis` aceptado por el
-esquema de validación y sin implementarlo, se pierde el evento igual. Además, Redis para un
-único evento de baja latencia y baja frecuencia es sobreingeniería.
-
-**Opciones**:
-
-1. **Llamada directa al `STORAGE_SERVICE` desde `UsersService`** (recomendada). Elimina la
-   indirección, el canal y el contrato del evento para un único caso de uso. Un avatar
-   huérfano es barato de aceptar de forma puntual; lo que no conviene es un canal de
-   eventos roto y silencioso.
-2. Implementar `redis.broker.ts` de verdad, si en el futuro hay trabajo asíncrono real
-   (notificaciones, exports, ingesta) que justifique un broker durable.
-
-→ **Paso 1.4** (rediseñado)
-
-
----
 
 ## Fase 1 — Compose: mejoras de mantenibilidad (sin cambiar comportamiento)
 
@@ -440,9 +466,17 @@ transversal ("history"), porque `history` no es un dominio de negocio aquí: lo 
 ### Paso 4.2 — Frontend: eliminar duplicados
 
 - `helpers/*` duplica `domain/*` → dejar solo `domain/*` (un nombre, un lugar) y actualizar imports.
-- `global_components/StormCard|StormList` duplica `features/weather/components/dashboard/` → dejar la versión de la feature.
-- `PageFallBack/` vs `PageFAllBack/` (typo) → dejar uno.
-- `pages/protected/*` vs `features/weather/pages/*` → decidir si `pages/` es solo un re-export (barrel) o desaparece.
+  **Pendiente**: `helpers/{format-time,geo,storms}` sigue existiendo junto a `domain/`.
+- ~~`global_components/StormCard|StormList` duplica `features/weather/components/dashboard/`.~~
+  **Resuelto en el Paso 2.4**: ambos se movieron a `features/weather/storms/components/`.
+  Ojo: la ruta real era `features/weather/dashboard/`, no `components/dashboard/`.
+- ~~`PageFallBack/` vs `PageFAllBack/` (typo).~~ **Resuelto antes de la Fase 0**: hoy solo
+  existe `src/global_components/PageFallBack/`. Se había anotado una variante que ya no está.
+- ~~`pages/protected/*` vs `features/weather/pages/*`.~~ **No existía esa segunda carpeta**:
+  `features/weather/` tiene `advisory/`, `dashboard/` y `storms/`, sin `pages/`. La
+  duplicación era real pero en el sentido inverso al anotado: lo que hay son páginas en
+  `pages/protected/` que importan de las features, no dos carpetas de páginas. **Pendiente**:
+  decidir si `pages/` es solo un barrel o si las páginas se mudan a `features/`.
 
 **Explicación**: "una responsabilidad, un lugar". Cuando el mismo componente existe en dos carpetas,
 cualquiera puede quedar desactualizada y el bug aparece en una sola de ellas. El Imports de una
@@ -468,6 +502,22 @@ Es lo primero de esta fase: mientras `npm test` falle, cualquier refactor poster
 
 Meta: 209 tests verdes, cubriendo el refactor de DTOs de `ab31a18` y los totales por
 cuenca de `4e425ae`.
+
+> 4.4 está **aplazada por decisión del usuario** (2026-09-26). No se ejecuta hasta que se
+> diga lo contrario.
+
+### Pasos 4.5–4.8 — Propuestos, sin tu visto bueno
+
+No forman parte del plan original. Surgieron al ejecutar las Fases 1 y 2 y están en el
+registro de deuda sin un paso que los cubra, así que se proponen aquí para que la relación
+deuda → arreglo exista. **Ninguno está aprobado.**
+
+| Paso | Cierra | Qué implica | Nota |
+|---|---|---|---|
+| 4.5 | D5 | Que `UsersService` llame a `STORAGE_SERVICE` directamente y deje de publicar `orphan-cleanup`, o un adapter de broker real | Toca backend con D1 aplazada |
+| 4.6 | D8 | Borrar `api.health()` y `api.tokens()` con sus schemas | Solo borrado, sin riesgo |
+| 4.7 | D6 | Mailer real (nodemailer/Resend) **o** link con token en vez de contraseña por correo | Decisión de producto, no técnica. Enviar contraseñas por correo es mala práctica; lo correcto es un token de un solo uso |
+| 4.8 | D7 | Declarar `ARG VITE_API_URL` en el Dockerfile y exportarlo al build | Cambio de una línea, ya empezado |
 
 ---
 
