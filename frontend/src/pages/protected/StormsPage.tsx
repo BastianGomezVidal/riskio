@@ -1,4 +1,4 @@
-import { StormsDirectory } from "@/layout/protected/storms/StormsDirectory/StormsDirectory";
+import { StormsDirectory } from "@/features/weather/storms";
 
 export function StormsPage() {
   return <StormsDirectory />;

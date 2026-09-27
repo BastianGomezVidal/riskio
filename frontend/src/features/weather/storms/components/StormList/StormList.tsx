@@ -1,4 +1,4 @@
-import { StormCard } from "@/global_components/StormCard/StormCard";
+import { StormCard } from "../StormCard/StormCard";
 import type { DashboardStorm, StormAggregate } from "@/domain/storm";
 
 type StormListItem = StormAggregate | DashboardStorm;

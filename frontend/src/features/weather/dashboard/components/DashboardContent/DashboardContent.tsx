@@ -9,7 +9,7 @@ import { formatUTC } from "@/helpers/format-time/datetime";
 import type { DashboardStorm } from "@/domain/storm";
 import { StatGrid } from "../StatGrid/StatGrid";
 import { DashboardEmpty } from "../DashboadEmpty/DashBoardEmpty";
-import { StormList } from "@/global_components/StormList/StormList";
+import { StormList } from "@/features/weather/storms/components/StormList/StormList";
 
 export function DashboardContent() {
   const { data, error, isPending, refetch } = useDashboardSummary();

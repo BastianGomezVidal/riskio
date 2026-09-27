@@ -1,5 +1,5 @@
 import { Card, Tag, Typography } from "antd";
-import { StormMap } from "@/global_components/StormMap";
+import { StormMap } from "@/features/weather/storms/components/StormMap";
 import { AdvisoryMetrics } from "../AdvisoryMetrics/AdvisoryMetrics";
 import type { AdvisoryDetail } from "@/domain/storm";
 import { AdvisoryForecastBars } from "../AdvisoryForecastBar/AdvisoryForecastBar";

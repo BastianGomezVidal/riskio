@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { SettingsContent } from "@/layout/protected/settings/SettingsContent/SettingsContent";
+import { SettingsContent } from "@/features/settings";
 
 export function SettingsPage() {
   const { hash } = useLocation();

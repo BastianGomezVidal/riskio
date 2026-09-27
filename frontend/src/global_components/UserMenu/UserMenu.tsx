@@ -2,7 +2,7 @@ import { Dropdown, type MenuProps } from "antd";
 import { useSession } from "@/auth/session-context";
 import { Link, useNavigate } from "react-router-dom";
 import { semantic } from "@/design-system/tokens/semantic";
-import { UserAvatar } from "@/layout/protected/settings/UserAvatar/UserAvatar";
+import { UserAvatar } from "@/features/settings";
 
 export function UserMenu() {
   const { user, signOut } = useSession();

@@ -1,5 +1,5 @@
 import { Navigate, useParams } from "react-router-dom";
-import { StormAdvisories } from "@/layout/protected/storms/StormAdvisories/StormAdvisories";
+import { StormAdvisories } from "@/features/weather/storms";
 
 export function StormDetailPage() {
   const { atcfId, n } = useParams<{ atcfId: string; n?: string }>();

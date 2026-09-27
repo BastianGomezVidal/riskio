@@ -8,8 +8,8 @@ import {
 import { useStormAdvisory } from "@/data/queries.hooks";
 import { classifyQueryError } from "@/data/query-error";
 import { StormHeader } from "../StormHeader/StormHeader";
-import { AdvisorySelector } from "../../advisory/AdvisorySelector/AdvisorySelector";
-import { AdvisoryContent } from "../../advisory/AdvisoryContent/AdvisoryContent";
+import { AdvisorySelector } from "@/features/weather/advisory/components/AdvisorySelector/AdvisorySelector";
+import { AdvisoryContent } from "@/features/weather/advisory/components/AdvisoryContent/AdvisoryContent";
 
 export function StormAdvisories({
   atcfId,

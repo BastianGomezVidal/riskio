@@ -11,7 +11,7 @@ import {
 import { StormsFilters } from "../StormsFilters/StormsFilters";
 import { StormsFilterDrawer } from "../StormFilterDrawer/StormFilterDrawer";
 import { StormsAppliedFilters } from "../StormsAppliedFilters/StormsAppliedFilters";
-import { StormList } from "@/global_components/StormList/StormList";
+import { StormList } from "../StormList/StormList";
 
 const DEBOUNCE_MS = 250;
 const DEFAULT_TAB: StormsTab = "active";
