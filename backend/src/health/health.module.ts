@@ -3,9 +3,7 @@ import { TerminusModule } from '@nestjs/terminus';
 import { HealthController } from './health.controller.js';
 
 /**
- * Health feature module: liveness/readiness probe backed by Terminus.
- *
- * Exposes {@link HealthController} at `GET /health`; no shared providers.
+ * Health module: liveness/readiness probe for the container healthcheck.
  */
 @Module({
   imports: [TerminusModule],

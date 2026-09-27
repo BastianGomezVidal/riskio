@@ -5,9 +5,12 @@ import {
   TypeOrmHealthIndicator,
 } from '@nestjs/terminus';
 import { ApiTags, ApiOperation, ApiOkResponse } from '@nestjs/swagger';
+import { Public } from '../domain/auth/decorators/public.decorator.js';
 
 /**
  * Readiness/liveness probe for the container healthcheck.
+ *
+ * Public: the Docker healthcheck runs without a JWT.
  */
 @ApiTags('health')
 @Controller('health')
@@ -20,6 +23,7 @@ export class HealthController {
   /**
    * Liveness + readiness probe: returns `ok` when the database is reachable.
    */
+  @Public()
   @Get()
   @HealthCheck()
   @ApiOperation({ summary: 'Health probe (liveness & readiness)' })
