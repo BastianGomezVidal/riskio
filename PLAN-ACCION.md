@@ -132,7 +132,7 @@ precaución y varios puntos ya están resueltos. La tabla es el índice; debajo 
 |---|---|---|---|---|
 | **D6** | `forgot-password` resetea la contraseña y no la entrega | 🔴 Usuario sin acceso a su cuenta | 4.7 *(propuesto)* | Abierta, sin paso |
 | **D1** | Specs de backend comentados (3 suites, ~34 tests) | 🔴 Sin red de seguridad | 4.4 | **Aplazada** por decisión |
-| **D7** | `VITE_API_URL` es un build arg muerto | 🟠 Solo funciona en local | 4.8 *(propuesto)* | **En curso** |
+| D7 | `VITE_API_URL` era un build arg muerto | 🟠 Solo funcionaba en local | — | **Resuelta** (`1ddefa5`) |
 | **D5** | `InMemoryBroker` no cruza procesos: avatares huérfanos | 🟠 Silencioso, crece sin límite | 4.5 *(propuesto)* | Abierta, sin paso |
 | **D2** | Carpetas duplicadas en backend | 🟡 Mantenimiento doble | 4.1 | Abierta |
 | **D3** | Carpetas duplicadas en frontend | 🟡 Una de las dos queda vieja | 4.2 | Parcialmente cerrada en 2.4 |
@@ -270,7 +270,11 @@ contrato es correcto y lo que falta es la entrega.
 **Arreglo**: implementar un mailer real (nodemailer/Resend) con configuración SMTP por
 entorno. Mientras no exista, la UI no debería prometer un envío.
 
-### D7 — `VITE_API_URL` es un build arg muerto: la URL de la API funciona por casualidad
+### D7 — ~~`VITE_API_URL` es un build arg muerto~~ **Resuelta** (`1ddefa5`)
+
+> El Dockerfile declaraba `ARG`/`ENV` para que Vite lo leyera. El aviso de build args no
+> consumidos desapareció y la URL sale del build arg, no del fallback. Verificado en ambos
+> sentidos: con la variable se compila en el bundle, sin ella el fallback sigue aplicando.
 
 **Síntoma**: el build de la imagen del frontend emite
 `one or more build args were not consumed: [VITE_API_URL]`, y aun así la app funciona.
