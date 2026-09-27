@@ -7,14 +7,22 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 const { Text } = Typography;
 
-function dedupeWarnings(
+/**
+ * Groups the warning segments by type, keeping how many there are.
+ *
+ * The map below draws one line per segment while the card lists the types, so
+ * without the count a storm with two separate Hurricane Watch segments shows a
+ * single tag next to two lines on the map, with nothing to reconcile them. The
+ * count is what makes the card and the map describe the same thing.
+ */
+function groupWarnings(
   warnings: { id: string; warningType: string }[],
-): string[] {
-  const set = new Set<string>();
+): { warningType: string; count: number }[] {
+  const counts = new Map<string, number>();
   for (const w of warnings) {
-    set.add(w.warningType);
+    counts.set(w.warningType, (counts.get(w.warningType) ?? 0) + 1);
   }
-  return Array.from(set);
+  return Array.from(counts, ([warningType, count]) => ({ warningType, count }));
 }
 
 
@@ -62,9 +70,14 @@ export function AdvisoryContent({ advisory }: { advisory: AdvisoryDetail }) {
       {advisory.warnings.length > 0 && (
         <Card size="small" title="Coastal warnings">
           <ul role="list" className="flex flex-wrap gap-2">
-            {dedupeWarnings(advisory.warnings).map((type) => (
-              <li key={type}>
-                <Tag color={warningColor(type)}>{type}</Tag>
+            {groupWarnings(advisory.warnings).map(({ warningType, count }) => (
+              <li key={warningType}>
+                <Tag color={warningColor(warningType)}>
+                  {warningType}
+                  {count > 1 && (
+                    <span className="ml-1 opacity-70">×{count}</span>
+                  )}
+                </Tag>
               </li>
             ))}
           </ul>
