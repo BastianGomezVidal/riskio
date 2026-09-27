@@ -1,10 +1,12 @@
 import { z } from "zod";
 import type { StormsQuery } from "@/domain/storm";
+import type { ResetPasswordRequest } from "@/domain/auth";
 import { getAccessToken } from "@/auth/session";
 import {
   apiTokenListSchema,
   dashboardSummarySchema,
   forgotPasswordResultSchema,
+  resetPasswordResultSchema,
   healthSchema,
   sessionSchema,
   stormAdvisoryDetailSchema,
@@ -206,6 +208,12 @@ export const api = {
     request("/auth/forgot-password", forgotPasswordResultSchema, {
       method: "POST",
       body: JSON.stringify({ email }),
+    }),
+
+  resetPassword: (body: ResetPasswordRequest) =>
+    request("/auth/reset-password", resetPasswordResultSchema, {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
 
   tokens: () => request("/auth/tokens", apiTokenListSchema),

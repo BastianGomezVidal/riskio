@@ -59,8 +59,8 @@ export function ForgotPasswordPage() {
           <h2 className="text-lg font-semibold">Password reset</h2>
           <p className="mt-1 text-sm text-gray-600">{result.message}</p>
           <p className="mt-1 text-sm text-gray-600">
-            If that address has an account, sign in with the temporary password
-            and change it in your profile.
+            If that address has an account, open the link in that email to
+            choose a new password.
           </p>
 
           <Link
@@ -79,7 +79,8 @@ export function ForgotPasswordPage() {
       <section>
         <h2 className="text-lg font-semibold">Reset your password</h2>
         <p className="mt-1 text-sm text-gray-600">
-          Enter your account email and we will send you a temporary password.
+          Enter your account email and we will send you a link to choose a new
+          password.
         </p>
 
         <form action={formAction} noValidate className="mt-8 space-y-4">

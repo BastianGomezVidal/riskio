@@ -18,6 +18,12 @@ const ForgotPasswordPage = lazyPage(
   () => import("@/pages/public/ForgotPasswordPage"),
   "ForgotPasswordPage",
 );
+// Outside PublicOnlyRoute: someone who followed the emailed link while signed
+// in must still be able to set a new password.
+const ResetPasswordPage = lazyPage(
+  () => import("@/pages/public/ResetPasswordPage"),
+  "ResetPasswordPage",
+);
 const OAuthCallbackPage = lazyPage(
   () => import("@/pages/public/OAuthCallbackPage"),
   "default",
@@ -53,6 +59,7 @@ export function AppRoutes() {
         <Route path="/forgot" element={<ForgotPasswordPage />} />
       </Route>
 
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/auth/callback" element={<OAuthCallbackPage />} />
 
       <Route element={<ProtectedRoute />}>

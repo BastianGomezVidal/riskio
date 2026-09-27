@@ -1,5 +1,9 @@
 import { z } from "zod";
-import type { Session, ForgotPasswordResult } from "@/domain/auth";
+import type {
+  ForgotPasswordResult,
+  ResetPasswordResult,
+  Session,
+} from "@/domain/auth";
 import type { DashboardSummary } from "@/domain/dashboard";
 import type {
   AdvisoryDetail,
@@ -75,6 +79,11 @@ export const sessionSchema = z.object({
  * enumerate which emails have an account.
  */
 export const forgotPasswordResultSchema = z.object({
+  message: z.string(),
+});
+
+/** Answer to redeeming a reset link. */
+export const resetPasswordResultSchema = z.object({
   message: z.string(),
 });
 
@@ -202,6 +211,9 @@ export type SchemaMatchesDomain = [
   Assert<Exact<z.infer<typeof sessionSchema>, Session>>,
   Assert<
     Exact<z.infer<typeof forgotPasswordResultSchema>, ForgotPasswordResult>
+  >,
+  Assert<
+    Exact<z.infer<typeof resetPasswordResultSchema>, ResetPasswordResult>
   >,
   Assert<Exact<z.infer<typeof healthSchema>, { status: string }>>,
   Assert<Exact<z.infer<typeof stormAggregateSchema>, StormAggregate>>,

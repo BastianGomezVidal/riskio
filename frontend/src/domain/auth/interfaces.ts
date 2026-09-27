@@ -14,3 +14,17 @@ export interface Session {
 export interface ForgotPasswordResult {
   message: string;
 }
+
+/**
+ * What the user chose as their new password, plus the token from the emailed
+ * link. The API answers with the same neutral shape as a forgot-password
+ * request; only the token distinguishes success from failure.
+ */
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+}
+
+export interface ResetPasswordResult {
+  message: string;
+}
