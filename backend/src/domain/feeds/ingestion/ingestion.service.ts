@@ -14,6 +14,7 @@ import {
 } from '../parser/kml-parser.js';
 import { StormsService } from '../../weather/storms/storms.service.js';
 import { AdvisoriesService } from '../../weather/advisories/advisories.service.js';
+import { CacheService } from '../../cache/cache.service.js';
 
 /**
  * Counters describing the outcome of one ingestion run for a basin.
@@ -60,6 +61,7 @@ export class IngestionService {
     private readonly nhc: NhcProvider,
     private readonly storms: StormsService,
     private readonly advisories: AdvisoriesService,
+    private readonly cache: CacheService,
   ) {}
 
   /**
@@ -245,6 +247,10 @@ export class IngestionService {
             `${ctx} advisory#${advisoryNumber} inserted ` +
               `(${Date.now() - stormStarted}ms)`,
           );
+
+          // Bust the cache so the next request picks up the new advisory.
+          await this.cache.invalidate('dashboard:*');
+          await this.cache.invalidate('storms:*');
         } else {
           report.advisoriesSkipped++;
 
