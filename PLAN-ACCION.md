@@ -171,8 +171,12 @@ accidente, y por eso el síntoma es "No test found in suite" en vez de un fallo 
   commitea, se añade a `.gitignore` o se borra.
 - `npm run lint` del frontend es un alias de `npm run build` (`"lint": "vite build"`):
   no hay linter real. El build sí ejecuta `tsc -b`, así que hay type-checking.
-- Bundle inicial del frontend: **1.063 kB** (gzip 337 kB) con un chunk que dispara el
-  aviso de Vite (>500 kB). → se ataca en **Paso 2.6**.
+- ~~Bundle inicial del frontend: **1.063 kB** (gzip 337 kB) con un chunk que dispara el
+  aviso de Vite (>500 kB).~~ → **Resuelto en el Paso 2.6**: el chunk de entrada pasó de
+  1.200 kB a **25 kB**, y el shell (react + antd + zod/TanStack) quedó en ~318 kB gzip
+  repartido en chunks de vendor que sobreviven a un deploy. El límite de aviso se subió a
+  600 kB con el motivo escrito en `vite.config.ts` (antd y `@rc-component` no se pueden
+  separar sin romper la app al cargar).
 
 ### D5 — `InMemoryBroker` no cruza procesos: los avatares huérfanos nunca se limpian
 
@@ -260,41 +264,55 @@ desacoplarse de Redis por completo.
 
 ## Fase 2 — Frontend: Adoptar React 19 (prioridad por impacto)
 
-### Paso 2.1 — Error Boundaries por ruta/feature
+**Estado: completada** (2026-09-26). Commits `edb2702`, `910ff56`, `3f4184d`, `f43a8ed`, `3f60f2a`.
+
+### Paso 2.1 — ✅ Ejecutado — Error Boundaries por ruta/feature
 
 Envolver rutas protegidas con un error boundary (`react-error-boundary` o uno propio pequeño) con fallback accesible ("Algo salió mal", botón reintentar). Complementa el loading ya existente.
 
 **Explicación**: `Suspense` maneja el estado *cargando*; un error durante render solo lo captura un *Error Boundary*. Sin él, un fallo en un componente tumba toda la app (pantalla en blanco). Es la pieza que faltaba para robustez de UX.
 
-### Paso 2.2 — Adoptar TanStack Query para server state
+**Resultado**: `RouteErrorBoundary` propio (sin dependencia nueva), montado en `AppLayout` y `AuthLayout` para que un fallo de una ruta no vacíe el shell. Verificado inyectando un fallo real en render.
+
+### Paso 2.2 — ✅ Ejecutado — Adoptar TanStack Query para server state
 
 Reemplazar el manejo manual de `loading/error/data` y el TTL cache de `data/promises.ts` por `useQuery`/`useMutation` con `queryKeys` por entidad. Beneficios: invalidación automática tras mutaciones (deuda actual), revalidación, dedupe, optimistic updates.
 
 **Explicación**: "server state" (datos del servidor) tiene ciclo de vida distinto al "client state" (UI local). React no tiene solver de server state; `useEffect` + `useState` es reinventar TanStack Query a medias. La invalidación post-mutación (p. ej. tras subir avatar, invalidar `['users','me']`) es lo que el TTL actual no puede hacer.
 
-### Paso 2.3 — Zod en la frontera API (`api/client.ts`)
+**Resultado**: `@tanstack/react-query` 5.104. Fuera el TTL manual de `data/promises.ts` y `data/preload-result.ts`. Las mutaciones de perfil escriben el usuario actualizado en caché en vez de invalidar y refetch. De paso se corrigió un bug preexistente: `ProfileCard` se inicializaba con el stub del JWT, así que guardar el perfil no funcionaba.
+
+### Paso 2.3 — ✅ Ejecutado — Zod en la frontera API (`api/client.ts`)
 
 Validar responses con Zod: contrato en runtime. Errores de validación explícitos (no `undefined` silenciosos).
 
 **Explicación**: TypeScript solo existe en build time; en runtime el JSON puede no cumplir el contrato (backend deployado con otro shape). Zod valida en la frontera y convierte "undefined silencioso" en "error visible". Es barato y previene bugs de runtime difíciles.
 
-### Paso 2.4 — Colocation + barrel exports por feature
+**Resultado**: cada schema está atado por una aserción de tipos exportada a la interfaz que refleja, así que un campo que se añade a un lado y no al otro rompe el build. Ese guard encontró un bug vivo: `ForgotPasswordResult` declaraba `email` y `temporaryPassword`, pero la API solo devuelve un mensaje neutro (a propósito, para no permitir enumerar cuentas) y la pantalla de éxito renderizaba literalmente "undefined".
+
+### Paso 2.4 — ✅ Ejecutado — Colocation + barrel exports por feature
 
 Mover componentes feature-only a `features/weather/storms/components/`. Crear `features/weather/storms/index.ts` que exporte la API pública de la feature (componentes, hooks, tipos). Reservar `components/layout/` para shells globales.
 
 **Explicación**: "colocation" = agrupar lo que cambia junto. Si un componente solo lo usa una feature, debe vivir en esa feature (no en `layout/protected/`, que sugiere layout global). El barrel export define la *API pública* de la feature y permite mover internals sin romper imports externos.
 
-### Paso 2.5 — React 19: `use()` + Suspense en páginas de detalle
+**Resultado**: 30 renombres, 0 cambios de lógica. `StormCard`, `StormList` y `StormMap` estaban en `global_components/` sin ser globales (un consumidor cada uno); ahora viven en `features/weather/*` tras un `index.ts`.
 
-Migrar el fetch de Storm detail a `use(promise)` + `<Suspense>`, reduciendo el estado `loading/error` manual. Aprovechar `useActionState`/`useFormStatus` en formularios simples.
+### Paso 2.5 — Cancelado — React 19: `use()` + Suspense en páginas de detalle
+
+**No se ejecuta, y no es deuda pendiente.** El Paso 2.2 migró las lecturas a `useQuery`, que ya expone `isPending`/`isError` y gestiona el ciclo de vida de la petición: `use()` ya no aporta nada aquí y reintroducirlo sería volver al estado manual que 2.2 eliminó a propósito. Los skeletons se renderizan inline en el componente que hace la query, no como fallback de `Suspense`. React 19 ya estaba adoptado antes de esta fase (`react`/`react-dom` `^19.1.0`).
+
+Lo que sí se conservó de la idea original: cada chunk lazy tiene su frontera `Suspense` (la de `AppLayout` para rutas protegidas, la raíz en `main.tsx` para las públicas).
 
 **Explicación**: `use()` (React 19) permite leer una promesa directamente en render y suspender el componente, sin `useEffect` + `useState` + bandera de loading. Menos código, y prepara para streaming. En formularios, `useFormStatus` da el estado de envío sin boilerplate.
 
-### Paso 2.6 — Code splitting por ruta
+### Paso 2.6 — ✅ Ejecutado — Code splitting por ruta
 
 `React.lazy` + `Suspense` para rutas pesadas (Dashboard, Storms, cualquier vista de mapa). Reduce bundle inicial.
 
 **Explicación**: code splitting descarga el código de rutas que el usuario quizá no visita. Con `Suspense` como frontera, cada chunk tiene su propio loading. Es la mejora de performance de carga más directa.
+
+**Resultado**: las 9 rutas cargan bajo demanda. `StormDetailsPage` era eager y arrastraba `AdvisoryContent` → `StormMap` → `react-leaflet` → `leaflet` al chunk inicial: iniciar sesión costaba el mapa aunque nunca se abriera una tormenta. Medido sobre el build real, abrir un detalle descarga 171 kB de código de mapa que el login ya no pide. El barrel de `storms` dejó de re-exportar `StormMap` por el mismo motivo.
 
 ---
 
