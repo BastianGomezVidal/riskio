@@ -521,7 +521,9 @@ deuda → arreglo exista. **Ninguno está aprobado.**
 | 4.5 | D5 | Que `UsersService` llame a `STORAGE_SERVICE` directamente y deje de publicar `orphan-cleanup`, o un adapter de broker real | Toca backend con D1 aplazada |
 | 4.6 | D8 | Borrar `api.health()` y `api.tokens()` con sus schemas | Solo borrado, sin riesgo |
 | 4.7 | D6 | Mailer real (nodemailer/Resend) **o** link con token en vez de contraseña por correo | Decisión de producto, no técnica. Enviar contraseñas por correo es mala práctica; lo correcto es un token de un solo uso |
-| 4.8 | D7 | Declarar `ARG VITE_API_URL` en el Dockerfile y exportarlo al build | Cambio de una línea, ya empezado |
+
+**4.8 (D7) queda cerrado** y por eso ya no figura como propuesto: se resolvió en `1ddefa5`
+con un `ARG`/`ENV` en el `Dockerfile`.
 
 ---
 
@@ -549,8 +551,8 @@ comportamiento verificado contra el stack en ejecución.
 5. **Fase 3** — auditorías de a11y y Web Vitals, con informe de prioridades.
 
 **Entre lo pendiente, lo primero por impacto de usuario es D6** (recuperación de contraseña
-que deja al usuario sin acceso) y **D7** (URL de la API que solo funciona en local). Ambos
-son cortos y no dependen de D1.
+que deja al usuario sin acceso). Es corto y no depende de D1, pero necesita una decisión de
+producto antes de escribir código. **D7** se resolvió en `1ddefa5`.
 
 Cada paso se ejecuta y se revisa antes de pasar al siguiente. Nada se commitea sin
 revisar el diff.
@@ -595,7 +597,8 @@ El usuario se quejó dos veces de comprobaciones lentas.
 
 ### Si retomar
 
-1. **D6** (mailer) — bloquea a usuarios, corto, no necesita D1.
-2. **D7** (URL de la API) — corto, invisible al build.
+1. **D6** (mailer) — bloquea a usuarios, corto, no necesita D1, pero requiere decidir
+   entre un mailer real y un link con token de un solo uso.
+2. ~~**D7** (URL de la API) — corto, invisible al build.~~ ✅ resuelto en `1ddefa5`.
 3. **Fase 3** — auditorías a11y y Web Vitals, solo si el usuario las habilita.
 4. **D1** — sigue siendo bloqueante para tocar el backend con tests.
