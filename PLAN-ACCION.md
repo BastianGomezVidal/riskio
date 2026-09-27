@@ -347,6 +347,21 @@ mantienen ~40 líneas de contrato que nada valida.
 
 ### D11 — 6 specs de integración fallan por aserciones, no por arranque
 
+**Causa raíz: no es una sola. Son cuatro problemas distintos**, diagnosticados el
+2026-09-27 con los endpoints reales de la API:
+
+| Specs | Síntoma | Causa real |
+|---|---|---|
+| `storms`, `dashboard`, `ingestion` (13 tests) | 401 | Los specs son **anteriores** al `JwtAuthGuard` global (Fase 0, `4875dd9`) y piden endpoints protegidos sin token. **El guard funciona bien; los tests quedaron atrás.** |
+| `storm-history` (6 tests) | 404 | Piden `/history`, el controller es `@Controller('storm-history')`. El rename de Fase 0 (`e56e0fa`) no actualizó los specs. |
+| `advisories` (5 tests) | 404 | Piden `storms/:id/advisories` (lista), que **no existe**: el controller solo expone `storms/:atcfId/advisories/:n` y `advisories/:id`. O falta el endpoint o el spec pergunta por una API que nunca hubo. |
+| `warnings` (3 tests) | 404 | **No existe `warnings.controller.ts`.** El spec prueba `/advisories/:id/warnings` y no hay controller. El dominio sí existe (`Warning`, `replaceWarnings` en `AdvisoriesService`), pero **no está expuesto por HTTP**. |
+
+**Por qué importa**: la cobertura de integración es efectivamente cero, y con D1 aplazado
+tampoco hay unitaria para `findOne` de storms y `getSummary` de dashboard. Además, el cuarto
+punto no es un test roto sino **una feature sin endpoint**: los warnings se persisten pero
+nadie puede leerlos por API. Eso puede ser un bug de producto, no solo deuda.
+
 **Estado**: `npm run test:integration` → **6 archivos fallan, 2 pasan** (34 tests, 7
 ejecutados). Antes de `0955a80` fallaban **los 8**, sin ejecutar una sola aserción.
 
