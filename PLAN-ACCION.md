@@ -124,9 +124,10 @@ Git detectó **20 renombres**, así que el historial muestra los movimientos com
 > Todo lo que se decidió **no** arreglar en esta fase, para no mezclar un commit
 > con un refactor grande.
 >
-> D1–D5 se recogieron al agrupar el trabajo previo; D6–D9 aparecieron al ejecutar las Fases 1
-y 2, buscando y no previstas en el plan. No todas las entradas son deuda: D9 es una
-precaución y varios puntos ya están resueltos. La tabla es el índice; debajo está el detalle.
+> D1–D5 se recogieron al agrupar el trabajo previo; D6–D12 aparecieron al ejecutar las Fases
+1 y 2, buscando y no previstas en el plan. No todas las entradas son deuda: D9 es una
+precaución, y de D6 a D10 la mayoría están resueltas. La tabla es el índice; debajo, el
+detalle.
 
 | # | Qué es | Impacto | Dónde se arregla | Estado |
 |---|---|---|---|---|
@@ -581,7 +582,7 @@ deuda → arreglo exista. **Ninguno está aprobado.**
 |---|---|---|---|
 | 4.5 | D5 | Que `UsersService` llame a `STORAGE_SERVICE` directamente y deje de publicar `orphan-cleanup`, o un adapter de broker real | Toca backend con D1 aplazada |
 | 4.6 | D8 | Borrar `api.health()` y `api.tokens()` con sus schemas | Solo borrado, sin riesgo |
-| 4.7 | D6 (resto) | Transporte real de correo para el link (nodemailer/Resend/SES) con SMTP por entorno | El link con token ya está hecho; falta que llegue. La interfaz es un método, sustituirla es lo único que queda |
+| ~~4.7~~ | ~~D6~~ | **Cerrada**: link de un solo uso + `MAIL_TRANSPORT=smtp` con nodemailer | Ya no queda nada por decidir aquí |
 
 **4.8 (D7) queda cerrado** y por eso ya no figura como propuesto: se resolvió en `1ddefa5`
 con un `ARG`/`ENV` en el `Dockerfile`.
@@ -612,9 +613,9 @@ comportamiento verificado contra el stack en ejecución.
 4. ~~**Fase 2** — React 19: Error Boundaries, TanStack Query, Zod, colocation, splitting.~~ ✅
 5. **Fase 3** — auditorías de a11y y Web Vitals, con informe de prioridades.
 
-**Entre lo pendiente, lo primero por impacto de usuario es D6** (recuperación de contraseña
-que deja al usuario sin acceso). Es corto y no depende de D1, pero necesita una decisión de
-producto antes de escribir código. **D7** se resolvió en `1ddefa5`.
+**Lo único 🔴 que quedaba, D6, está resuelto.** Ya no hay ninguna entrada abierta con
+impacto directo sobre un usuario: D1 está aplazada por decisión, y D5, D11 y D12 son
+silenciosos o de mantenimiento.
 
 Cada paso se ejecuta y se revisa antes de pasar al siguiente. Nada se commitea sin
 revisar el diff.
