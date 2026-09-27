@@ -9,7 +9,7 @@ import { Link } from "react-router-dom";
  * available — the user is not stranded on a blank screen.
  *
  * Distinct from "resource not found" (e.g. a storm that doesn't exist in
- * the database), which is handled per-page through PreloadResult.
+ * the database), which each page handles through `classifyQueryError`.
  */
 export function NotFoundPage() {
   return (

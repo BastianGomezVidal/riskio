@@ -1,22 +1,12 @@
-import { Suspense } from "react";
-import { Skeleton } from "antd";
 import { DashboardContent } from "@/layout/protected/dashboard/DashboardContent/DashboardContent";
 
 export function DashboardPage() {
   // No <main> here — AppLayout owns the main landmark.
+  // The route-level <Suspense> in AppLayout covers this chunk being lazy;
+  // the summary query renders its own skeleton inside DashboardContent.
   return (
     <div className="mx-auto w-full max-w-4xl">
-      <Suspense fallback={<DashboardFallback />}>
-        <DashboardContent />
-      </Suspense>
-    </div>
-  );
-}
-
-function DashboardFallback() {
-  return (
-    <div aria-busy="true" className="mt-6">
-      <Skeleton active paragraph={{ rows: 6 }} />
+      <DashboardContent />
     </div>
   );
 }

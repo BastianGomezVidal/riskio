@@ -1,8 +1,7 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { Button, message } from "antd";
 import { UserAvatar } from "../UserAvatar/UserAvatar";
-import { useSession } from "@/auth/session-context";
-import { api } from "@/api/client";
+import { useUploadAvatar } from "@/data/queries.hooks";
 import type { User } from "@/domain/users";
 
 interface Props {
@@ -10,9 +9,8 @@ interface Props {
 }
 
 export function ProfileHeader({ user }: Props) {
-  const { updateUser } = useSession();
+  const uploadAvatar = useUploadAvatar();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
 
   const fullName = `${user.firstName} ${user.lastName}`.trim() || user.email;
 
@@ -20,15 +18,12 @@ export function ProfileHeader({ user }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploading(true);
     try {
-      const updated = await api.uploadAvatar(file);
-      updateUser(updated);
+      await uploadAvatar.mutateAsync(file);
       message.success("Avatar updated");
     } catch {
       message.error("Could not upload avatar. Try again.");
     } finally {
-      setUploading(false);
       // Reset so the same file can be picked again.
       if (inputRef.current) inputRef.current.value = "";
     }
@@ -52,7 +47,7 @@ export function ProfileHeader({ user }: Props) {
         <Button
           size="small"
           className="mt-2"
-          loading={uploading}
+          loading={uploadAvatar.isPending}
           onClick={() => inputRef.current?.click()}
         >
           Change photo

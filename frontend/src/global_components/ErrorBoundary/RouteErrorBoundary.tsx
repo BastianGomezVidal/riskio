@@ -19,11 +19,10 @@ interface RouteErrorBoundaryProps {
  * page takes down only that page: the header, the footer and the
  * session-expiry modal stay mounted, and the user keeps a way out.
  *
- * Fetch failures do not arrive here. `toPreloadResult` encodes 404, offline
- * and API errors as data, and the pages render `NotFoundEmpty` /
- * `OfflineEmpty` / `ErrorEmpty` for them. What reaches this boundary is a
- * genuine render fault — a thrown error or a rejected promise surfaced
- * through `use()` — so there is no cache to invalidate on retry.
+ * Fetch failures do not arrive here. `classifyQueryError` turns 404, offline
+ * and API errors into the three states the pages render, so what reaches this
+ * boundary is a genuine render fault — a thrown error or a rejected promise
+ * surfaced through `use()` — with no cache to invalidate on retry.
  */
 export function RouteErrorBoundary({
   children,

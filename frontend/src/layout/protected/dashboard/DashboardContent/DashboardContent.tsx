@@ -1,8 +1,6 @@
-import { use, useState } from "react";
-import {
-  preloadDashboardSummary,
-  resetDashboardSummary,
-} from "@/data/promises";
+import { Skeleton } from "antd";
+import { useDashboardSummary } from "@/data/queries.hooks";
+import { classifyQueryError } from "@/data/query-error";
 import {
   ErrorEmpty,
   OfflineEmpty,
@@ -14,29 +12,40 @@ import { DashboardEmpty } from "../DashboadEmpty/DashBoardEmpty";
 import { StormList } from "@/global_components/StormList/StormList";
 
 export function DashboardContent() {
-  const result = use(preloadDashboardSummary());
-  const [retryToken, setRetryToken] = useState(0);
+  const { data, error, isPending, refetch } = useDashboardSummary();
 
   const retry = () => {
-    resetDashboardSummary();
-    setRetryToken((n) => n + 1);
+    void refetch();
   };
 
-  if (result.status === "offline") {
-    return <OfflineEmpty onRetry={retry} />;
-  }
-
-  if (result.status === "error") {
-    return <ErrorEmpty message={result.message} onRetry={retry} />;
-  }
-
-  if (result.status === "not-found") {
+  // The query lives here, so its pending state renders here. This used to be
+  // a <Suspense> fallback in DashboardPage, back when the component read a
+  // promise through `use()` and suspended instead of reporting isPending.
+  if (isPending) {
     return (
-      <ErrorEmpty message="Dashboard summary unavailable." onRetry={retry} />
+      <div aria-busy="true" className="mt-6">
+        <Skeleton active paragraph={{ rows: 6 }} />
+      </div>
     );
   }
 
-  const summary = result.data;
+  if (error) {
+    const failure = classifyQueryError(error);
+
+    if (failure.kind === "offline") {
+      return <OfflineEmpty onRetry={retry} />;
+    }
+
+    if (failure.kind === "not-found") {
+      return (
+        <ErrorEmpty message="Dashboard summary unavailable." onRetry={retry} />
+      );
+    }
+
+    return <ErrorEmpty message={failure.message} onRetry={retry} />;
+  }
+
+  const summary = data;
 
   const storms: DashboardStorm[] = summary.storms.map((s) => ({
     ...s.storm,
@@ -50,7 +59,7 @@ export function DashboardContent() {
   }
 
   return (
-    <div key={retryToken}>
+    <div>
       <StatGrid totals={summary.totals} />
 
       <section aria-labelledby="storms-heading" className="mt-8">

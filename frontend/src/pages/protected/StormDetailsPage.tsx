@@ -1,5 +1,3 @@
-import { Suspense } from "react";
-import { Skeleton } from "antd";
 import { Navigate, useParams } from "react-router-dom";
 import { StormAdvisories } from "@/layout/protected/storms/StormAdvisories/StormAdvisories";
 
@@ -19,9 +17,5 @@ export function StormDetailPage() {
     return <Navigate to={`/storms/${atcfId}/advisories/latest`} replace />;
   }
 
-  return (
-    <Suspense fallback={<Skeleton active paragraph={{ rows: 12 }} />}>
-      <StormAdvisories atcfId={atcfId} advisoryNumber={n} />
-    </Suspense>
-  );
+  return <StormAdvisories atcfId={atcfId} advisoryNumber={n} />;
 }

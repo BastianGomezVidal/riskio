@@ -1,7 +1,8 @@
-import { use, useEffect, useMemo, useState } from "react";
-import { Empty } from "antd";
+import { useEffect, useMemo, useState } from "react";
+import { Empty, Skeleton } from "antd";
 import { useSearchParams } from "react-router-dom";
-import { preloadStorms, resetStorms } from "@/data/promises";
+import { useStorms } from "@/data/queries.hooks";
+import { classifyQueryError } from "@/data/query-error";
 import type { StormsQuery, StormsSort, StormsTab } from "@/domain/storm";
 import {
   ErrorEmpty,
@@ -47,7 +48,6 @@ function parseCatCsv(value: string | null): number[] {
 
 export function StormsDirectory() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [retryToken, setRetryToken] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // ── Read from URL ───────────────────────────────────────────────────
@@ -141,22 +141,38 @@ export function StormsDirectory() {
     [tab, sort, qParam, basins, categories, yearFrom, yearTo],
   );
 
-  const result = use(preloadStorms(query));
+  const { data, error, isPending, refetch } = useStorms(query);
 
   const retry = () => {
-    resetStorms();
-    setRetryToken((n) => n + 1);
+    void refetch();
   };
 
-  if (result.status === "offline") return <OfflineEmpty onRetry={retry} />;
-  if (result.status === "error") {
-    return <ErrorEmpty message={result.message} onRetry={retry} />;
-  }
-  if (result.status === "not-found") {
-    return <ErrorEmpty message="Storms unavailable." onRetry={retry} />;
+  // The query lives here, so its pending state renders here. This used to be
+  // a <Suspense> fallback in StormsPage, back when the component read a
+  // promise through `use()` and suspended instead of reporting isPending.
+  if (isPending) {
+    return (
+      <div aria-busy="true">
+        <Skeleton active paragraph={{ rows: 10 }} />
+      </div>
+    );
   }
 
-  const storms = result.data;
+  if (error) {
+    const failure = classifyQueryError(error);
+
+    if (failure.kind === "offline") {
+      return <OfflineEmpty onRetry={retry} />;
+    }
+
+    if (failure.kind === "not-found") {
+      return <ErrorEmpty message="Storms unavailable." onRetry={retry} />;
+    }
+
+    return <ErrorEmpty message={failure.message} onRetry={retry} />;
+  }
+
+  const storms = data;
 
   const latestAdvisoryIssuedAtMap: Record<string, string | null> = {};
   for (const s of storms) {
@@ -164,7 +180,7 @@ export function StormsDirectory() {
   }
 
   return (
-    <div key={retryToken}>
+    <div>
       <header className="mb-6">
         <h2 className="text-2xl font-semibold" style={{ marginBottom: 4 }}>
           Storms

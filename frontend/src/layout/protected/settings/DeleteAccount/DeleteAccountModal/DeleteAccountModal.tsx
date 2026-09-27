@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Input, Modal, message } from "antd";
 import { useNavigate } from "react-router-dom";
-import { api } from "@/api/client";
-import { useSession } from "@/auth/session-context";
+import { useDeleteMe } from "@/data/queries.hooks";
 
 interface Props {
   open: boolean;
@@ -13,9 +12,11 @@ const CONFIRM_WORD = "DELETE";
 
 export function DeleteAccountModal({ open, onClose }: Props) {
   const [text, setText] = useState("");
-  const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
-  const { signOut } = useSession();
+  // The hook clears the cached profile and signs out on success, so this
+  // component only has to report and navigate.
+  const deleteMe = useDeleteMe();
+  const deleting = deleteMe.isPending;
 
   // Reset input when opening.
   useEffect(() => {
@@ -25,15 +26,12 @@ export function DeleteAccountModal({ open, onClose }: Props) {
   const canConfirm = text === CONFIRM_WORD && !deleting;
 
   const handleConfirm = async () => {
-    setDeleting(true);
     try {
-      await api.deleteMe();
-      signOut();
+      await deleteMe.mutateAsync();
       message.success("Account deleted");
       navigate("/", { replace: true });
     } catch {
       message.error("Could not delete account. Try again.");
-      setDeleting(false);
     }
   };
 

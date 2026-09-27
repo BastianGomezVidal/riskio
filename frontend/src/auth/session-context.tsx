@@ -7,11 +7,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { message } from "antd";
 import { useNavigate } from "react-router-dom";
 import type { Session } from "@/domain/auth";
 import type { User } from "@/domain/users";
-import { preloadMe } from "@/data/promises";
+import { queryKeys, meQuery } from "@/data/queries";
 import { setUnauthorizedHandler } from "@/api/client";
 import { useInactivityLogout } from "./use-inactivity-logout";
 
@@ -69,23 +70,38 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     Math.round(IDLE_WARNING_MS / 1000),
   );
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const signOut = useCallback(() => {
     clearAccessToken();
     setUser(null);
     setWarningOpen(false);
-  }, []);
+    // The cached profile belongs to whoever was signed in; keeping it would
+    // leak it to the next user on a shared machine.
+    queryClient.removeQueries({ queryKey: queryKeys.me.all });
+  }, [queryClient]);
 
   // Rehydrate profile on mount when only JWT claims are available.
+  //
+  // `fetchQuery` rather than a bare `api.me()`: it goes through the shared
+  // cache, so anything else reading the profile shares this request instead
+  // of firing a second one, and the profile lands in the cache where
+  // mutations can invalidate it.
   useEffect(() => {
     if (!user) return;
     if (user.firstName && user.email) return;
 
     let cancelled = false;
-    preloadMe().then((result) => {
-      if (cancelled) return;
-      if (result.status === "ok") setUser(result.data);
-    });
+    queryClient
+      .fetchQuery(meQuery)
+      .then((profile) => {
+        if (cancelled) return;
+        setUser(profile);
+      })
+      .catch(() => {
+        // A failed rehydration leaves the claims-derived user in place; the
+        // app stays usable and the next mount retries.
+      });
 
     return () => {
       cancelled = true;
@@ -141,6 +157,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signIn: (session: Session) => {
         storeAccessToken(session.accessToken);
         setUser(session.user);
+        // Login already returns the full user, so warm the cache instead of
+        // letting the first reader refetch what we are holding.
+        queryClient.setQueryData(queryKeys.me.all, session.user);
         if (session.previousSessionInvalidated) {
           message.info(
             "You were signed in on another device or browser. That session has been closed.",
@@ -151,7 +170,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       restoreFromStoredToken: () => setUser(userFromClaims()),
       updateUser: (next: User) => setUser(next),
     }),
-    [user, signOut],
+    [user, signOut, queryClient],
   );
 
   return (

@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Card, message } from "antd";
+import { useUpdateMe } from "@/data/queries.hooks";
 import { useSession } from "@/auth/session-context";
-import { api } from "@/api/client";
 import { ProfileHeader } from "./ProfileHeader";
 import { ProfileFields } from "./ProfileFields";
 import { ProfileReadOnly } from "./ProfileReadOnly";
@@ -13,6 +13,13 @@ interface FormState {
   phone: string;
 }
 
+const EMPTY_FORM: FormState = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+};
+
 /**
  * Profile card: identity header, editable fields, read-only fields.
  *
@@ -21,20 +28,31 @@ interface FormState {
  * flow (with verification) lands.
  */
 export function ProfileCard() {
-  const { user, updateUser } = useSession();
+  const { user } = useSession();
+  const updateMe = useUpdateMe();
 
-  if (!user) return null;
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [baseline, setBaseline] = useState<FormState>(EMPTY_FORM);
 
-  const initial: FormState = {
-    firstName: user.firstName,
-    lastName: user.lastName,
-    email: user.email,
-    phone: user.phone ?? "",
+  const profile: FormState = {
+    firstName: user?.firstName ?? "",
+    lastName: user?.lastName ?? "",
+    email: user?.email ?? "",
+    phone: user?.phone ?? "",
   };
 
-  const [form, setForm] = useState<FormState>(initial);
-  const [baseline, setBaseline] = useState<FormState>(initial);
-  const [saving, setSaving] = useState(false);
+  // The session boots from JWT claims, where firstName and lastName are empty
+  // strings, and the real profile lands a tick later. Seeding the form only on
+  // the first render left it holding the stub, so every save sent an empty
+  // firstName and the API answered 400 — the form could not be saved at all.
+  // Re-seeding when the profile actually changes fixes that, and does not
+  // disturb in-progress edits: typing updates `form`, not `user`.
+  useEffect(() => {
+    setForm(profile);
+    setBaseline(profile);
+  }, [profile.firstName, profile.lastName, profile.email, profile.phone]);
+
+  if (!user) return null;
 
   const hasChanges =
     form.firstName !== baseline.firstName ||
@@ -42,20 +60,16 @@ export function ProfileCard() {
     form.phone !== baseline.phone;
 
   const onSave = async () => {
-    setSaving(true);
     try {
-      const updated = await api.updateMe({
+      const updated = await updateMe.mutateAsync({
         firstName: form.firstName,
         lastName: form.lastName,
         phone: form.phone || undefined,
       });
-      updateUser(updated);
       setBaseline({ ...form, email: updated.email });
       message.success("Profile updated");
     } catch {
       message.error("Could not update profile. Try again.");
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -71,14 +85,14 @@ export function ProfileCard() {
       </div>
       <ProfileReadOnly user={user} />
       <div className="mt-6 flex justify-end gap-2">
-        <Button onClick={onCancel} disabled={!hasChanges || saving}>
+        <Button onClick={onCancel} disabled={!hasChanges || updateMe.isPending}>
           Cancel
         </Button>
         <Button
           type="primary"
           onClick={onSave}
           disabled={!hasChanges}
-          loading={saving}
+          loading={updateMe.isPending}
         >
           Save
         </Button>
