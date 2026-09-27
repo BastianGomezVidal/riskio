@@ -36,3 +36,5 @@ coverage/
 # NestJS
 backend/.env
 backend/.eslintrc.js
+# Personal notes
+contexto.txt

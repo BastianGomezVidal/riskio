@@ -128,7 +128,13 @@ Git detectó **20 renombres**, así que el historial muestra los movimientos com
 > Fases 1 y 2** y aún no tienen paso asignado: son de las que se encontraron buscando, no
 > previstas en el plan.
 
-### D1 — Specs de backend con tests comentados (🔴 prioritaria)
+### D1 — Specs de backend con tests comentados (⏸ aplazado por decisión)
+
+> **Decisión del usuario (2026-09-26): aplazar.** No es deuda que se vaya a resolver sola ni
+> un olvido: queda registrada como aplazada a propósito. Sigue siendo la puerta que bloquea
+> cualquier cambio de backend que toque código cubierto por estos specs. Mientras tanto,
+> `npm test` no se ejecuta como criterio de aceptación — la verificación es `npm run build` +
+> navegador.
 
 **Estado actual:** `npm test` → **3 failed | 171 passed | 1 skipped (175)**.
 Antes de la Fase 0 la suite estaba en **209/209**.
@@ -171,8 +177,8 @@ accidente, y por eso el síntoma es "No test found in suite" en vez de un fallo 
 
 ### D4 — Otras observaciones
 
-- `contexto.txt` sin trackear en la raíz (notas personales, no código). Decidir si se
-  commitea, se añade a `.gitignore` o se borra.
+- ~~`contexto.txt` sin trackear en la raíz.~~ **Resuelto**: añadido a `.gitignore` por
+  decisión del usuario (2026-09-26). Son notas personales, no código.
 - `npm run lint` del frontend es un alias de `npm run build` (`"lint": "vite build"`):
   no hay linter real. El build sí ejecuta `tsc -b`, así que hay type-checking.
 - ~~Bundle inicial del frontend: **1.063 kB** (gzip 337 kB) con un chunk que dispara el
@@ -480,8 +486,9 @@ comportamiento verificado contra el stack en ejecución.
 
 ## Orden de ejecución
 
-1. ~~**Fase 4.4** (D1) — reactivar los tests.~~ **Aplazado por decisión del usuario** ("por
-   ahora"). Sigue siendo bloqueante para cualquier otra cosa que toque el backend con tests.
+1. ~~**Fase 4.4** (D1) — reactivar los tests.~~ **Aplazado por decisión del usuario**
+   (2026-09-26). Sigue siendo bloqueante para cualquier otra cosa que toque el backend con
+   tests: no se ha cerrado, se ha pospuesto.
 2. ~~**Fase 1** — compose: anchors, credenciales a `.env`, red dedicada.~~ ✅
 3. ~~**Fase 4.1–4.3** — unificar duplicados de backend y frontend.~~ Pendiente.
 4. ~~**Fase 2** — React 19: Error Boundaries, TanStack Query, Zod, colocation, splitting.~~ ✅
@@ -499,8 +506,9 @@ revisar el diff.
 
 ## Estado al cierre — 2026-09-26, commit `0740471`
 
-Fases 0, 1 y 2 ejecutadas. Árbol limpio salvo `contexto.txt` sin trackear (pendiente de
-decidir, ver D4). Sin push: los 5 commits de la Fase 2 están solo en local.
+Fases 0, 1 y 2 ejecutadas. Árbol limpio. Sin push: los commits de la Fase 2 y la
+documentación están solo en local. `contexto.txt` quedó en `.gitignore` y D1 aplazado por
+decisión, ambos registrados en la sección de deuda.
 
 ### Stack
 
