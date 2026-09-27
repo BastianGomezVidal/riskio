@@ -1,5 +1,20 @@
-import { createContext, use, useMemo, useState, type ReactNode } from "react";
-import type { Session, User } from "@/domain/auth";
+import {
+  createContext,
+  use,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { message } from "antd";
+import { useNavigate } from "react-router-dom";
+import type { Session } from "@/domain/auth";
+import type { User } from "@/domain/users";
+import { preloadMe } from "@/data/promises";
+import { setUnauthorizedHandler } from "@/api/client";
+import { useInactivityLogout } from "./use-inactivity-logout";
+
 import {
   clearAccessToken,
   decodeTokenClaims,
@@ -7,16 +22,20 @@ import {
   hasValidSession,
   storeAccessToken,
 } from "./session";
+import { SessionExpiryModal } from "@/global_components/SessionExpiryModal/SessionExpiryModal";
 
 interface SessionContextValue {
   user: User | null;
   signIn: (session: Session) => void;
   signOut: () => void;
-  /** Rebuild the user from the stored JWT (used after the OAuth round-trip). */
   restoreFromStoredToken: () => void;
+  updateUser: (user: User) => void;
 }
 
 export const SessionContext = createContext<SessionContextValue | null>(null);
+
+const IDLE_TIMEOUT_MS = 30 * 1000; // 30s temporal
+const IDLE_WARNING_MS = 10 * 1000; // 10s temporal
 
 function userFromClaims(): User | null {
   const token = getAccessToken();
@@ -31,6 +50,13 @@ function userFromClaims(): User | null {
     role: claims.role === "admin" ? "admin" : "client",
     firstName: "",
     lastName: "",
+    phone: null,
+    avatarUrl: null,
+    lastLoginAt: null,
+    lastLoginBrowser: null,
+    lastLoginOs: null,
+    createdAt: "",
+    updatedAt: "",
   };
 }
 
@@ -38,6 +64,76 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() =>
     hasValidSession() ? userFromClaims() : null,
   );
+  const [warningOpen, setWarningOpen] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(
+    Math.round(IDLE_WARNING_MS / 1000),
+  );
+  const navigate = useNavigate();
+
+  const signOut = useCallback(() => {
+    clearAccessToken();
+    setUser(null);
+    setWarningOpen(false);
+  }, []);
+
+  // Rehydrate profile on mount when only JWT claims are available.
+  useEffect(() => {
+    if (!user) return;
+    if (user.firstName && user.email) return;
+
+    let cancelled = false;
+    preloadMe().then((result) => {
+      if (cancelled) return;
+      if (result.status === "ok") setUser(result.data);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Handle 401 from a session invalidated by another device/browser.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      clearAccessToken();
+      setUser(null);
+      message.warning(
+        "Your session was closed because you signed in on another device or browser.",
+      );
+      window.location.href = "/";
+    });
+  }, []);
+
+  // Idle logout (only when a user is signed in).
+  useInactivityLogout({
+    enabled: user != null,
+    idleTimeoutMs: IDLE_TIMEOUT_MS,
+    warningMs: IDLE_WARNING_MS,
+    onWarning: () => {
+      setSecondsLeft(Math.round(IDLE_WARNING_MS / 1000));
+      setWarningOpen(true);
+    },
+    onActivity: () => {
+      setWarningOpen(false);
+    },
+    onExpire: () => {
+      signOut();
+      message.info("You were signed out due to inactivity.");
+      navigate("/", { replace: true });
+    },
+  });
+
+  // Countdown inside the warning modal.
+  useEffect(() => {
+    if (!warningOpen) return;
+
+    const interval = setInterval(() => {
+      setSecondsLeft((s) => Math.max(0, s - 1));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [warningOpen]);
 
   const value = useMemo<SessionContextValue>(
     () => ({
@@ -45,20 +141,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signIn: (session: Session) => {
         storeAccessToken(session.accessToken);
         setUser(session.user);
+        if (session.previousSessionInvalidated) {
+          message.info(
+            "You were signed in on another device or browser. That session has been closed.",
+          );
+        }
       },
-      signOut: () => {
-        clearAccessToken();
-        setUser(null);
-      },
+      signOut,
       restoreFromStoredToken: () => setUser(userFromClaims()),
+      updateUser: (next: User) => setUser(next),
     }),
-    [user],
+    [user, signOut],
   );
 
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  return (
+    <SessionContext.Provider value={value}>
+      {children}
+      <SessionExpiryModal
+        open={warningOpen}
+        secondsLeft={secondsLeft}
+        onStay={() => setWarningOpen(false)}
+      />
+    </SessionContext.Provider>
+  );
 }
 
-/** Read the current session; throws if used outside <SessionProvider>. */
 export function useSession(): SessionContextValue {
   const context = use(SessionContext);
   if (!context) {
