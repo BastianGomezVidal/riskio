@@ -58,7 +58,14 @@ export function StormMap({ track, cone, warnings = [], height = 340 }: Props) {
     return null;
   }
 
-  const bounds = computeBounds([...trackPoints, ...coneRing]);
+  // The warning segments have to be part of the viewport, not just drawn on
+  // it. They follow the coastline, which can sit well away from the storm
+  // centre, and a line outside the bounds is simply not on screen.
+  const warningPoints = warnings
+    .flatMap((warning) => warning.geometry?.coordinates ?? [])
+    .filter((point): point is [number, number] => Array.isArray(point) && point.length >= 2);
+
+  const bounds = computeBounds([...trackPoints, ...coneRing, ...warningPoints]);
   const start = trackPoints[0];
   const current = trackPoints[trackPoints.length - 1];
 
