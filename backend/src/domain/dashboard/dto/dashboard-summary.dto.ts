@@ -4,6 +4,7 @@ import {
   StormSummaryDto,
 } from '../../weather/storms/dto/storm-summary.dto.js';
 
+// Re-export so consumers can import them from the dashboard module.
 export { LatestAdvisoryDto, StormSummaryDto };
 
 export class DashboardTotalsDto {
@@ -25,6 +26,18 @@ export class DashboardTotalsDto {
     example: 45.2,
   })
   ace: number;
+
+  @ApiProperty({
+    description: 'Storms in the Pacific basin (EP + CP)',
+    example: 4,
+  })
+  pacific: number;
+
+  @ApiProperty({
+    description: 'Storms in the Atlantic basin (AL)',
+    example: 2,
+  })
+  atlantic: number;
 }
 
 export class DashboardSummaryDto {

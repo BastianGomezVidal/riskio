@@ -2,10 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { DashboardSummaryDto } from './dto/dashboard-summary.dto.js';
+import {
+  DashboardSummaryDto,
+  DashboardTotalsDto,
+} from './dto/dashboard-summary.dto.js';
 import { StormSummaryDto } from '../weather/storms/dto/storm-summary.dto.js';
 import { Storm } from '../weather/storms/entities/storm.entity.js';
 import { AdvisoriesService } from '../weather/advisories/advisories.service.js';
+import { riskFromCategory } from '../weather/storms/utils/storm-risk.js';
+import { CacheService } from '../cache/cache.service.js';
 
 @Injectable()
 export class DashboardService {
@@ -14,17 +19,17 @@ export class DashboardService {
     private readonly stormsRepository: Repository<Storm>,
 
     private readonly advisoriesService: AdvisoriesService,
+
+    private readonly cache: CacheService,
   ) {}
 
-  /**
-   * Aggregated dashboard read-model: season totals plus every storm with its
-   * latest advisory and that advisory's forecast points.
-   *
-   * Two queries total regardless of storm count:
-   *  1. all storms;
-   *  2. latest advisory per storm (via AdvisoriesService.findLatestPerStorm).
-   */
   async getSummary(): Promise<DashboardSummaryDto> {
+    return this.cache.getOrSet('dashboard:summary', 30_000, () =>
+      this.computeSummary(),
+    );
+  }
+
+  private async computeSummary(): Promise<DashboardSummaryDto> {
     const storms = await this.stormsRepository.find({
       where: { isActive: true },
       order: { lastSeenInFeedAt: 'DESC' },
@@ -34,7 +39,14 @@ export class DashboardService {
     if (storms.length === 0) {
       return {
         generatedAt: new Date().toISOString(),
-        totals: { events: 0, named: 0, hurricanes: 0, ace: 0 },
+        totals: {
+          events: 0,
+          named: 0,
+          hurricanes: 0,
+          ace: 0,
+          pacific: 0,
+          atlantic: 0,
+        },
         storms: [],
       };
     }
@@ -49,14 +61,30 @@ export class DashboardService {
 
     const summaries: StormSummaryDto[] = storms.map((storm) => {
       const advisory = advisoriesByAtcfId.get(storm.atcfId);
+      const points = advisory?.forecastPoints ?? [];
+      const firstCategory = points[0]?.category ?? null;
+      const latestNumber = advisory?.advisoryNumber ?? null;
+
       return {
-        storm,
+        storm: {
+          atcfId: storm.atcfId,
+          name: storm.name,
+          basin: storm.basin,
+          firstSeenAt: storm.firstSeenAt,
+          lastSeenAt: storm.lastSeenAt,
+          isActive: storm.isActive,
+          lastSeenInFeedAt: storm.lastSeenInFeedAt,
+          advisoryCount: latestNumber ?? 0,
+          latestAdvisoryNumber: latestNumber,
+          latestAdvisoryIssuedAt: advisory?.issuedAt ?? null,
+        },
+        riskLevel: riskFromCategory(firstCategory),
         latestAdvisory: advisory
           ? {
               id: advisory.id,
               advisoryNumber: advisory.advisoryNumber,
               issuedAt: advisory.issuedAt.toISOString(),
-              forecastPoints: advisory.forecastPoints ?? [],
+              forecastPoints: points,
             }
           : null,
       };
@@ -70,18 +98,18 @@ export class DashboardService {
   }
 }
 
-function computeTotals(summaries: StormSummaryDto[]): {
-  events: number;
-  named: number;
-  hurricanes: number;
-  ace: number;
-} {
+function computeTotals(summaries: StormSummaryDto[]): DashboardTotalsDto {
   let named = 0;
   let hurricanes = 0;
   let ace = 0;
+  let pacific = 0;
+  let atlantic = 0;
 
   for (const { storm, latestAdvisory } of summaries) {
     if (storm.name != null) named += 1;
+
+    if (storm.basin === 'AL') atlantic += 1;
+    else if (storm.basin === 'EP' || storm.basin === 'CP') pacific += 1;
 
     const points = latestAdvisory?.forecastPoints ?? [];
 
@@ -99,5 +127,7 @@ function computeTotals(summaries: StormSummaryDto[]): {
     named,
     hurricanes,
     ace: Math.round(ace * 10) / 10,
+    pacific,
+    atlantic,
   };
 }
