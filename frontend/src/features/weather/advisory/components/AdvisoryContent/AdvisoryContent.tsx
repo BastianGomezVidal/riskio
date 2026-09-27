@@ -1,5 +1,5 @@
 import { Card, Tag, Typography } from "antd";
-import { StormMap } from "@/features/weather/storms/components/StormMap";
+import { StormMap, warningColor } from "@/features/weather/storms/components/StormMap";
 import { AdvisoryMetrics } from "../AdvisoryMetrics/AdvisoryMetrics";
 import type { AdvisoryDetail } from "@/domain/storm";
 import { AdvisoryForecastBars } from "../AdvisoryForecastBar/AdvisoryForecastBar";
@@ -17,13 +17,7 @@ function dedupeWarnings(
   return Array.from(set);
 }
 
-function warningColor(type: string): string {
-  const t = type.toLowerCase();
-  if (t.includes("hurricane") && t.includes("warning")) return "red";
-  if (t.includes("hurricane") && t.includes("watch")) return "volcano";
-  if (t.includes("warning")) return "orange";
-  return "gold";
-}
+
 
 export function AdvisoryContent({ advisory }: { advisory: AdvisoryDetail }) {
   const isMobile = useMediaQuery("(max-width: 767px)");
@@ -39,6 +33,7 @@ export function AdvisoryContent({ advisory }: { advisory: AdvisoryDetail }) {
             <StormMap
               track={advisory.track}
               cone={advisory.cone}
+              warnings={advisory.warnings}
               height={mapHeight}
             />
           ) : (

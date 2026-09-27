@@ -11,13 +11,39 @@ import { GraticuleLayer } from "./GraticulateLayer";
 
 type LngLat = [number, number];
 
+interface WarningSegment {
+  id: string;
+  warningType: string;
+  geometry: { type: "LineString"; coordinates: [number, number][] } | null;
+}
+
 interface Props {
   track: { type: "LineString"; coordinates: [number, number][] } | null;
   cone: { type: "Polygon"; coordinates: [number, number][][] } | null;
+  warnings?: WarningSegment[];
   height?: number;
 }
 
-export function StormMap({ track, cone, height = 340 }: Props) {
+/**
+ * Palette shared by the warning tags and the warning lines, so a segment and
+ * its tag in the card below always read as the same warning.
+ */
+const WARNING_COLORS: Record<string, string> = {
+  red: "#dc2626",
+  volcano: "#7c3aed",
+  orange: "#ea580c",
+  gold: "#ca8a04",
+};
+
+export function warningColor(type: string): string {
+  const t = type.toLowerCase();
+  if (t.includes("hurricane") && t.includes("warning")) return "red";
+  if (t.includes("hurricane") && t.includes("watch")) return "volcano";
+  if (t.includes("warning")) return "orange";
+  return "gold";
+}
+
+export function StormMap({ track, cone, warnings = [], height = 340 }: Props) {
   const trackPoints = useMemo<LngLat[]>(
     () => (track?.coordinates ?? []) as LngLat[],
     [track],
@@ -71,6 +97,22 @@ export function StormMap({ track, cone, height = 340 }: Props) {
           pathOptions={{ color: "#1e3a8a", weight: 3 }}
         />
       )}
+
+      {warnings.map((warning) => {
+        const points = warning.geometry?.coordinates ?? [];
+        if (points.length < 2) return null;
+        return (
+          <Polyline
+            key={warning.id}
+            positions={points.map(([lng, lat]) => [lat, lng])}
+            pathOptions={{
+              color: WARNING_COLORS[warningColor(warning.warningType)],
+              weight: 4,
+              opacity: 0.85,
+            }}
+          />
+        );
+      })}
 
       {start && (
         <CircleMarker

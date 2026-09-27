@@ -35,9 +35,23 @@ export interface Advisory {
   storm?: Storm;
 }
 
+/**
+ * A coastal warning segment attached to an advisory.
+ *
+ * `geometry` comes from the KMZ products the backend parses and is present on
+ * the wire. It is declared here because the map draws it: without it the Zod
+ * schema would strip the field on the way in and the segments would vanish
+ * without a single error.
+ */
+export interface AdvisoryWarning {
+  id: string;
+  warningType: string;
+  geometry: { type: "LineString"; coordinates: [number, number][] } | null;
+}
+
 export interface AdvisoryDetail extends Advisory {
   forecastPoints: ForecastPoint[];
-  warnings: { id: string; warningType: string }[];
+  warnings: AdvisoryWarning[];
 }
 
 export interface AdvisoryRef {

@@ -146,8 +146,15 @@ export const advisoryDetailSchema = z.object({
   cone: polygon.nullable(),
   storm: stormSchema.optional(),
   forecastPoints: z.array(forecastPointSchema),
+  // geometry is included on purpose. z.object() strips undeclared keys, so
+  // leaving it out here would delete the warning segments on the way in and
+  // the map would quietly draw nothing.
   warnings: z.array(
-    z.object({ id: z.string(), warningType: z.string() }),
+    z.object({
+      id: z.string(),
+      warningType: z.string(),
+      geometry: lineString.nullable(),
+    }),
   ),
 });
 
