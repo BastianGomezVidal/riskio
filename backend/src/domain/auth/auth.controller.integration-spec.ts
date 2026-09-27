@@ -108,6 +108,35 @@ describe('Auth controller (integration)', () => {
       .expect(400);
   });
 
+  it('answers the same when delivery fails, so SMTP cannot enumerate accounts', async () => {
+    const failing = await createTestApp([
+      {
+        provide: MailerService,
+        useValue: {
+          sendPasswordResetLink: () => Promise.reject(new Error('smtp down')),
+        },
+      },
+    ]);
+
+    try {
+      const real = await request(failing.getHttpServer())
+        .post('/auth/forgot-password')
+        .send({ email })
+        .expect(200);
+
+      const unknown = await request(failing.getHttpServer())
+        .post('/auth/forgot-password')
+        .send({ email: 'nobody@test.local' })
+        .expect(200);
+
+      // Identical answers, or a broken SMTP would tell an attacker which
+      // addresses are registered.
+      expect(real.body).toEqual(unknown.body);
+    } finally {
+      await failing.close();
+    }
+  });
+
   it('rejects an unknown token without saying why', async () => {
     const res = await request(app.getHttpServer())
       .post('/auth/reset-password')
