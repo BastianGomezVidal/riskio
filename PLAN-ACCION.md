@@ -133,7 +133,7 @@ detalle.
 |---|---|---|---|---|
 | **D10** | Una migración aplicada en la BD **nunca existió en el repo** | 🔴 El despliegue no es reproducible | — | **Resuelta** (`0955a80`) |
 | D6 | `forgot-password` resetea la contraseña y no la entrega | — | 4.7 | **Resuelta** (`cf4f2e5`, `e646477`, `608ce38`) |
-| D11 | 6 specs de integración fallan por aserciones (401/404) | 🟠 Cobertura real inexistente | — | Abierta, sin paso |
+| ~~D11~~ | Specs de integración caídos | — | — | **Resuelta** (`0955a80`, `2dd0b3e`) |
 | D12 | `generateTemporaryPassword` sin uso tras el flujo de token | 🟡 Código muerto, aún testeado | — | Abierta, decisión tuya |
 | **D1** | Specs de backend comentados (3 suites, ~34 tests) | 🔴 Sin red de seguridad | 4.4 | **Aplazada** por decisión |
 | D7 | `VITE_API_URL` era un build arg muerto | 🟠 Solo funcionaba en local | — | **Resuelta** (`1ddefa5`) |
@@ -152,8 +152,9 @@ detalle.
 > `npm test` no se ejecuta como criterio de aceptación — la verificación es `npm run build` +
 > navegador.
 
-**Estado actual:** `npm test` → **3 failed | 171 passed | 1 skipped (175)**.
-Antes de la Fase 0 la suite estaba en **209/209**.
+**Estado actual**: `npm test` → **3 failed | 171 passed | 1 skipped (175)**. Sin cambios:
+lo que se reparó en esta sesión fue la suite de **integración**, que es distinta. Antes de la
+Fase 0 la suite unitaria estaba en **209/209**.
 
 **Causa:** al agrupar los cambios se preservó tal cual un bloque de tests que ya estaba
 comentado en el working tree. No lo introdujo el agrupado.
@@ -345,7 +346,7 @@ mantienen ~40 líneas de contrato que nada valida.
 > (`AddSessionTrackingColumns1893500000000`) porque el timestamp de la original
 > (`1700000000000`) ordena **antes** de `InitialSchema` y fallaría donde no exista `users`.
 
-### D11 — 6 specs de integración fallan por aserciones, no por arranque
+### ~~D11 — 6 specs de integración fallaban~~ **Resuelta** (`2dd0b3e`)
 
 **Causa raíz: no es una sola. Son cuatro problemas distintos**, diagnosticados el
 2026-09-27 con los endpoints reales de la API:
@@ -372,13 +373,18 @@ mapa**. Arreglado en `b3e0d6d` — de 10 a 12 paths en el overlay, verificado en
 desplegado. Ese sí era un bug de producto, y estaba escondido detrás de una feature que
 parecía completa.
 
-**Estado**: `npm run test:integration` → **6 archivos fallan, 2 pasan** (34 tests, 7
-ejecutados). Antes de `0955a80` fallaban **los 8**, sin ejecutar una sola aserción.
+**Estado final**: `npm run test:integration` → **8/8 archivos, 37 tests, todos en verde.**
+Partía de 8/8 fallando sin ejecutar una sola aserción.
 
-**Cómo se arregla**: los 13 tests del guard necesitan un token (registrar un usuario y
-mandar `Authorization: Bearer`); los 6 de storm-history, cambiar `/history` por
-`/storm-history`; los 5 de advisories y 3 de warnings, decidir si el endpoint que preguntan
-debe existir o si el spec debe apuntar al detalle del advisory. Ninguno requiere D1.
+**Cómo se cerró**: los 13 tests del guard registran una cuenta y mandan bearer por las rutas
+reales de registro/login (no se desactivó el guard en el harness: se dejaría de probar la
+postura de seguridad real); los 6 de storm-history usan `/storm-history`; los 2 de totales del
+dashboard que fallaban **no eran un bug del backend, sino un spec que rechazaba una respuesta
+correcta** tras los cambios por cuenca de `4e425ae`; y los 8 de advisories/warnings se
+reescribieron contra la API que existe, sin inventar endpoints que nadie consume.
+
+El spec de warnings ahora afirma que la **geometría** de los segmentos vuelve intacta. Antes
+solo comprobaba la cantidad, y por eso no detectó que el schema del front la eliminaba.
 
 **Causa**: ya no es DI ni esquema (eso se arregló). Ahora fallan con
 `expected 200, got 401`, `expected 404, got 401`, `expected 400, got 404`. Son endpoints que
@@ -690,12 +696,15 @@ El usuario se quejó dos veces de comprobaciones lentas.
 
 ### Si retomar
 
-1. **D11** — los 6 specs de integración que fallan por aserciones (401/404). Con D1 aplazado,
-   es la cobertura que más falta.
+1. **D1** — las 3 suites unitarias (D1). Con la integración ya verde, es la cobertura que
+   falta. Sigue aplazada por decisión tuya; es lo que bloquea tocar storms/dashboard.
 2. **D5** — `InMemoryBroker` no cruza procesos: los avatares huérfanos se acumulan en silencio.
    La receta ya está escrita (paso 4.5).
 3. **Fase 3** — auditorías a11y y Web Vitals. No es código, es un informe. Requiere tu permiso.
 4. **Fase 4.1–4.3** — unificar carpetas duplicadas. Mantenimiento, no urgencia.
-5. **D1** — sigue siendo bloqueante para tocar el backend con tests, mientras esté aplazada.
 
-Resueltos y cerrados: D6, D7, D10. D12 es una decisión de diez minutos.
+Resueltos y cerrados: D6, D7, D10, D11. D12 es una decisión de diez minutos.
+
+**Nota de cobertura**: la integración (37 tests, verde) y la unitaria (175) son suites
+distintas. Que la primera esté en verde no reactiva D1, que es solo sobre las 3 suites
+unitarias comentadas.
