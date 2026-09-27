@@ -26,6 +26,17 @@ x-backend-env: &backend-env
   # The broker is only used to hand off avatar cleanup (see PLAN-ACCION.md,
   # deuda D5). Ingestion does not use it: it is a plain @Cron poll.
   BROKER_DRIVER: ${BROKER_DRIVER:-memory}
+  # Outbound email, used only for the password reset link. `log` keeps the link
+  # in the backend log instead of sending it, which is fine locally and unsafe
+  # anywhere else. Set MAIL_TRANSPORT=smtp plus the SMTP_* values to send for
+  # real; the API refuses to boot on smtp with an incomplete configuration.
+  MAIL_TRANSPORT: ${MAIL_TRANSPORT:-log}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASS: ${SMTP_PASS:-}
+  MAIL_FROM: ${MAIL_FROM:-riskio@example.com}
 
 services:
   db:

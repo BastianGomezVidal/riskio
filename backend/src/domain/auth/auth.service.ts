@@ -1,6 +1,7 @@
 // src/auth/auth.service.ts
 import {
   Injectable,
+  Logger,
   BadRequestException,
   ConflictException,
   UnauthorizedException,
@@ -53,6 +54,7 @@ export type PublicUser = AuthPrincipal & {
  */
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly adminEmails: Set<string>;
   private readonly frontendBase: string;
 
@@ -204,10 +206,19 @@ export class AuthService {
       }),
     );
 
-    await this.mailer.sendPasswordResetLink(
-      user.email,
-      `${this.frontendBase}/reset-password?token=${token}`,
-    );
+    // A delivery failure must not change the response. The reply is identical
+    // for real and unknown addresses, and a 500 here would give that away:
+    // broken SMTP would become an oracle for which emails are registered.
+    try {
+      await this.mailer.sendPasswordResetLink(
+        user.email,
+        `${this.frontendBase}/reset-password?token=${token}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Could not deliver the reset link to ${user.email}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
 
     return { message: NEUTRAL_MESSAGE };
   }

@@ -76,4 +76,49 @@ export const envValidationSchema = Joi.object({
    * at that documented gap rather than at an unrelated startup assert.
    */
   BROKER_DRIVER: Joi.string().valid('memory', 'redis').default('memory'),
-});
+
+  /**
+   * Outbound email. Only the password-reset link uses it today.
+   *
+   * `log` writes the message to the backend log instead of sending it. That is
+   * convenient locally and a liability in production: a reset link in a log
+   * file is a working credential for anyone who can read it. The choice is
+   * therefore explicit rather than inferred from whether SMTP happens to be
+   * configured, and a `log` deployment announces itself at boot.
+   *
+   * `smtp` is refused at boot unless the connection details are all present,
+   * so a typo surfaces here instead of on the first reset someone requests.
+   */
+  MAIL_TRANSPORT: Joi.string().valid('log', 'smtp').default('log'),
+  SMTP_HOST: Joi.string().allow('').default(''),
+  SMTP_PORT: Joi.number().default(587),
+  /** Implicit TLS on 465, STARTTLS otherwise. */
+  SMTP_SECURE: Joi.boolean().default(false),
+  SMTP_USER: Joi.string().allow('').default(''),
+  SMTP_PASS: Joi.string().allow('').default(''),
+  /** Envelope sender and the From header. */
+  MAIL_FROM: Joi.string()
+    .email({ tlds: false })
+    .default('riskio@example.com'),
+})
+  .custom((value, helpers) => {
+    // Joi has no way to say "these three are required, but only when that other
+    // one is set", so the conditional part is checked here. The point is that a
+    // half-configured SMTP fails at boot: the alternative is discovering it when
+    // a user asks to reset their password and the mail silently never arrives.
+    if (value.MAIL_TRANSPORT !== 'smtp') {
+      return value;
+    }
+
+    const missing = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM'].filter(
+      (key) => !String(value[key] ?? '').trim(),
+    );
+
+    if (missing.length > 0) {
+      return helpers.message({
+        custom: `MAIL_TRANSPORT=smtp but missing: ${missing.join(', ')}`,
+      });
+    }
+
+    return value;
+  });
