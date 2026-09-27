@@ -6,8 +6,11 @@ export interface Session {
   previousSessionInvalidated: boolean;
 }
 
+/**
+ * The API answers with a neutral message and nothing else — no address, no
+ * temporary password — so the response cannot be used to discover which emails
+ * have an account.
+ */
 export interface ForgotPasswordResult {
-  email: string;
-  temporaryPassword: string;
   message: string;
 }

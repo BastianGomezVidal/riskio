@@ -1,13 +1,18 @@
-import type {
-  StormAdvisoryDetail,
-  StormDetail,
-  StormListItem,
-  StormsQuery,
-} from "@/domain/storm";
-import type { ForgotPasswordResult, Session } from "@/domain/auth";
-import type { DashboardSummary } from "@/domain/dashboard";
-import type { User } from "@/domain/users";
+import { z } from "zod";
+import type { StormsQuery } from "@/domain/storm";
 import { getAccessToken } from "@/auth/session";
+import {
+  apiTokenListSchema,
+  dashboardSummarySchema,
+  forgotPasswordResultSchema,
+  healthSchema,
+  sessionSchema,
+  stormAdvisoryDetailSchema,
+  stormDetailSchema,
+  stormsListSchema,
+  userSchema,
+  type TokensResponse,
+} from "./schemas";
 
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
@@ -26,7 +31,61 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+/**
+ * Raised when a response parses as JSON but does not match the contract.
+ * Kept distinct from ApiError so the UI can tell "the server said no" from
+ * "the server said something we do not understand".
+ */
+export class ApiContractError extends Error {
+  constructor(
+    message: string,
+    readonly issues: string,
+  ) {
+    super(message);
+    this.name = "ApiContractError";
+  }
+}
+
+async function request<S extends z.ZodTypeAny>(
+  path: string,
+  schema: S,
+  init?: RequestInit,
+): Promise<z.infer<S>> {
+  const response = await fetch(`${API_URL}${path}`, {
+    ...init,
+    headers: buildHeaders(init),
+  });
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  if (response.status === 204) {
+    return undefined as z.infer<S>;
+  }
+
+  const payload: unknown = await response.json().catch(() => {
+    throw new ApiContractError(
+      `Malformed response from ${path}: body was not JSON.`,
+      "",
+    );
+  });
+
+  const parsed = schema.safeParse(payload);
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map((i) => `${i.path.join(".") || "<root>"}: ${i.message}`)
+      .join("; ");
+    throw new ApiContractError(
+      `Response from ${path} did not match the expected shape.`,
+      issues,
+    );
+  }
+
+  return parsed.data;
+}
+
+function buildHeaders(init?: RequestInit): Headers {
   const headers = new Headers(init?.headers);
 
   // Only default to JSON when the caller has not set a Content-Type.
@@ -41,26 +100,29 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
+  return headers;
+}
+
+async function toApiError(response: Response): Promise<ApiError> {
+  if (response.status === 401 && getAccessToken()) {
+    onUnauthorized?.();
+  }
+
+  const body = await response.text().catch(() => "");
+  const message = extractError(body) ?? `API returned ${response.status}`;
+  return new ApiError(message, response.status);
+}
+
+/** Endpoints that answer 204 with no body. */
+async function requestEmpty(path: string, init?: RequestInit): Promise<void> {
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
-    headers,
+    headers: buildHeaders(init),
   });
 
   if (!response.ok) {
-    if (response.status === 401 && getAccessToken()) {
-      onUnauthorized?.();
-    }
-
-    const body = await response.text().catch(() => "");
-    const message = extractError(body) ?? `API returned ${response.status}`;
-    throw new ApiError(message, response.status);
+    throw await toApiError(response);
   }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return (await response.json()) as T;
 }
 
 export function authErrorMessage(error: unknown): string {
@@ -95,7 +157,7 @@ export function oauthAuthorizeUrl(provider: "google" | "outlook"): string {
 }
 
 export const api = {
-  health: () => request<{ status: string }>("/health"),
+  health: () => request("/health", healthSchema),
 
   // ── Storms ────────────────────────────────────────────────────────
 
@@ -108,15 +170,16 @@ export const api = {
     if (query.cat) params.set("cat", query.cat);
     if (query.yearFrom != null) params.set("yearFrom", String(query.yearFrom));
     if (query.yearTo != null) params.set("yearTo", String(query.yearTo));
-    return request<StormListItem[]>(`/storms?${params.toString()}`);
+    return request(`/storms?${params.toString()}`, stormsListSchema);
   },
 
   storm: (atcfId: string) =>
-    request<StormDetail>(`/storms/${encodeURIComponent(atcfId)}`),
+    request(`/storms/${encodeURIComponent(atcfId)}`, stormDetailSchema),
 
   stormAdvisory: (atcfId: string, n: string) =>
-    request<StormAdvisoryDetail>(
+    request(
       `/storms/${encodeURIComponent(atcfId)}/advisories/${encodeURIComponent(n)}`,
+      stormAdvisoryDetailSchema,
     ),
 
   // ── Auth ──────────────────────────────────────────────────────────
@@ -128,40 +191,39 @@ export const api = {
     email: string;
     password: string;
   }) =>
-    request<Session>("/auth/register", {
+    request("/auth/register", sessionSchema, {
       method: "POST",
       body: JSON.stringify(input),
     }),
 
   login: (email: string, password: string) =>
-    request<Session>("/auth/login", {
+    request("/auth/login", sessionSchema, {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
 
   forgotPassword: (email: string) =>
-    request<ForgotPasswordResult>("/auth/forgot-password", {
+    request("/auth/forgot-password", forgotPasswordResultSchema, {
       method: "POST",
       body: JSON.stringify({ email }),
     }),
 
-  tokens: () =>
-    request<{ id: string; name: string; prefix: string }[]>("/auth/tokens"),
+  tokens: () => request("/auth/tokens", apiTokenListSchema),
 
   // ── Dashboard ─────────────────────────────────────────────────────
 
-  dashboardSummary: () => request<DashboardSummary>("/dashboard/summary"),
+  dashboardSummary: () => request("/dashboard/summary", dashboardSummarySchema),
 
   // ── Users ─────────────────────────────────────────────────────────
 
-  me: () => request<User>("/users/me"),
+  me: () => request("/users/me", userSchema),
 
   updateMe: (patch: {
     firstName?: string;
     lastName?: string;
     phone?: string;
   }) =>
-    request<User>("/users/me", {
+    request("/users/me", userSchema, {
       method: "PATCH",
       body: JSON.stringify(patch),
     }),
@@ -169,14 +231,13 @@ export const api = {
   uploadAvatar: (file: File) => {
     const form = new FormData();
     form.append("file", file);
-    return request<User>("/users/me/avatar", {
+    return request("/users/me/avatar", userSchema, {
       method: "POST",
       body: form,
     });
   },
 
-  deleteMe: () =>
-    request<void>("/users/me", {
-      method: "DELETE",
-    }),
+  deleteMe: () => requestEmpty("/users/me", { method: "DELETE" }),
 };
+
+export type { TokensResponse };

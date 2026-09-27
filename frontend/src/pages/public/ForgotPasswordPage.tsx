@@ -57,10 +57,10 @@ export function ForgotPasswordPage() {
       <AuthLayout>
         <section>
           <h2 className="text-lg font-semibold">Password reset</h2>
+          <p className="mt-1 text-sm text-gray-600">{result.message}</p>
           <p className="mt-1 text-sm text-gray-600">
-            We sent a temporary password to <strong>{result.email}</strong>.
-            Check your inbox and sign in with it, then change it in your
-            profile.
+            If that address has an account, sign in with the temporary password
+            and change it in your profile.
           </p>
 
           <Link
