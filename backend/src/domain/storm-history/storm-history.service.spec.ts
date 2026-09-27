@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Repository } from 'typeorm';
-import { HistoryService } from './history.service.js';
+import { HistoryService } from './storm-history.service.js';
 import { Storm } from '../weather/storms/entities/storm.entity.js';
 import { Advisory } from '../weather/advisories/entities/advisory.entity.js';
 import { PageQueryDto } from '../../common/dto/page-query.dto.js';
@@ -66,7 +66,7 @@ describe('HistoryService', () => {
     findAndCount.mockResolvedValue([[storm], 45]);
     getRawMany.mockResolvedValue([{ atcf_id: 'AL112017', count: '3' }]);
 
-    const result = await service.findHistory(makePage(1, 20));
+    const result = await service.findStormHistory(makePage(1, 20));
 
     expect(findAndCount).toHaveBeenCalledWith({
       where: { isActive: false },
@@ -95,7 +95,7 @@ describe('HistoryService', () => {
   it('derives the offset from the requested page', async () => {
     findAndCount.mockResolvedValue([[], 45]);
 
-    await service.findHistory(makePage(3, 10));
+    await service.findStormHistory(makePage(3, 10));
 
     expect(findAndCount).toHaveBeenCalledWith(
       expect.objectContaining({ skip: 20, take: 10 }),
@@ -107,7 +107,7 @@ describe('HistoryService', () => {
     findAndCount.mockResolvedValue([[storm], 1]);
     getRawMany.mockResolvedValue([]);
 
-    const result = await service.findHistory(makePage());
+    const result = await service.findStormHistory(makePage());
 
     expect(result.data).toEqual([
       {
@@ -121,7 +121,7 @@ describe('HistoryService', () => {
   it('reports no next page on the last exact page', async () => {
     findAndCount.mockResolvedValue([[], 20]);
 
-    const result = await service.findHistory(makePage(2, 10));
+    const result = await service.findStormHistory(makePage(2, 10));
 
     expect(result.meta).toEqual({
       total: 20,
@@ -135,7 +135,7 @@ describe('HistoryService', () => {
   it('returns an empty page without querying advisories when no storms match', async () => {
     findAndCount.mockResolvedValue([[], 0]);
 
-    const result = await service.findHistory(makePage());
+    const result = await service.findStormHistory(makePage());
 
     expect(result.meta.pageCount).toBe(0);
     expect(result.meta.hasNextPage).toBe(false);
@@ -147,6 +147,6 @@ describe('HistoryService', () => {
     const error = new Error('database down');
     findAndCount.mockRejectedValue(error);
 
-    await expect(service.findHistory(makePage())).rejects.toBe(error);
+    await expect(service.findStormHistory(makePage())).rejects.toBe(error);
   });
 });

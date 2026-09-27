@@ -25,7 +25,7 @@ export class HistoryService {
     private readonly advisoriesRepository: Repository<Advisory>,
   ) {}
 
-  async findHistory(
+  async findStormHistory(
     page: PageQueryDto,
   ): Promise<PaginatedResultDto<StormHistoryItemDto>> {
     const [storms, total] = await this.stormsRepository.findAndCount({

@@ -8,16 +8,16 @@ import {
   ApiExtraModels,
   getSchemaPath,
 } from '@nestjs/swagger';
-import { HistoryService } from './history.service.js';
+import { HistoryService } from './storm-history.service.js';
 import { Storm } from '../weather/storms/entities/storm.entity.js';
 import { PaginatedResultDto } from '../../common/dto/paginated-result.dto.js';
 import { PageQueryDto } from '../../common/dto/page-query.dto.js';
 import { StormHistoryItemDto } from './dto/storm-history-item.dto.js';
 
-@ApiTags('history')
+@ApiTags('storm')
 @ApiExtraModels(Storm, StormHistoryItemDto, PaginatedResultDto)
-@Controller('history')
-export class HistoryController {
+@Controller('storm-history')
+export class StormHistoryController {
   constructor(private readonly historyService: HistoryService) {}
 
   @Get()
@@ -48,9 +48,9 @@ export class HistoryController {
     },
   })
   @ApiBadRequestResponse({ description: 'Invalid pagination parameters' })
-  findHistory(
+  findStormHistory(
     @Query() page: PageQueryDto,
   ): Promise<PaginatedResultDto<StormHistoryItemDto>> {
-    return this.historyService.findHistory(page);
+    return this.historyService.findStormHistory(page);
   }
 }
