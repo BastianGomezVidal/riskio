@@ -494,3 +494,46 @@ son cortos y no dependen de D1.
 Cada paso se ejecuta y se revisa antes de pasar al siguiente. Nada se commitea sin
 revisar el diff.
 
+
+---
+
+## Estado al cierre — 2026-09-26, commit `0740471`
+
+Fases 0, 1 y 2 ejecutadas. Árbol limpio salvo `contexto.txt` sin trackear (pendiente de
+decidir, ver D4). Sin push: los 5 commits de la Fase 2 están solo en local.
+
+### Stack
+
+| Servicio | Estado |
+|---|---|
+| `frontend` | Up, sirve el build de la Fase 2 (chunks `vendor-antd`, `vendor-react`, `vendor-data`, `index`) |
+| `backend-api` | healthy, `/health` → 200 |
+| `backend-worker`, `db`, `redis`, `storage` | Up |
+
+Web en `http://localhost` (**puerto 80**: `.env` tiene `WEB_PORT=80`, no 8080 como
+`.env.example`). API en `:3000`.
+
+**Ojo al desplegar**: `podman-compose up -d --build frontend` construye la imagen pero **no
+recrea el contenedor** — se queda sirviendo el build anterior sin avisar. Hay que añadir
+`--force-recreate`. Se detectó comparando el nombre del chunk que servía el contenedor con el
+del build local.
+
+### Verificación
+
+Sin tests (D1 aplazado por decisión). La puerta real es el navegador: **`npm run build` da 0
+errores en casos que rompen la app** (ver D9).
+
+Scripts desechables en `/tmp/opencode` (fuera del repo, se pierden al reiniciar):
+`spa.py` sirve `frontend/dist` en `:8080`; `walk2.mjs` recorre las 4 rutas contra un usuario
+de prueba; `detail.mjs` abre un advisory con mapa; `weight.mjs` mide bytes por ruta. La
+cuenta de prueba está en `probe-email.txt`.
+
+**Sin esperas**: `domcontentloaded` + selector con timeout, nunca `networkidle` ni `sleep`.
+El usuario se quejó dos veces de comprobaciones lentas.
+
+### Si retomar
+
+1. **D6** (mailer) — bloquea a usuarios, corto, no necesita D1.
+2. **D7** (URL de la API) — corto, invisible al build.
+3. **Fase 3** — auditorías a11y y Web Vitals, solo si el usuario las habilita.
+4. **D1** — sigue siendo bloqueante para tocar el backend con tests.
