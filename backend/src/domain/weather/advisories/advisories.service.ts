@@ -9,6 +9,8 @@ import { AdvisoryDetailDto } from './dto/advisory-detail.dto.js';
 import { ForecastPoint } from './entities/forecast-point.entity.js';
 import type { ForecastPointDto } from '../../feeds/parser/nhc-parser.js';
 import { categoryFromWindKt } from '../storms/storm-category.js';
+import { StormDto } from '../storms/dto/storm.dto.js';
+import { StormAdvisoryDetailDto } from './dto/storm-advisory-detail.js';
 
 /**
  * A coastal watch/warning geometry received from the ingestion layer.
@@ -168,6 +170,112 @@ export class AdvisoriesService {
     await this.warningsRepository.save(entities);
 
     return entities.length;
+  }
+
+  /**
+   * Fetch one advisory by storm ATCF id and advisory number, together with
+   * the storm context needed to render the advisory view.
+   *
+   * `advisoryNumber` accepts the string 'latest' to resolve the newest
+   * advisory for the storm.
+   *
+   * Returns the storm aggregate (without advisories[] and without
+   * riskLevel) plus the full advisory detail (forecast points, warnings,
+   * track, cone).
+   *
+   * @throws NotFoundException when the storm or advisory does not exist.
+   */
+  async findByStormAndNumber(
+    atcfId: string,
+    advisoryNumber: number | 'latest',
+  ): Promise<StormAdvisoryDetailDto> {
+    // 1. Resolve the storm row.
+    const storm = await this.advisoriesRepository.manager
+      .getRepository(Storm)
+      .findOne({ where: { atcfId } });
+
+    if (!storm) {
+      throw new NotFoundException(`Storm ${atcfId} not found`);
+    }
+
+    // 2. Resolve 'latest' to the highest advisory number.
+    let resolvedNumber: number;
+    if (advisoryNumber === 'latest') {
+      const latest = await this.advisoriesRepository
+        .createQueryBuilder('a')
+        .select('MAX(a.advisoryNumber)', 'maxNumber')
+        .where('a.storm_atcf_id = :atcfId', { atcfId })
+        .getRawOne<{ maxNumber: string | null }>();
+
+      if (!latest?.maxNumber) {
+        throw new NotFoundException(`Storm ${atcfId} has no advisories yet`);
+      }
+      resolvedNumber = Number(latest.maxNumber);
+    } else {
+      resolvedNumber = advisoryNumber;
+    }
+
+    // 3. Load the advisory with its relations.
+    const advisory = await this.advisoriesRepository.findOne({
+      where: {
+        storm: { atcfId },
+        advisoryNumber: resolvedNumber,
+      },
+      relations: {
+        forecastPoints: true,
+        warnings: true,
+      },
+    });
+
+    if (!advisory) {
+      throw new NotFoundException(
+        `Advisory #${resolvedNumber} not found for storm ${atcfId}`,
+      );
+    }
+
+    // 4. Aggregate counters + latest advisory issuedAt for the storm.
+    const metrics = await this.advisoriesRepository
+      .createQueryBuilder('a')
+      .select('COUNT(a.id)', 'advisoryCount')
+      .addSelect('MAX(a.advisoryNumber)', 'latestAdvisoryNumber')
+      .addSelect(
+        `(
+      SELECT a2."issuedAt"
+      FROM advisories a2
+      WHERE a2."storm_atcf_id" = :atcfId
+      ORDER BY a2."advisoryNumber" DESC
+      LIMIT 1
+    )`,
+        'latestAdvisoryIssuedAt',
+      )
+      .where('a.storm = :atcfId', { atcfId })
+      .getRawOne<{
+        advisoryCount: string;
+        latestAdvisoryNumber: string | null;
+        latestAdvisoryIssuedAt: Date | null;
+      }>();
+
+    // 5. Assemble the response.
+    const stormDto: StormDto = {
+      atcfId: storm.atcfId,
+      name: storm.name,
+      basin: storm.basin,
+      firstSeenAt: storm.firstSeenAt,
+      lastSeenAt: storm.lastSeenAt,
+      isActive: storm.isActive,
+      lastSeenInFeedAt: storm.lastSeenInFeedAt,
+      advisoryCount: metrics ? Number(metrics.advisoryCount) : 0,
+      latestAdvisoryNumber:
+        metrics?.latestAdvisoryNumber != null
+          ? Number(metrics.latestAdvisoryNumber)
+          : null,
+      latestAdvisoryIssuedAt: metrics?.latestAdvisoryIssuedAt ?? null,
+    };
+
+    return {
+      storm: stormDto,
+      advisory: advisory as unknown as AdvisoryDetailDto,
+    };
   }
 
   /**

@@ -1,4 +1,10 @@
-import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiExtraModels,
@@ -13,6 +19,7 @@ import { Advisory } from './entities/advisory.entity.js';
 import { Warning } from './entities/warning.entity.js';
 import { ForecastPoint } from './entities/forecast-point.entity.js';
 import { AdvisoryDetailDto, WarningRefDto } from './dto/advisory-detail.dto.js';
+import { StormAdvisoryDetailDto } from './dto/storm-advisory-detail.js';
 
 @ApiTags('advisories')
 @ApiExtraModels(
@@ -21,6 +28,7 @@ import { AdvisoryDetailDto, WarningRefDto } from './dto/advisory-detail.dto.js';
   WarningRefDto,
   Warning,
   ForecastPoint,
+  StormAdvisoryDetailDto,
 )
 @Controller()
 export class AdvisoriesController {
@@ -57,5 +65,54 @@ export class AdvisoriesController {
     @Param('id', new ParseUUIDPipe()) id: string,
   ): Promise<AdvisoryDetailDto> {
     return this.advisoriesService.findOne(id);
+  }
+
+  @Get('storms/:atcfId/advisories/:n')
+  @ApiOperation({
+    summary: 'Get one advisory of a storm by number or "latest"',
+    description:
+      'Returns the storm context plus the full advisory detail ' +
+      '(forecastPoints, warnings, track, cone). Use `n=latest` to fetch the ' +
+      'newest advisory of the storm.',
+  })
+  @ApiParam({
+    name: 'atcfId',
+    description: 'ATCF storm identifier',
+    example: 'EP162026',
+  })
+  @ApiParam({
+    name: 'n',
+    description: 'Advisory number (positive integer) or the string "latest"',
+    example: '5',
+  })
+  @ApiOkResponse({
+    description: 'Storm context and advisory detail',
+    type: StormAdvisoryDetailDto,
+  })
+  @ApiNotFoundResponse({
+    description: 'Storm or advisory not found',
+  })
+  @ApiBadRequestResponse({
+    description: 'Advisory number is not a positive integer or "latest"',
+  })
+  findByStormAndNumber(
+    @Param('atcfId') atcfId: string,
+    @Param('n') n: string,
+  ): Promise<StormAdvisoryDetailDto> {
+    let advisoryNumber: number | 'latest';
+
+    if (n === 'latest') {
+      advisoryNumber = 'latest';
+    } else {
+      const parsed = Number(n);
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        throw new BadRequestException(
+          `Invalid advisory number: "${n}". Use a positive integer or "latest".`,
+        );
+      }
+      advisoryNumber = parsed;
+    }
+
+    return this.advisoriesService.findByStormAndNumber(atcfId, advisoryNumber);
   }
 }

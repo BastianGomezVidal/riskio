@@ -1,12 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-/**
- * Lightweight advisory reference used in the storm detail listing.
- *
- * Contains only the fields needed to render the advisory card header. The
- * full advisory (forecastPoints, warnings, track, cone, rawText) is
- * fetched on demand from GET /advisories/:id.
- */
 export class AdvisoryRefDto {
   @ApiProperty({ description: 'Advisory UUID' })
   id: string;
@@ -19,17 +12,14 @@ export class AdvisoryRefDto {
 }
 
 /**
- * A storm expanded with its advisories relation.
+ * Storm aggregate used across the app.
  *
- * Advisories are the plain rows reduced to their identity fields; the
- * forecastPoints, warnings, track and cone are NOT loaded here. Fetch an
- * individual advisory (GET /advisories/:id) for the full content.
+ * Does NOT include `riskLevel` — that concept belongs to advisories, not
+ * storms. The dashboard computes it separately.
  *
- * Intentionally does NOT extend `Storm`. The relation we add
- * (`advisories`) is a subset of the base class's `Relation<Advisory[]>`,
- * and TS forbids narrowing a property via inheritance.
+ * The `advisories` field is only populated by the detail endpoint.
  */
-export class StormDetailDto {
+export class StormDto {
   @ApiProperty({ description: 'ATCF storm identifier', example: 'EP142026' })
   atcfId: string;
 
@@ -56,11 +46,32 @@ export class StormDetailDto {
   })
   lastSeenInFeedAt: Date | null;
 
+  @ApiProperty({
+    description: 'Total advisories recorded for this storm',
+  })
+  advisoryCount: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Highest advisory number issued for this storm, or null when no ' +
+      'advisories exist.',
+    nullable: true,
+  })
+  latestAdvisoryNumber: number | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Issue timestamp of the latest advisory, or null when no advisories exist. ' +
+      'Used to render the "Updated Xm ago" line on storm cards.',
+    nullable: true,
+  })
+  latestAdvisoryIssuedAt: Date | null;
+
   @ApiPropertyOptional({
     type: () => AdvisoryRefDto,
     isArray: true,
     description:
-      'Lightweight advisory references (id, number, issuedAt) ordered newest-first. ForecastPoints, warnings, track and cone are NOT loaded here.',
+      'Lightweight advisory references ordered newest-first. Only populated by GET /storms/:atcfId.',
   })
-  advisories: AdvisoryRefDto[];
+  advisories?: AdvisoryRefDto[];
 }
