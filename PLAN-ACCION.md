@@ -130,7 +130,10 @@ precaución y varios puntos ya están resueltos. La tabla es el índice; debajo 
 
 | # | Qué es | Impacto | Dónde se arregla | Estado |
 |---|---|---|---|---|
-| **D6** | `forgot-password` resetea la contraseña y no la entrega | 🔴 Usuario sin acceso a su cuenta | 4.7 *(propuesto)* | Abierta, sin paso |
+| **D10** | Una migración aplicada en la BD **nunca existió en el repo** | 🔴 El despliegue no es reproducible | — | **Resuelta** (`0955a80`) |
+| **D6** | `forgot-password` resetea la contraseña y no la entrega | 🔴 Ya no destruye la cuenta; el link sigue sin llegar | 4.7 | **Mitigada** (`cf4f2e5`, `e646477`) — falta el transporte |
+| D11 | 6 specs de integración fallan por aserciones (401/404) | 🟠 Cobertura real inexistente | — | Abierta, sin paso |
+| D12 | `generateTemporaryPassword` sin uso tras el flujo de token | 🟡 Código muerto, aún testeado | — | Abierta, decisión tuya |
 | **D1** | Specs de backend comentados (3 suites, ~34 tests) | 🔴 Sin red de seguridad | 4.4 | **Aplazada** por decisión |
 | D7 | `VITE_API_URL` era un build arg muerto | 🟠 Solo funcionaba en local | — | **Resuelta** (`1ddefa5`) |
 | **D5** | `InMemoryBroker` no cruza procesos: avatares huérfanos | 🟠 Silencioso, crece sin límite | 4.5 *(propuesto)* | Abierta, sin paso |
@@ -239,11 +242,24 @@ esquema de validación y sin implementarlo, se pierde el evento igual. Además, 
 
 ---
 
-### D6 — `forgot-password` resetea la contraseña pero nunca entrega la nueva (🔴 prioritaria)
+### D6 — ~~`forgot-password` resetea la contraseña y nunca entrega la nueva~~ **Mitigada, no cerrada**
 
-> **Sin paso asignado**, y es lo más urgente de la lista: deja usuarios sin acceso a su
-> cuenta. El arreglo es una decisión de producto (mailer real vs. link con token), así que
-> necesita tu criterio antes de escribir código. → **Paso 4.7** (propuesto)
+> **Lo que se arregló** (`cf4f2e5`, `e646477`): el endpoint ya no destruye la cuenta. Pide un
+> link, no toca la contraseña, y el usuario elige la nueva. Verificado end-to-end: pedir el
+> link deja la contraseña actual funcionando, canjearlo cambia la contraseña, el link se
+> gasta y un token inventado se rechaza.
+>
+> **Lo que queda**: el `MailerService` sigue escribiendo el link en el log
+> (`backend/src/domain/auth/mailer.service.ts:19`). El diseño de seguridad está resuelto; la
+> **entrega no**. Mientras tanto un usuario que pide el link no recibe nada y sigue sin poder
+> entrar, aunque ya no se le haya bloqueado la cuenta.
+>
+> **Arreglo pendiente**: un transporte real (nodemailer, Resend, SES) con configuración SMTP
+> por entorno. La interfaz es un solo método a propósito, para que sustituirlo sea lo único
+> que falte. → **Paso 4.7**
+
+<details><summary>Causa original (histórico)</summary>
+
 
 **Síntoma**: un usuario pide recuperar su contraseña, la UI confirma "If that address has an
 account, sign in with the temporary password", y no puede iniciar sesión con ninguna
@@ -267,8 +283,11 @@ intento de recuperación acaba en un password reset manual desde la base de dato
 El frontend ya no puede corregirlo — la respuesta solo trae `message` — porque el
 contrato es correcto y lo que falta es la entrega.
 
-**Arreglo**: implementar un mailer real (nodemailer/Resend) con configuración SMTP por
-entorno. Mientras no exista, la UI no debería prometer un envío.
+**Arreglo original (superado por el link con token)**: implementar un mailer real. La
+implementación elegida fue un link de un solo uso en lugar de mandar la contraseña por
+correo, que es mala práctica.
+
+</details>
 
 ### D7 — ~~`VITE_API_URL` es un build arg muerto~~ **Resuelta** (`1ddefa5`)
 
@@ -306,11 +325,50 @@ devuelve nada. Son restos de un health check que se retiró.
 **Arreglo**: borrarlos (cliente y schema), o bien documentar para qué se conservan. Hoy
 mantienen ~40 líneas de contrato que nada valida.
 
+### D10 — ~~Una migración aplicada en la BD nunca existió en el repo~~ **Resuelta** (`0955a80`)
+
+> **Era la más grave del registro** y no estaba prevista. La tabla `migrations` de la base de
+> desarrollo registra `AddSessionTracking1700000000000`, pero ese archivo no existe: ni en el
+> árbol, ni en ningún commit (`git log --all -S` vacío). Las 4 columnas que creaba
+> (`lastLoginAt`, `lastLoginBrowser`, `lastLoginOs`, `currentSessionId`) están en la entidad
+> `User` y `synchronize: false`, así que nada más pudo crearlas.
+>
+> **Consecuencia**: una base construida desde las migraciones del repo saldría sin esas
+> columnas y **todo login fallaría**. El esquema actual funciona solo porque esta base de
+> datos concreta las tiene.
+>
+> Reconstruida desde la definición real con `IF NOT EXISTS`, y con nombre propio
+> (`AddSessionTrackingColumns1893500000000`) porque el timestamp de la original
+> (`1700000000000`) ordena **antes** de `InitialSchema` y fallaría donde no exista `users`.
+
+### D11 — 6 specs de integración fallan por aserciones, no por arranque
+
+**Estado**: `npm run test:integration` → **6 archivos fallan, 2 pasan** (34 tests, 7
+ejecutados). Antes de `0955a80` fallaban **los 8**, sin ejecutar una sola aserción.
+
+**Causa**: ya no es DI ni esquema (eso se arregló). Ahora fallan con
+`expected 200, got 401`, `expected 404, got 401`, `expected 400, got 404`. Son endpoints que
+responden distinto de lo que el spec asume — posiblemente rutas inexistentes o specs escritos
+contra otra versión de la API.
+
+**Por qué importa**: la cobertura de integración es efectivamente cero. Con D1 además
+aplazado, `findOne` de storms y `getSummary` de dashboard se quedan sin red de seguridad.
+
+### D12 — `generateTemporaryPassword` quedó sin uso
+
+**Causa**: el flujo de token no genera contraseñas temporales. La función sigue en
+`auth.utils.ts` y solo la consume su propio spec.
+
+**Por qué no la borré**: borrarla exige borrar también sus tests, y con D1 aplazado reducir el
+conteo de tests verdes (objetivo: 209/209) hace la meta más difícil de seguir. Es una decisión
+tuya: borrarla, o dejarla como utilidad disponible.
+
 ### D9 — Precaución, no deuda: `manualChunks` compila verde y mata la app al cargar
 
 > **Clasificación: no es deuda.** No hay ningún bug activo. Se registra aparte porque,
-> junto a D10, es de la clase de cosas que el build no detecta y que conviene no
-> perder al reordenar este documento.
+> junto a la que fue D10 (una migración aplicada en la BD pero ausente del repo), es de la
+> clase de cosas que el build no detecta y que conviene no perder al reordenar este
+> documento.
 
 Es una disarmadiza para quien retoque `vite.config.ts`.
 
@@ -520,7 +578,7 @@ deuda → arreglo exista. **Ninguno está aprobado.**
 |---|---|---|---|
 | 4.5 | D5 | Que `UsersService` llame a `STORAGE_SERVICE` directamente y deje de publicar `orphan-cleanup`, o un adapter de broker real | Toca backend con D1 aplazada |
 | 4.6 | D8 | Borrar `api.health()` y `api.tokens()` con sus schemas | Solo borrado, sin riesgo |
-| 4.7 | D6 | Mailer real (nodemailer/Resend) **o** link con token en vez de contraseña por correo | Decisión de producto, no técnica. Enviar contraseñas por correo es mala práctica; lo correcto es un token de un solo uso |
+| 4.7 | D6 (resto) | Transporte real de correo para el link (nodemailer/Resend/SES) con SMTP por entorno | El link con token ya está hecho; falta que llegue. La interfaz es un método, sustituirla es lo único que queda |
 
 **4.8 (D7) queda cerrado** y por eso ya no figura como propuesto: se resolvió en `1ddefa5`
 con un `ARG`/`ENV` en el `Dockerfile`.
@@ -544,7 +602,8 @@ comportamiento verificado contra el stack en ejecución.
 
 1. ~~**Fase 4.4** (D1) — reactivar los tests.~~ **Aplazado por decisión del usuario**
    (2026-09-26). Sigue siendo bloqueante para cualquier otra cosa que toque el backend con
-   tests: no se ha cerrado, se ha pospuesto.
+   tests: no se ha cerrado, se ha pospuesto. **Nota**: el paso 4.7 tocó backend sin red de
+   seguridad, con el spec de auth updated y los de integración en el estado de D11.
 2. ~~**Fase 1** — compose: anchors, credenciales a `.env`, red dedicada.~~ ✅
 3. ~~**Fase 4.1–4.3** — unificar duplicados de backend y frontend.~~ Pendiente.
 4. ~~**Fase 2** — React 19: Error Boundaries, TanStack Query, Zod, colocation, splitting.~~ ✅
@@ -599,6 +658,8 @@ El usuario se quejó dos veces de comprobaciones lentas.
 
 1. **D6** (mailer) — bloquea a usuarios, corto, no necesita D1, pero requiere decidir
    entre un mailer real y un link con token de un solo uso.
-2. ~~**D7** (URL de la API) — corto, invisible al build.~~ ✅ resuelto en `1ddefa5`.
+2. **D11** — los 6 specs de integración que fallan por aserciones. Con D1 aplazado, es la
+   cobertura que falta.
+3. ~~**D7** (URL de la API) — corto, invisible al build.~~ ✅ resuelto en `1ddefa5`.
 3. **Fase 3** — auditorías a11y y Web Vitals, solo si el usuario las habilita.
 4. **D1** — sigue siendo bloqueante para tocar el backend con tests.
