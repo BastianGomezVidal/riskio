@@ -660,10 +660,12 @@ El usuario se quejó dos veces de comprobaciones lentas.
 
 ### Si retomar
 
-1. **D6** (mailer) — bloquea a usuarios, corto, no necesita D1, pero requiere decidir
-   entre un mailer real y un link con token de un solo uso.
-2. **D11** — los 6 specs de integración que fallan por aserciones. Con D1 aplazado, es la
-   cobertura que falta.
-3. ~~**D7** (URL de la API) — corto, invisible al build.~~ ✅ resuelto en `1ddefa5`.
-3. **Fase 3** — auditorías a11y y Web Vitals, solo si el usuario las habilita.
-4. **D1** — sigue siendo bloqueante para tocar el backend con tests.
+1. **D11** — los 6 specs de integración que fallan por aserciones (401/404). Con D1 aplazado,
+   es la cobertura que más falta.
+2. **D5** — `InMemoryBroker` no cruza procesos: los avatares huérfanos se acumulan en silencio.
+   La receta ya está escrita (paso 4.5).
+3. **Fase 3** — auditorías a11y y Web Vitals. No es código, es un informe. Requiere tu permiso.
+4. **Fase 4.1–4.3** — unificar carpetas duplicadas. Mantenimiento, no urgencia.
+5. **D1** — sigue siendo bloqueante para tocar el backend con tests, mientras esté aplazada.
+
+Resueltos y cerrados: D6, D7, D10. D12 es una decisión de diez minutos.
