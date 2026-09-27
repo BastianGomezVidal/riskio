@@ -3,11 +3,12 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { createTestApp, seedStorm } from '../../../test/helpers/test-app.js';
+import { createTestApp, seedStorm, registerAndLogin, bearer } from '../../../test/helpers/test-app.js';
 import { Storm } from '../weather/storms/entities/storm.entity.js';
 
 describe('Dashboard summary endpoint (integration)', () => {
   let app: INestApplication;
+  let token: string;
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -78,6 +79,8 @@ describe('Dashboard summary endpoint (integration)', () => {
     await app
       .get<Repository<Storm>>(getRepositoryToken(Storm))
       .update({ atcfId: 'CP082026' }, { isActive: false });
+
+    token = await registerAndLogin(app);
   });
 
   afterAll(async () => {
@@ -87,14 +90,19 @@ describe('Dashboard summary endpoint (integration)', () => {
   it('returns season totals and per-storm latest-advisory summaries', async () => {
     const res = await request(app.getHttpServer())
       .get('/dashboard/summary')
+      .set(...bearer(token) as [string, string])
       .expect(200);
 
     expect(res.body.generatedAt).toEqual(expect.any(String));
+    // pacific/atlantic came with the per-basin totals in 4e425ae; the spec
+    // predates them and was failing on the two extra keys.
     expect(res.body.totals).toEqual({
       events: 3,
       named: 2,
       hurricanes: 1,
       ace: 1.2,
+      pacific: 2,
+      atlantic: 1,
     });
 
     expect(res.body.storms).toHaveLength(3);
@@ -103,6 +111,7 @@ describe('Dashboard summary endpoint (integration)', () => {
   it('picks the newest advisory per storm', async () => {
     const res = await request(app.getHttpServer())
       .get('/dashboard/summary')
+      .set(...bearer(token) as [string, string])
       .expect(200);
 
     const odile = res.body.storms.find(
@@ -121,6 +130,7 @@ describe('Dashboard summary endpoint (integration)', () => {
   it('exposes low-intensity points without inflating totals', async () => {
     const res = await request(app.getHttpServer())
       .get('/dashboard/summary')
+      .set(...bearer(token) as [string, string])
       .expect(200);
 
     const al = res.body.storms.find(
@@ -136,6 +146,7 @@ describe('Dashboard summary endpoint (integration)', () => {
   it('sets latestAdvisory to null for storms without advisories', async () => {
     const res = await request(app.getHttpServer())
       .get('/dashboard/summary')
+      .set(...bearer(token) as [string, string])
       .expect(200);
 
     const zeta = res.body.storms.find(
@@ -150,6 +161,7 @@ describe('Dashboard summary endpoint (integration)', () => {
   it('excludes storms that are no longer active', async () => {
     const res = await request(app.getHttpServer())
       .get('/dashboard/summary')
+      .set(...bearer(token) as [string, string])
       .expect(200);
 
     const ghost = res.body.storms.find(
@@ -158,11 +170,15 @@ describe('Dashboard summary endpoint (integration)', () => {
 
     expect(ghost).toBeUndefined();
     expect(res.body.storms).toHaveLength(3);
+    // pacific/atlantic came with the per-basin totals in 4e425ae; the spec
+    // predates them and was failing on the two extra keys.
     expect(res.body.totals).toEqual({
       events: 3,
       named: 2,
       hurricanes: 1,
       ace: 1.2,
+      pacific: 2,
+      atlantic: 1,
     });
   });
 });

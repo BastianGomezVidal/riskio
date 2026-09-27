@@ -3,12 +3,12 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { createTestApp, seedStorm } from '../../../test/helpers/test-app.js';
+import { createTestApp, seedStorm, registerAndLogin, bearer } from '../../../test/helpers/test-app.js';
 import { NhcProvider } from '../feeds/providers/nhc/nhc.provider.js';
 import { Storm } from '../weather/storms/entities/storm.entity.js';
 
 /**
- * History endpoint (integration): `GET /history` paginates storms that are
+ * History endpoint (integration): `GET /storm-history` paginates storms that are
  * no longer in the active NOAA feed, each with its total advisory count.
  *
  * A `NhcProvider` override keeps the scheduler from touching the database
@@ -21,6 +21,7 @@ const INACTIVE_OLD = 'CP942026';
 
 describe('History endpoint (integration)', () => {
   let app: INestApplication;
+  let token: string;
 
   beforeAll(async () => {
     app = await createTestApp([
@@ -72,6 +73,8 @@ describe('History endpoint (integration)', () => {
       { atcfId: INACTIVE_OLD },
       { isActive: false, lastSeenInFeedAt: new Date('2026-09-12T00:00:00Z') },
     );
+
+    token = await registerAndLogin(app);
   });
 
   afterAll(async () => {
@@ -80,7 +83,8 @@ describe('History endpoint (integration)', () => {
 
   it('returns only inactive storms', async () => {
     const res = await request(app.getHttpServer())
-      .get('/history')
+      .get('/storm-history')
+      .set(...bearer(token) as [string, string])
       .query({ limit: 100 })
       .expect(200);
 
@@ -101,7 +105,8 @@ describe('History endpoint (integration)', () => {
 
   it('orders by the feed pass that last saw each storm', async () => {
     const res = await request(app.getHttpServer())
-      .get('/history')
+      .get('/storm-history')
+      .set(...bearer(token) as [string, string])
       .query({ limit: 100 })
       .expect(200);
 
@@ -114,7 +119,8 @@ describe('History endpoint (integration)', () => {
 
   it('reports the advisory count for each storm', async () => {
     const res = await request(app.getHttpServer())
-      .get('/history')
+      .get('/storm-history')
+      .set(...bearer(token) as [string, string])
       .query({ limit: 100 })
       .expect(200);
 
@@ -131,7 +137,8 @@ describe('History endpoint (integration)', () => {
 
   it('paginates and reports internally consistent metadata', async () => {
     const res = await request(app.getHttpServer())
-      .get('/history')
+      .get('/storm-history')
+      .set(...bearer(token) as [string, string])
       .query({ page: 1, limit: 2 })
       .expect(200);
 
@@ -148,14 +155,16 @@ describe('History endpoint (integration)', () => {
 
   it('rejects an out-of-range limit', async () => {
     await request(app.getHttpServer())
-      .get('/history')
+      .get('/storm-history')
+      .set(...bearer(token) as [string, string])
       .query({ limit: 101 })
       .expect(400);
   });
 
   it('rejects a non-positive page', async () => {
     await request(app.getHttpServer())
-      .get('/history')
+      .get('/storm-history')
+      .set(...bearer(token) as [string, string])
       .query({ page: 0 })
       .expect(400);
   });

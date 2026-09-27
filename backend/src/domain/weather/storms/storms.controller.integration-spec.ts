@@ -3,7 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { createTestApp, seedStorm } from '../../../../test/helpers/test-app.js';
+import { createTestApp, seedStorm, registerAndLogin, bearer } from '../../../../test/helpers/test-app.js';
 import { NhcProvider } from '../../feeds/providers/nhc/nhc.provider.js';
 import { Storm } from './entities/storm.entity.js';
 
@@ -25,6 +25,7 @@ const INACTIVE_OLD = 'CP942026';
 
 describe('Storms endpoints (integration)', () => {
   let app: INestApplication;
+  let token: string;
 
   beforeAll(async () => {
     app = await createTestApp([
@@ -66,6 +67,8 @@ describe('Storms endpoints (integration)', () => {
       { atcfId: INACTIVE_OLD },
       { isActive: false, lastSeenInFeedAt: new Date('2026-09-12T00:00:00Z') },
     );
+
+    token = await registerAndLogin(app);
   });
 
   afterAll(async () => {
@@ -73,7 +76,9 @@ describe('Storms endpoints (integration)', () => {
   });
 
   it('GET /storms returns only the active set, newest feed appearance first', async () => {
-    const res = await request(app.getHttpServer()).get('/storms').expect(200);
+    const res = await request(app.getHttpServer())
+      .get('/storms').expect(200)
+      .set(...bearer(token) as [string, string]);
 
     const ids = res.body.map((s: { atcfId: string }) => s.atcfId);
 
@@ -93,6 +98,7 @@ describe('Storms endpoints (integration)', () => {
   it('GET /storms/:atcfId exposes the activity flags', async () => {
     const res = await request(app.getHttpServer())
       .get(`/storms/${INACTIVE_NEW}`)
+      .set(...bearer(token) as [string, string])
       .expect(200);
 
     expect(res.body).toMatchObject({
@@ -104,6 +110,8 @@ describe('Storms endpoints (integration)', () => {
   });
 
   it('returns 404 for an unknown storm', async () => {
-    await request(app.getHttpServer()).get('/storms/ZZ999999').expect(404);
+    await request(app.getHttpServer())
+      .get('/storms/ZZ999999').expect(404)
+      .set(...bearer(token) as [string, string]);
   });
 });

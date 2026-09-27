@@ -19,6 +19,8 @@ import { AddUserAvatarUrl1892000000000 } from '../../src/database/migrations/189
 import { AddPasswordResetTokens1893000000000 } from '../../src/database/migrations/1893000000000-AddPasswordResetTokens.js';
 import { AddSessionTrackingColumns1893500000000 } from '../../src/database/migrations/1893500000000-AddSessionTrackingColumns.js';
 import { TEST_DATABASE_URL } from '../setup-integration.js';
+import request from 'supertest';
+import { randomUUID } from 'node:crypto';
 import { StormsService } from '../../src/domain/weather/storms/storms.service.js';
 import { AdvisoriesService } from '../../src/domain/weather/advisories/advisories.service.js';
 
@@ -90,6 +92,43 @@ export async function createTestApp(
   );
   await app.init();
   return app;
+}
+
+/**
+ * Registers a throwaway account and returns a bearer token for it.
+ *
+ * The specs below predate the global JwtAuthGuard, so they hit protected
+ * endpoints with no Authorization header and get 401 before reaching any
+ * assertion. Rather than making the guard optional in the harness — which
+ * would stop these specs from testing the real security posture — they
+ * authenticate the way a client does.
+ *
+ * @returns the access token to send as `Authorization: Bearer <token>`.
+ */
+export async function registerAndLogin(
+  app: INestApplication,
+  email = `spec-${randomUUID()}@test.local`,
+  password = 'spec-password-123',
+): Promise<string> {
+  await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ firstName: 'Spec', lastName: 'User', email, password })
+    .expect(201);
+
+  const login = await request(app.getHttpServer())
+    .post('/auth/login')
+    .send({ email, password })
+    .expect(200);
+
+  return login.body.accessToken as string;
+}
+
+/**
+ * Header pair for an authenticated request, spread into supertest's
+ * `.set(header, value)` which takes two arguments rather than an object.
+ */
+export function bearer(token: string): [string, string] {
+  return ['Authorization', `Bearer ${token}`];
 }
 
 export interface StormSeed {
@@ -164,4 +203,37 @@ export async function seedStorm(
   }
 
   return savedStorm;
+}
+
+/**
+ * Lists the advisories of a storm through the endpoint that actually exists.
+ *
+ * The specs used to call `GET /storms/:atcfId/advisories`, which is not a
+ * route in this API: the list is embedded in the storm detail as lightweight
+ * refs, and the full advisory has to be fetched by id or by number. Rather than
+ * add an endpoint nothing consumes, the specs read the real shape.
+ */
+export async function listAdvisoryIds(
+  app: INestApplication,
+  atcfId: string,
+  token: string,
+): Promise<string[]> {
+  const res = await request(app.getHttpServer())
+    .get(`/storms/${atcfId}`)
+    .set(...(bearer(token) as [string, string]))
+    .expect(200);
+
+  return (res.body.advisories ?? []).map((a: { id: string }) => a.id);
+}
+
+/** Fetches a full advisory by UUID, as the API exposes it. */
+export async function fetchAdvisory(
+  app: INestApplication,
+  id: string,
+  token: string,
+) {
+  return request(app.getHttpServer())
+    .get(`/advisories/${id}`)
+    .set(...(bearer(token) as [string, string]))
+    .expect(200);
 }

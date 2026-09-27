@@ -1,11 +1,18 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { createTestApp, seedStorm } from '../../../../test/helpers/test-app.js';
+import {
+  createTestApp,
+  seedStorm,
+  registerAndLogin,
+  bearer,
+  listAdvisoryIds,
+} from '../../../../test/helpers/test-app.js';
 
 describe('Advisories endpoints (integration)', () => {
   let app: INestApplication;
   let advisoryId: string;
+  let token: string;
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -46,30 +53,32 @@ describe('Advisories endpoints (integration)', () => {
       },
     ]);
 
-    const adv = await request(app.getHttpServer())
-      .get('/storms/EP142026/advisories')
-      .expect(200);
-    advisoryId = adv.body[0].id;
+    token = await registerAndLogin(app);
+    advisoryId = (await listAdvisoryIds(app, 'EP142026', token))[0];
   });
 
   afterAll(async () => {
     await app.close();
   });
 
-  it('lists advisories newest-first', async () => {
+  it('lists advisories newest-first on the storm detail', async () => {
+    // There is no GET /storms/:atcfId/advisories route. The list lives on the
+    // storm as lightweight refs, so that is what this asserts.
     const res = await request(app.getHttpServer())
-      .get('/storms/EP142026/advisories')
+      .get('/storms/EP142026')
+      .set(...(bearer(token) as [string, string]))
       .expect(200);
 
-    expect(res.body).toHaveLength(2);
+    expect(res.body.advisories).toHaveLength(2);
     // DESC order → advisory #2 first
-    expect(res.body[0].advisoryNumber).toBe(2);
-    expect(res.body[1].advisoryNumber).toBe(1);
+    expect(res.body.advisories[0].advisoryNumber).toBe(2);
+    expect(res.body.advisories[1].advisoryNumber).toBe(1);
   });
 
   it('returns an advisory with forecast points', async () => {
     const res = await request(app.getHttpServer())
       .get(`/advisories/${advisoryId}`)
+      .set(...(bearer(token) as [string, string]))
       .expect(200);
 
     expect(res.body.advisoryNumber).toBe(2);
@@ -85,6 +94,7 @@ describe('Advisories endpoints (integration)', () => {
   it('returns forecast points ordered by validAt ascending', async () => {
     const res = await request(app.getHttpServer())
       .get(`/advisories/${advisoryId}`)
+      .set(...(bearer(token) as [string, string]))
       .expect(200);
 
     expect(res.body.forecastPoints).toHaveLength(2);
@@ -94,6 +104,7 @@ describe('Advisories endpoints (integration)', () => {
   it('rejects an unknown advisory id', async () => {
     await request(app.getHttpServer())
       .get('/advisories/00000000-0000-0000-0000-000000000000')
+      .set(...(bearer(token) as [string, string]))
       .expect(404);
   });
 
@@ -128,16 +139,18 @@ describe('Advisories endpoints (integration)', () => {
       },
     ]);
 
+    const ids = await listAdvisoryIds(app, 'AL012026', token);
     const res = await request(app.getHttpServer())
-      .get('/storms/AL012026/advisories')
+      .get(`/advisories/${ids[0]}`)
+      .set(...(bearer(token) as [string, string]))
       .expect(200);
 
-    expect(res.body[0]).toMatchObject({
+    expect(res.body).toMatchObject({
       advisoryNumber: 3,
       track: expect.objectContaining({ type: 'LineString' }),
       cone: expect.objectContaining({ type: 'Polygon' }),
     });
-    expect(res.body[0].track.coordinates).toHaveLength(2);
-    expect(res.body[0].cone.coordinates[0]).toHaveLength(3);
+    expect(res.body.track.coordinates).toHaveLength(2);
+    expect(res.body.cone.coordinates[0]).toHaveLength(3);
   });
 });

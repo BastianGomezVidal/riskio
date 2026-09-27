@@ -5,7 +5,12 @@ import { join } from 'node:path';
 import request from 'supertest';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { createTestApp } from '../../../../test/helpers/test-app.js';
+import {
+  createTestApp,
+  registerAndLogin,
+  bearer,
+  listAdvisoryIds,
+} from '../../../../test/helpers/test-app.js';
 import { NhcProvider } from '../providers/nhc/nhc.provider.js';
 import { StormsService } from '../../weather/storms/storms.service.js';
 import { Advisory } from '../../weather/advisories/entities/advisory.entity.js';
@@ -51,6 +56,7 @@ async function createAdminApiKey(targetApp: INestApplication): Promise<string> {
 
 describe('Ingestion endpoints (integration)', () => {
   let app: INestApplication;
+  let token: string;
   let stormsService: StormsService;
   let adminKey: string;
 
@@ -66,6 +72,8 @@ describe('Ingestion endpoints (integration)', () => {
     app = await createTestApp([{ provide: NhcProvider, useValue: nhcMock }]);
     stormsService = app.get(StormsService);
     adminKey = await createAdminApiKey(app);
+
+    token = await registerAndLogin(app);
   });
 
   afterAll(async () => {
@@ -86,12 +94,16 @@ describe('Ingestion endpoints (integration)', () => {
   });
 
   it('rejects a request without an API key', async () => {
-    await request(app.getHttpServer()).post('/admin/ingest/run/ep').expect(401);
+    await request(app.getHttpServer())
+      .post('/admin/ingest/run/ep')
+      .set(...(bearer(token) as [string, string]))
+      .expect(401);
   });
 
   it('POST /admin/ingest/run/ep ingests storm + advisory + points', async () => {
     const res = await request(app.getHttpServer())
       .post('/admin/ingest/run/ep')
+      .set(...bearer(token) as [string, string])
       .set('x-api-key', adminKey)
       .expect(200);
 
@@ -109,11 +121,13 @@ describe('Ingestion endpoints (integration)', () => {
   it('is idempotent: re-running skips the same advisory', async () => {
     await request(app.getHttpServer())
       .post('/admin/ingest/run/ep')
+      .set(...bearer(token) as [string, string])
       .set('x-api-key', adminKey)
       .expect(200);
 
     const second = await request(app.getHttpServer())
       .post('/admin/ingest/run/ep')
+      .set(...bearer(token) as [string, string])
       .set('x-api-key', adminKey)
       .expect(200);
 
@@ -128,6 +142,7 @@ describe('Ingestion endpoints (integration)', () => {
   it('POST /admin/ingest/run ingests all basins', async () => {
     const res = await request(app.getHttpServer())
       .post('/admin/ingest/run')
+      .set(...bearer(token) as [string, string])
       .set('x-api-key', adminKey)
       .expect(200);
 
@@ -180,6 +195,7 @@ describe('Ingestion endpoints (integration)', () => {
     try {
       const res = await request(kmzApp.getHttpServer())
         .post('/admin/ingest/run/ep')
+        .set(...(bearer(token) as [string, string]))
         .set('x-api-key', adminKey)
         .expect(200);
 
@@ -187,20 +203,21 @@ describe('Ingestion endpoints (integration)', () => {
       expect(res.body.warningSegments).toBeGreaterThanOrEqual(1);
       expect(res.body.errors).toEqual([]);
 
+      const ids = await listAdvisoryIds(kmzApp, 'EP142026', token);
       const adv = await request(kmzApp.getHttpServer())
-        .get('/storms/EP142026/advisories')
+        .get(`/advisories/${ids[0]}`)
+        .set(...(bearer(token) as [string, string]))
         .expect(200);
-      expect(adv.body[0].track).toMatchObject({ type: 'LineString' });
-      expect(adv.body[0].cone).toMatchObject({ type: 'Polygon' });
+      expect(adv.body.track).toMatchObject({ type: 'LineString' });
+      expect(adv.body.cone).toMatchObject({ type: 'Polygon' });
 
-      const warnings = await request(kmzApp.getHttpServer())
-        .get(`/advisories/${adv.body[0].id}/warnings`)
-        .expect(200);
-      expect(warnings.body.type).toBe('FeatureCollection');
-      expect(warnings.body.features.length).toBeGreaterThanOrEqual(1);
-      expect(warnings.body.features[0].properties.warningType).toBe(
-        'Hurricane Watch',
-      );
+      // There is no /advisories/:id/warnings route. The segments ride inside
+      // the advisory detail, which is where the web client looks for them.
+      expect(adv.body.warnings.length).toBeGreaterThanOrEqual(1);
+      expect(adv.body.warnings[0].warningType).toBe('Hurricane Watch');
+      expect(adv.body.warnings[0].geometry).toMatchObject({
+        type: 'LineString',
+      });
     } finally {
       await kmzApp.close();
     }
@@ -209,6 +226,7 @@ describe('Ingestion endpoints (integration)', () => {
   it('rejects an unknown basin', async () => {
     const res = await request(app.getHttpServer())
       .post('/admin/ingest/run/xx')
+      .set(...bearer(token) as [string, string])
       .set('x-api-key', adminKey)
       .expect(400);
 
