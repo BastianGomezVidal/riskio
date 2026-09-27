@@ -1,6 +1,7 @@
 services:
   db:
     image: postgis/postgis:16-3.4
+    runtime: runc
     restart: unless-stopped
     env_file: .env
     environment:
@@ -8,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432" # solo local
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -17,15 +18,57 @@ services:
       timeout: 5s
       retries: 5
 
+  storage:
+    image: docker.io/chrislusf/seaweedfs
+    runtime: runc
+    restart: unless-stopped
+    command: server -s3 -s3.port=8333 -volume.max=100
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8333/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "${STORAGE_PORT:-8333}:8333"
+    volumes:
+      - storage_data:/data
+
+  redis:
+    image: docker.io/library/redis:7-alpine
+    runtime: runc
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
   backend-api:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    runtime: runc
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: ${DATABASE_URL} # debe apuntar a @db:5432
+      DATABASE_URL: ${DATABASE_URL}
       PORT: 3000
+      STORAGE_DRIVER: s3
+      STORAGE_ENDPOINT: http://storage:8333
+      STORAGE_REGION: us-east-1
+      STORAGE_BUCKET: riskio-avatars
+      STORAGE_ACCESS_KEY: any
+      STORAGE_SECRET_KEY: any
+      STORAGE_PUBLIC_URL: http://localhost:${STORAGE_PORT:-8333}/riskio-avatars
+      BROKER_DRIVER: memory
+      CACHE_DRIVER: redis
+      REDIS_URL: redis://redis:6379
     ports:
       - "${BACKEND_API_PORT:-3000}:3000"
     healthcheck:
@@ -43,25 +86,45 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      storage:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   backend-worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    runtime: runc
     command: ["npm", "run", "start:worker"]
     restart: unless-stopped
     env_file: .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      STORAGE_DRIVER: s3
+      STORAGE_ENDPOINT: http://storage:8333
+      STORAGE_REGION: us-east-1
+      STORAGE_BUCKET: riskio-avatars
+      STORAGE_ACCESS_KEY: any
+      STORAGE_SECRET_KEY: any
+      STORAGE_PUBLIC_URL: http://localhost:${STORAGE_PORT:-8333}/riskio-avatars
+      IS_WORKER: "true"
+      CACHE_DRIVER: redis
+      REDIS_URL: redis://redis:6379
     depends_on:
       db:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   frontend:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000} # host visible por el navegador
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    runtime: runc
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-8080}:80"
@@ -71,3 +134,5 @@ services:
 
 volumes:
   pgdata:
+  storage_data:
+  redis_data:
