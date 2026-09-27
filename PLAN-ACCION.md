@@ -131,7 +131,7 @@ precaución y varios puntos ya están resueltos. La tabla es el índice; debajo 
 | # | Qué es | Impacto | Dónde se arregla | Estado |
 |---|---|---|---|---|
 | **D10** | Una migración aplicada en la BD **nunca existió en el repo** | 🔴 El despliegue no es reproducible | — | **Resuelta** (`0955a80`) |
-| **D6** | `forgot-password` resetea la contraseña y no la entrega | 🔴 Ya no destruye la cuenta; el link sigue sin llegar | 4.7 | **Mitigada** (`cf4f2e5`, `e646477`) — falta el transporte |
+| D6 | `forgot-password` resetea la contraseña y no la entrega | — | 4.7 | **Resuelta** (`cf4f2e5`, `e646477`, `608ce38`) |
 | D11 | 6 specs de integración fallan por aserciones (401/404) | 🟠 Cobertura real inexistente | — | Abierta, sin paso |
 | D12 | `generateTemporaryPassword` sin uso tras el flujo de token | 🟡 Código muerto, aún testeado | — | Abierta, decisión tuya |
 | **D1** | Specs de backend comentados (3 suites, ~34 tests) | 🔴 Sin red de seguridad | 4.4 | **Aplazada** por decisión |
@@ -242,21 +242,24 @@ esquema de validación y sin implementarlo, se pierde el evento igual. Además, 
 
 ---
 
-### D6 — ~~`forgot-password` resetea la contraseña y nunca entrega la nueva~~ **Mitigada, no cerrada**
+### D6 — ~~`forgot-password` resetea la contraseña y nunca entrega la nueva~~ **Resuelta**
 
-> **Lo que se arregló** (`cf4f2e5`, `e646477`): el endpoint ya no destruye la cuenta. Pide un
-> link, no toca la contraseña, y el usuario elige la nueva. Verificado end-to-end: pedir el
+> **Resuelta en tres commits.** El endpoint ya no destruye la cuenta: pide un link, no toca la
+> contraseña, y el usuario elige la nueva. Verificado end-to-end contra el stack — pedir el
 > link deja la contraseña actual funcionando, canjearlo cambia la contraseña, el link se
-> gasta y un token inventado se rechaza.
+> gasta y un token inventado se rechaza. El `MailerService` ahora tiene transporte real
+> (nodemailer) con `MAIL_TRANSPORT=smtp`.
 >
-> **Lo que queda**: el `MailerService` sigue escribiendo el link en el log
-> (`backend/src/domain/auth/mailer.service.ts:19`). El diseño de seguridad está resuelto; la
-> **entrega no**. Mientras tanto un usuario que pide el link no recibe nada y sigue sin poder
-> entrar, aunque ya no se le haya bloqueado la cuenta.
+> **Detalle de seguridad que quedó en el camino**: un envío fallido se captura y se loguea,
+> nunca se propaga. Si una rotura de SMTP devolviera un estado distinto, contestaría
+> diferente a direcciones registradas y a desconocidas, que es justo la enumeración que el
+> mensaje neutro existe para evitar. Cubierto por un test.
 >
-> **Arreglo pendiente**: un transporte real (nodemailer, Resend, SES) con configuración SMTP
-> por entorno. La interfaz es un solo método a propósito, para que sustituirlo sea lo único
-> que falte. → **Paso 4.7**
+> **Modo `log`**: en dev sigue escribiendo el link en el log, y ahora **avisa al arrancar**
+> que no se está enviando nada. Es cómodo localmente y es un riesgo en cualquier otro
+> entorno, así que lo dice en voz alta en vez de fingir que el correo salió. Para enviar de
+> verdad: `MAIL_TRANSPORT=smtp` más `SMTP_*` en `.env`; la API se niega a arrancar con `smtp`
+> incompleto.
 
 <details><summary>Causa original (histórico)</summary>
 
