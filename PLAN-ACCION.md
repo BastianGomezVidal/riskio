@@ -174,6 +174,38 @@ accidente, y por eso el síntoma es "No test found in suite" en vez de un fallo 
 - Bundle inicial del frontend: **1.063 kB** (gzip 337 kB) con un chunk que dispara el
   aviso de Vite (>500 kB). → se ataca en **Paso 2.6**.
 
+### D5 — `InMemoryBroker` no cruza procesos: los avatares huérfanos nunca se limpian
+
+**Síntoma**: al borrar un usuario, la API publica `orphan-cleanup`; el worker se suscribe a
+ese evento. Pero la limpieza no ocurre.
+
+**Causa**: `InMemoryBroker` guarda la cola en la memoria del proceso que la usa. La API
+(publica) y el worker (suscribe) son **procesos distintos**, cada uno con su propia
+instancia y su propio mapa en memoria. El evento se publica en el mapa de la API, donde
+nadie lo escucha. Confirmado en runtime: el log `[InMemoryBroker] Subscribed to
+orphan-cleanup` aparece en el worker, y el API tiene su propia instancia sin suscriptores.
+
+**Consecuencia**: cada usuario eliminado deja su avatar huérfano en el bucket
+`riskio-avatars`. No grows sin límite, porque el mismo bug deja huérfano cualquier otro
+objeto pendiente de limpieza, pero no se notó en desarrollo porque el síntoma es
+silencioso.
+
+**Por qué NO se arregla con Redis**: activar `BROKER_DRIVER=redis` sin escribir el adapter
+`redis.broker.ts` no arregla nada, solo cambia el modo de fallo. Con `redis` aceptado por el
+esquema de validación y sin implementarlo, se pierde el evento igual. Además, Redis para un
+único evento de baja latencia y baja frecuencia es sobreingeniería.
+
+**Opciones**:
+
+1. **Llamada directa al `STORAGE_SERVICE` desde `UsersService`** (recomendada). Elimina la
+   indirección, el canal y el contrato del evento para un único caso de uso. Un avatar
+   huérfano es barato de aceptar de forma puntual; lo que no conviene es un canal de
+   eventos roto y silencioso.
+2. Implementar `redis.broker.ts` de verdad, si en el futuro hay trabajo asíncrono real
+   (notificaciones, exports, ingesta) que justifique un broker durable.
+
+→ **Paso 1.4** (rediseñado)
+
 
 ---
 
@@ -191,17 +223,38 @@ Quitar `STORAGE_ACCESS_KEY: any` / `STORAGE_SECRET_KEY: any` hardcodeados y leer
 
 **Explicación**: "any" es específico de SeaweedFS. Hardcodearlo en el compose lo viajaría a otros entornos. Con defaults en `.env` el compose queda agnóstico al proveedor de storage (facilita migrar a AWS/LocalStack después).
 
-### Paso 1.3 — (Opcional) Red dedicada
+### Paso 1.3 — Redes dedicadas `core` / `edge` — **HECHO**
 
-Crear red `app` (comunicación interna) y mantener la red por defecto para puertos publicados. Impacto: aislamiento. Riesgo: romper conectividad si se hace mal. Se puede posponer.
+Dos redes en lugar de una: `core` (db, storage, redis, backend-api, backend-worker) y
+`edge` (frontend, backend-api, storage). El frontend queda sin ruta a la base de datos ni a
+Redis. `storage` está en ambas porque el navegador necesita alcanzar los avatares por
+puerto publicado; `backend-api` en ambas porque es el único que habla con el browser.
 
-**Explicación**: una red dedicada documenta y restringe qué servicios se ven entre sí. Pero agrega complejidad; en dev local no es urgente.
+`postgres` y `redis` pasan a publicarse solo en `127.0.0.1`.
 
-### Paso 1.4 — (Opcional) `BROKER_DRIVER=redis`
+**Explicación**: una red dedicada documenta y restringe qué servicios se ven entre sí. Pero
+agrega complejidad; en dev local no es urgente.
 
-Solo si los jobs en background (ingest) no pueden perderse ante reinicio. Redis ya existe.
+**Trampa encontrada al implementarlo**: SeaweedFS hace bind de **una sola interfaz** (la que
+detecta último), no de `0.0.0.0`. Con dos redes, el worker —solo en `core`— recibía
+`ECONNREFUSED` contra storage, mientras el API, en ambas redes, respondía bien: el síntoma
+parecía intermitente y quedaba enmascarado. Se resolvió con `-ip.bind=0.0.0.0` en el
+`command` de `storage`, dejando `-ip` en autodetección porque es la dirección que SeaweedFS
+se anuncia a sus propios master/volume/filer.
 
-**Explicación**: `BROKER_DRIVER=memory` guarda la cola en RAM del proceso. Si el worker reinicia, la cola se pierde. Con Redis la cola persiste. Es una decisión de negocio (durabilidad), no técnica pura.
+> Lección: al partir un servicio en varias redes, verificar que escucha en `0.0.0.0` y no
+> solo en "una IP concreta". Comprobar la conectividad desde **el** servicio con menos
+> redes, no desde el que tiene todas.
+
+### Paso 1.4 — Limpieza de avatares huérfanos: **rediseñado, no hecho**
+
+El paso original (persistir la cola con `BROKER_DRIVER=redis`) parte de una premisa
+incorrecta y está **descartado como está escrito**. Ver **D5**: el problema no es que la cola
+se pierda ante un reinicio, es que el evento **nunca llega** a su consumidor.
+
+La ingesta de NHC no pasa por el broker (usa `@Cron` cada 10 min), así que la única función
+del broker hoy es la limpieza de avatares huérfanos. El broker puede quedarse en memoria y
+desacoplarse de Redis por completo.
 
 ---
 
