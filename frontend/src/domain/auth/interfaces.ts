@@ -1,16 +1,9 @@
-export type Role = "admin" | "client";
-
-export interface User {
-  id: string;
-  email: string;
-  role: Role;
-  firstName: string;
-  lastName: string;
-}
+import { User } from "../users";
 
 export interface Session {
   accessToken: string;
   user: User;
+  previousSessionInvalidated: boolean;
 }
 
 export interface ForgotPasswordResult {
