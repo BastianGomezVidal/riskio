@@ -8,7 +8,7 @@ import { AdvisoriesModule } from '../../src/domain/weather/advisories/advisories
 import { IngestionModule } from '../../src/domain/feeds/ingestion/ingestion.module.js';
 import { AuthModule } from '../../src/domain/auth/auth.module.js';
 import { DashboardModule } from '../../src/domain/dashboard/dashboard.module.js';
-import { HistoryModule } from '../../src/domain/history/history.module.js';
+import { HistoryModule } from '../../src/domain/storm-history/storm-history.module.js';
 import { HealthModule } from '../../src/health/health.module.js';
 import { InitialSchema1789065155402 } from '../../src/database/migrations/1789065155402-InitialSchema.js';
 import { AddStormGeometry1888240000000 } from '../../src/database/migrations/1888240000000-AddStormGeometry.js';

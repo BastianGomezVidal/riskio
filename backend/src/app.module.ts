@@ -7,16 +7,18 @@ import { StormsModule } from './domain/weather/storms/storms.module.js';
 import { AdvisoriesModule } from './domain/weather/advisories/advisories.module.js';
 import { IngestionModule } from './domain/feeds/ingestion/ingestion.module.js';
 import { AuthModule } from './domain/auth/auth.module.js';
+import { UsersModule } from './domain/users/users.module.js';
 import { HealthModule } from './health/health.module.js';
 import { DashboardModule } from './domain/dashboard/dashboard.module.js';
-import { HistoryModule } from './domain/history/history.module.js';
+import { HistoryModule } from './domain/storm-history/storm-history.module.js';
+import { MessagingModule } from './domain/messaging/messaging-module.js';
+import { AppCacheModule } from './domain/cache/cache.module.js';
 
 /**
  * Root application module.
  *
- * Wires up environment validation, the Postgres connection (migrations run
- * automatically on boot), the ingestion scheduler and the feature modules:
- * storms, advisories, ingestion, dashboard and history.
+ * JwtAuthGuard is registered globally from AuthModule via APP_GUARD,
+ * because that is where the User repository is available for injection.
  */
 @Module({
   imports: [
@@ -42,9 +44,12 @@ import { HistoryModule } from './domain/history/history.module.js';
     AdvisoriesModule,
     IngestionModule,
     AuthModule,
+    UsersModule,
     HealthModule,
     DashboardModule,
     HistoryModule,
+    MessagingModule,
+    AppCacheModule,
   ],
 })
 export class AppModule {}
