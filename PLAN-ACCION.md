@@ -386,19 +386,19 @@ detecta navigating en un navegador. Si alguien "optimiza" el chunk de antd para 
 
 ## Fase 1 — Compose: mejoras de mantenibilidad (sin cambiar comportamiento)
 
-### Paso 1.1 — YAML anchors para variables S3 compartidas
+### Paso 1.1 — ✅ Ejecutado — YAML anchors para variables S3 compartidas
 
 Extraer el bloque STORAGE_* repetido en `backend-api` y `backend-worker` a un anchor `x-common-storage: &common-storage` y aplicarlo con `<<: *common-storage`. Sin cambios de comportamiento: mismo resultado, menos duplicidad.
 
 **Explicación**: YAML anchors + merge keys (`<<`) permiten definir un bloque una vez y reutilizarlo. Compose los soporta (extensión de YAML), y evitan que un valor cambie en un servicio y no en el otro (drift).
 
-### Paso 1.2 — Mover credenciales S3 a `.env` (con defaults `any`)
+### Paso 1.2 — ✅ Ejecutado — Mover credenciales S3 a `.env` (con defaults `any`)
 
 Quitar `STORAGE_ACCESS_KEY: any` / `STORAGE_SECRET_KEY: any` hardcodeados y leerlos de `.env` con fallback `any` solo en dev. Actualizar `.env.example`.
 
 **Explicación**: "any" es específico de SeaweedFS. Hardcodearlo en el compose lo viajaría a otros entornos. Con defaults en `.env` el compose queda agnóstico al proveedor de storage (facilita migrar a AWS/LocalStack después).
 
-### Paso 1.3 — Redes dedicadas `core` / `edge` — **HECHO**
+### Paso 1.3 — ✅ Ejecutado — Redes dedicadas `core` / `edge`
 
 Dos redes en lugar de una: `core` (db, storage, redis, backend-api, backend-worker) y
 `edge` (frontend, backend-api, storage). El frontend queda sin ruta a la base de datos ni a
@@ -489,7 +489,7 @@ Lo que sí se conservó de la idea original: cada chunk lazy tiene su frontera `
 
 ## Fase 3 — Auditorías (permite el usuario)
 
-### Paso 3.1 — Auditoría de accesibilidad (a11y)
+### Paso 3.1 — ⬜ Pendiente — Auditoría de accesibilidad (a11y)
 
 Revisar con axe-core (dev) y Lighthouse: roles/aria en elementos interactivos, navegación por teclado, foco visible, labels en formularios, contraste, landmarks, `alt` en imágenes, live regions para errores. Corregir hallazgos y documentar.
 
@@ -497,7 +497,7 @@ Herramientas: axe DevTools / `@axe-core/react`, Lighthouse, plugins de teclado.
 
 **Explicación**: a11y no es "extra", es usabilidad para todos (teclado, lectores de pantalla, contraste). Se automatiza con axe/Lighthouse y se corrige con foco visible, roles correctos y teclado operable.
 
-### Paso 3.2 — Auditoría de Web Vitals
+### Paso 3.2 — ⬜ Pendiente — Auditoría de Web Vitals
 
 Medir en la app real (build de producción, no dev server):
 - **LCP** (Largest Contentful Paint): qué se ve primero. Objetivo < 2.5s.
@@ -515,7 +515,7 @@ Acciones típicas: preconnect, servir imágenes optimizadas, code splitting (Pas
 
 No se toca antes de commitear, para no mezclar un commit con un refactor grande.
 
-### Paso 4.1 — Backend: unificar `history` / `storm-history` / `weather/storms`
+### Paso 4.1 — ⬜ Pendiente — Backend: unificar `history` / `storm-history` / `weather/storms`
 
 Hoy conviven tres carpetas. `StormHistoryController` sigue montado en `/storm-history`.
 Decidir: ¿`storm-history` es el nombre definitivo (se renombra a `weather/storm-history` o similar),
@@ -525,7 +525,7 @@ o se elimina y se sirve desde `weather/storms`? Luego borrar código muerto y su
 depurga por separado. El nombre debe reflejar el dominio (`weather/storm-history`), no el concepto
 transversal ("history"), porque `history` no es un dominio de negocio aquí: lo es el historial de tormentas.
 
-### Paso 4.2 — Frontend: eliminar duplicados
+### Paso 4.2 — ⬜ Pendiente (parcial) — Frontend: eliminar duplicados
 
 - `helpers/*` duplica `domain/*` → dejar solo `domain/*` (un nombre, un lugar) y actualizar imports.
   **Pendiente**: `helpers/{format-time,geo,storms}` sigue existiendo junto a `domain/`.
@@ -544,7 +544,7 @@ transversal ("history"), porque `history` no es un dominio de negocio aquí: lo 
 cualquiera puede quedar desactualizada y el bug aparece en una sola de ellas. El Imports de una
 carpeta duplicada también confunde: no se sabe cuál es la fuente de verdad.
 
-### Paso 4.3 — Propagar las mejoras de Fase 2 al código ya movido
+### Paso 4.3 — ⬜ Pendiente — Propagar las mejoras de Fase 2 al código ya movido
 
 Las mejoras de Fase 2 (Error Boundaries, TanStack Query, Zod, React 19) se aplican primero al código
 "vivo" (el que los routers importan). Al resolver 4.2, verificar que las features nuevas heredan los patrones.
@@ -590,10 +590,10 @@ con un `ARG`/`ENV` en el `Dockerfile`.
 | Fase | Entregable | Riesgo |
 |---|---|---|
 | 0 | ✅ 20 commits atómicos, árbol limpio | Bajo |
-| 1 | ✅ Compose con anchors + config por `.env` | Bajo |
+| 1 | ✅ **Completa**: 1.1, 1.2, 1.3 hechos. 1.4 redirigido a D5 (sin paso) | Bajo |
 | 2 | ✅ Frontend con Error Boundaries, TanStack Query, Zod, colocation, splitting | Medio (refactor de data layer) |
-| 3 | Informe de a11y + Web Vitals con acciones priorizadas | Bajo (auditoría) |
-| 4 | **D1 primero:** 209/209 tests verdes, duplicados eliminados (backend history, frontend helpers/pages) | Medio (toca imports) |
+| 3 | ⬜ **Sin empezar.** Informe de a11y + Web Vitals. Requiere tu permiso | Bajo (auditoría) |
+| 4 | ⬜ **Sin empezar.** 4.1–4.3 duplicados; 4.4 = D1, aplazada | Medio (toca imports) |
 
 Fases 0, 1 y 2 ejecutadas (2026-09-26). La 2 dejó el bundle de entrada en 25 kB y el
 comportamiento verificado contra el stack en ejecución.
