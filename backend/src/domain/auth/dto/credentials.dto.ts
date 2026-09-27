@@ -8,7 +8,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { Role } from '../auth.roles.js';
+import { UserProfileDto } from '../../users/dto/user-profile.dto.js';
 
 const PHONE_PATTERN = /^[+()0-9\s.-]{6,20}$/;
 
@@ -71,17 +71,21 @@ export class RegisterDto {
   password: string;
 }
 
-/** Authenticated session: a JWT access token plus the user summary. */
+/** Authenticated session: a JWT access token plus the user profile. */
 export class AuthResponseDto {
   @ApiProperty({ description: 'JWT access token' })
   accessToken: string;
 
-  @ApiProperty({ description: 'Authenticated user' })
-  user: {
-    id: string;
-    email: string;
-    role: Role;
-    firstName: string;
-    lastName: string;
-  };
+  @ApiProperty({
+    description: 'Authenticated user profile',
+    type: () => UserProfileDto,
+  })
+  user: UserProfileDto;
+
+  @ApiProperty({
+    description:
+      'True if a previous session was invalidated by this login ' +
+      '(another device or browser was signed in).',
+  })
+  previousSessionInvalidated: boolean;
 }

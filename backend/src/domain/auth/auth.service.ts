@@ -24,6 +24,8 @@ import { CreatedApiTokenDto } from './dto/create-api-token.dto.js';
 import { Role, AuthPrincipal, resolveRole } from './auth.roles.js';
 import { OAuthService, OAuthProviderName } from './oauth/oauth.service.js';
 import { MailerService } from './mailer.service.js';
+import { randomUUID } from 'crypto';
+import { parseUserAgent } from './user-agent.util.js';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -79,13 +81,16 @@ export class AuthService {
    *
    * @throws ConflictException when the email is already registered.
    */
-  async register(input: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    phone: string | null;
-  }): Promise<AuthResponseDto> {
+  async register(
+    input: {
+      email: string;
+      password: string;
+      firstName: string;
+      lastName: string;
+      phone: string | null;
+    },
+    userAgent?: string,
+  ): Promise<AuthResponseDto> {
     const email = this.normalizeEmail(input.email);
     const existing = await this.usersRepository.exists({ where: { email } });
 
@@ -105,7 +110,7 @@ export class AuthService {
       }),
     );
 
-    return this.session(user);
+    return this.session(user, userAgent);
   }
 
   /**
@@ -114,7 +119,11 @@ export class AuthService {
    * @throws UnauthorizedException when the credentials are wrong or the
    * account uses OAuth-only login (no password set).
    */
-  async login(email: string, password: string): Promise<AuthResponseDto> {
+  async login(
+    email: string,
+    password: string,
+    userAgent?: string,
+  ): Promise<AuthResponseDto> {
     const normalized = this.normalizeEmail(email);
 
     const user = await this.usersRepository.findOne({
@@ -129,7 +138,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.session(user);
+    return this.session(user, userAgent);
   }
 
   /**
@@ -192,11 +201,12 @@ export class AuthService {
     provider: OAuthProviderName,
     code: string,
     state: string,
+    userAgent?: string,
   ): Promise<AuthResponseDto> {
     const profile = await this.oauth.exchangeIdentity(provider, code, state);
     const user = await this.upsertOauthUser(profile);
 
-    return this.session(user);
+    return this.session(user, userAgent);
   }
 
   /**
@@ -319,17 +329,52 @@ export class AuthService {
     return { id: user.id, email: user.email, role: user.role };
   }
 
-  private async session(user: User): Promise<AuthResponseDto> {
-    const principal = this.principal(user);
-    const payload = { sub: user.id, email: user.email, role: user.role };
+  /**
+   * Create a session for a user:
+   *  - generates a new sessionId,
+   *  - persists it as currentSessionId (invalidating any previous session),
+   *  - updates lastLoginAt / lastLoginBrowser / lastLoginOs,
+   *  - signs a JWT containing the sessionId.
+   */
+  private async session(
+    user: User,
+    userAgent?: string,
+  ): Promise<AuthResponseDto> {
+    const previousSessionInvalidated = user.currentSessionId !== null;
+
+    const sessionId = randomUUID();
+    const { browser, os } = parseUserAgent(userAgent);
+
+    user.currentSessionId = sessionId;
+    user.lastLoginAt = new Date();
+    user.lastLoginBrowser = browser;
+    user.lastLoginOs = os;
+    await this.usersRepository.save(user);
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      sessionId,
+    };
 
     return {
       accessToken: await this.jwt.signAsync(payload),
       user: {
-        ...principal,
+        id: user.id,
+        email: user.email,
+        role: user.role,
         firstName: user.firstName,
         lastName: user.lastName,
+        phone: user.phone,
+        avatarUrl: user.avatarUrl,
+        lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : null,
+        lastLoginBrowser: user.lastLoginBrowser,
+        lastLoginOs: user.lastLoginOs,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
       },
+      previousSessionInvalidated,
     };
   }
 }

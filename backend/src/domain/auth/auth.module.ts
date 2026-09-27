@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -13,11 +14,6 @@ import { RolesGuard } from './guards/roles.guard.js';
 import { OAuthService } from './oauth/oauth.service.js';
 import { parseDurationToSeconds } from './auth.utils.js';
 
-/**
- * Auth feature module: registration/login, JWT sessions, Google/Outlook
- * sign-in and machine API tokens. `RolesGuard` is exported so other modules
- * can enforce admin/client roles on their routes.
- */
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, ApiToken]),
@@ -42,7 +38,11 @@ import { parseDurationToSeconds } from './auth.utils.js';
     JwtAuthGuard,
     ApiKeyGuard,
     RolesGuard,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
   ],
-  exports: [AuthService, JwtAuthGuard, ApiKeyGuard, RolesGuard],
+  exports: [AuthService, JwtAuthGuard, ApiKeyGuard, RolesGuard, JwtModule],
 })
 export class AuthModule {}

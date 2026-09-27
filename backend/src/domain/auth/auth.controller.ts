@@ -11,7 +11,6 @@ import {
   Body,
   Query,
   Res,
-  UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import {
@@ -41,20 +40,24 @@ import {
   CreatedApiTokenDto,
 } from './dto/create-api-token.dto.js';
 import { ApiToken } from './entities/api-token.entity.js';
-import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { CurrentUser } from './decorators/current-user.decorator.js';
+import { Public } from './decorators/public.decorator.js';
 import type { AuthPrincipal } from './auth.roles.js';
 import { OAuthProviderName } from './oauth/oauth.service.js';
 
 /**
  * Account registration, login, Google/Outlook sign-in and machine
  * API-token management.
+ *
+ * All routes are protected by JwtAuthGuard (registered globally). The
+ * `@Public()` decorator opts a route out of authentication.
  */
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new account' })
@@ -70,6 +73,7 @@ export class AuthController {
     });
   }
 
+  @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Log in and obtain an access token' })
@@ -79,6 +83,7 @@ export class AuthController {
     return this.auth.login(credentials.email, credentials.password);
   }
 
+  @Public()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reset an account password to a temporary one' })
@@ -95,6 +100,7 @@ export class AuthController {
     return this.auth.resetPassword(body.email);
   }
 
+  @Public()
   @Get('oauth/:provider')
   @ApiOperation({ summary: 'Start Google/Outlook sign-in (browser redirect)' })
   @ApiParam({
@@ -111,6 +117,7 @@ export class AuthController {
     response.redirect(this.auth.oauthAuthorizeUrl(provider));
   }
 
+  @Public()
   @Get('oauth/:provider/callback')
   @ApiOperation({ summary: 'OAuth callback, redirects with a session token' })
   @ApiParam({
@@ -141,7 +148,6 @@ export class AuthController {
   }
 
   @Post('tokens')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a machine API token' })
@@ -155,7 +161,6 @@ export class AuthController {
   }
 
   @Get('tokens')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List the current account API tokens' })
   @ApiOkResponse({ description: 'Active tokens (metadata only)' })
@@ -165,7 +170,6 @@ export class AuthController {
   }
 
   @Delete('tokens/:id')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Revoke an API token' })
@@ -182,7 +186,10 @@ export class AuthController {
    * Landing page the frontend must handle after an OAuth round-trip.
    * `?token=...` carries the session on success, `?error=...` on failure.
    */
-  private buildFrontendCallbackUrl(key: 'token' | 'error', value: string): string {
+  private buildFrontendCallbackUrl(
+    key: 'token' | 'error',
+    value: string,
+  ): string {
     const base = this.auth.frontendBaseUrl();
     return `${base}/auth/callback?${key}=${encodeURIComponent(value)}`;
   }
