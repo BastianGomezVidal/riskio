@@ -20,6 +20,8 @@ import {
   ParentBasedSampler,
   TraceIdRatioBasedSampler,
 } from '@opentelemetry/sdk-trace-base';
+import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs';
+import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import {
   ATTR_SERVICE_NAME,
@@ -69,11 +71,28 @@ const sdk = new NodeSDK({
   // ended in an error. Keeping this at 1 means nothing is lost before the
   // collector can make the better-informed decision; the collector is the one
   // that drops.
+  /**
+   * Logs go to Loki through the same collector, so a log line and the trace it
+   * belongs to travel the same path and arrive with the same resource
+   * attributes. Batched for the same reason traces are: one HTTP request per
+   * batch, not one per line.
+   */
+  logRecordProcessors: [
+    new BatchLogRecordProcessor({
+      exporter: new OTLPLogExporter({ url: `${endpoint}/v1/logs` }),
+    }),
+  ],
   sampler: new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(sampleRatio) }),
   instrumentations: [
     getNodeAutoInstrumentations({
       // The filesystem instrumentation is chatty and rarely useful here.
       '@opentelemetry/instrumentation-fs': { enabled: false },
+      // This one attaches the whole request and response to every log line,
+      // headers included, which means the `Authorization: Bearer <jwt>` value
+      // lands in the log store as an index label. Correlation is already done
+      // by the mixin in observability.module.ts, from the active span, and it
+      // does not need the request to do it.
+      '@opentelemetry/instrumentation-pino': { enabled: false },
     }),
   ],
 });

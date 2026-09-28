@@ -46,6 +46,28 @@ receivers:
       load: {}
 
 processors:
+  # Defence in depth against credentials reaching the log store.
+  #
+  # The app already stops forwarding headers, and Loki is told not to index
+  # them. This is the third layer, and the one that still holds if either of the
+  # other two is later changed by someone who did not know what was at stake: a
+  # JWT deleted here cannot be persisted or indexed no matter how Loki is
+  # configured. Cheap, and it fails safe.
+  attributes/sanitize:
+    actions:
+      - key: req_headers_authorization
+        action: delete
+      - key: http.request.header.authorization
+        action: delete
+      - key: req_headers_cookie
+        action: delete
+      - key: http.request.header.cookie
+        action: delete
+      - key: res_headers_set_cookie
+        action: delete
+      - key: http.response.header.set-cookie
+        action: delete
+
   # Sampling decided when the operation finishes, not when it starts.
   #
   # A head-based sampler has to choose at the first span and cannot know how the
@@ -83,6 +105,11 @@ processors:
 
 exporters:
   # Traces go to Jaeger, which accepts OTLP directly.
+  # Loki 3.x speaks OTLP natively, so logs travel the same path as traces and
+  # metrics instead of needing a filelog agent with access to podman's store.
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+
   otlp/jaeger:
     endpoint: jaeger:4317
     tls:
@@ -116,6 +143,13 @@ service:
     logs:
       level: warn
   pipelines:
+    # Logs never reach Jaeger, which would drop them. They go straight to Loki's
+    # OTLP endpoint, carrying the same resource attributes as the traces, so the
+    # same service name filters both in Grafana.
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/sanitize, batch]
+      exporters: [otlphttp/loki]
     traces:
       receivers: [otlp]
       processors: [memory_limiter, tail_sampling, batch]

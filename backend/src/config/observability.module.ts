@@ -1,6 +1,10 @@
 import { Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
+import pino from 'pino';
 import { context, trace } from '@opentelemetry/api';
+import { createOtelLogStream } from './otel-log-stream.js';
+
+const serviceName = process.env.OTEL_SERVICE_NAME ?? 'riskio-api';
 
 /**
  * Structured JSON logging.
@@ -20,11 +24,24 @@ import { context, trace } from '@opentelemetry/api';
   imports: [
     LoggerModule.forRoot({
       pinoHttp: {
+        /**
+         * Two destinations for the same line: stdout, for `docker logs`, and
+         * the OTel logs signal, for Loki. Not a pino transport, because a
+         * transport runs in a worker thread with no OTel context and the trace
+         * correlation would be lost. See otel-log-stream.ts.
+         */
+        stream: pino.multistream(
+          [
+            { stream: pino.destination({ dest: 1 }) },
+            { stream: createOtelLogStream(serviceName) },
+          ],
+          { dedupe: false },
+        ),
         // ISO-8601 in UTC: sortable, unambiguous, and what every backend
         // downstream expects.
         timestamp: () => `,"time":"${new Date().toISOString()}"`,
         base: {
-          service: process.env.OTEL_SERVICE_NAME ?? 'riskio-api',
+          service: serviceName,
           env: process.env.DEPLOYMENT_ENVIRONMENT ?? 'local',
         },
         formatters: {

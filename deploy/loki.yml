@@ -20,13 +20,19 @@ schema_config:
     - from: 2024-01-01
       store: tsdb
       object_store: filesystem
+      # v13 plus TSDB is what carries structured metadata. Both are required;
+      # without them Loki silently downgrades metadata to labels.
       schema: v13
       index:
         prefix: index_
         period: 24h
 
 limits_config:
-  # Traces reference log lines; a short retention is enough to follow a
-  # request and keeps the volume bounded on a dev machine.
   retention_period: 168h
+  # Required for the Push API to accept a third element per entry as structured
+  # metadata instead of folding it into the stream labels.
   allow_structured_metadata: true
+  volume_enabled: true
+
+compactor:
+  working_directory: /loki/compactor

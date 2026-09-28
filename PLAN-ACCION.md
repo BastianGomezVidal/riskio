@@ -1042,6 +1042,33 @@ llevar los logs, así que este paso no bloquea a los anteriores:
 | **OTLP nativo** (app → collector → `/otlp` de Loki) | Sin agente y correlación limpia. El puente pino→OTLP es la pieza menos estandarizada |
 | **`filelog` en el collector** | Traditional, pero necesita acceso al store de podman |
 
+Elegida **OTLP nativo**, y con un matiz importante: un stream en el mismo proceso, no un
+`transport` de pino. Un transport corre en un worker thread sin contexto OTel, así que la
+correlación con la traza —que es justo lo que se vino a buscar— se pierde. El stream
+reconstruye el contexto a partir del `trace_id` que el `mixin` ya escribe en la línea.
+
+Estado: funcionando. 2 streams, 4 labels indexados (`service_name`, `level`, `severity_text`,
+`deployment_environment_name`) y el resto structured metadata, con
+`{service_name="riskio-api"} | trace_id="..."`localizando la línea exacta.
+
+**Cuidado al medir esto.** `query_range` devuelve la structured metadata *fundida dentro* del
+campo `stream` de la respuesta, igual que si fueran labels. Contando etiquetas ahí parece que
+hay 27 labels y un stream por línea de log, y no es ninguna de las dos cosas: son 2 streams.
+Las etiquetas indexadas de verdad se ven en `/loki/api/v1/series` y `/loki/api/v1/labels`. No
+hace falta tocar `otlp_config`: los defaults de Loki ya hacen lo correcto, y probarlo cuesta
+un ciclo de reinicio por cada versión.
+
+**Lo que sí había, y era un agujero de verdad**: la instrumentación automática de pino
+adjuntaba la request entera a cada línea, cabeceras incluida, así que el
+`Authorization: Bearer <jwt>` llegaba a Loki. Se cierra en tres capas, y las tres importan:
+la app solo envía una lista blanca de campos, el collector borra `authorization` y `cookie`
+en un processor `attributes/sanitize`, y Loki no los indexa. La del collector es la que
+aguanta si alguien cambia las otras dos sin saber qué había en juego.
+
+**Matiz al navegar**: los logs se guardan siempre, pero el tail sampling descarta ~80 % de las
+trazas de éxito. Saltar de una línea a su traza fallará en la mayoría de los éxitos y
+funcionará siempre en los errores.
+
 ### 6.6 — `feeds` como servicio propio
 
 El único con trabajo real. Requiere, en este orden:
