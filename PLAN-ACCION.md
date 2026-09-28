@@ -915,13 +915,13 @@ Cuatro servicios, con el collector midiendo todos:
   └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
          └────────────────┴─────────────────┴──────────────────┘
                                     │  todos hablan OTLP
-                                    ▼
-                          ┌────────────────────┐
-                          │  otel-collector    │
-                          └─────────┬──────────┘
+              ┌─────────────────────┼─────────────────────┐
+              │                     │                     │
+         navegador                backend          collector
+          (6.2)              (y sus servicios)      ┌────▼─────┐
               traces ───────────────┼────────────── métricas
                     ▼               │              ▼
-                 Jaeger      Loki (6.4)      Prometheus ──▶ Grafana
+                 Jaeger      Loki (6.5)      Prometheus ──▶ Grafana
 ```
 
 **El matiz que decide el coste**: "separar en servicios" admite dos lecturas, y no son lo mismo.
@@ -929,7 +929,7 @@ Cuatro servicios, con el collector midiendo todos:
 | | Qué es | Coste | Reversible |
 |---|---|---|---|
 | **Deployables separados** | 4 procesos/contenedores, **base de datos compartida**, cada uno dueño de sus tablas | Bajo. Es lo que se propone aquí | Sí, son 4 `CMD` y 4 `depends_on` |
-| **Servicios de red con DB propia** | Cada uno con su esquema, y **`feeds` hablando con `other` por API o eventos** | Alto. Requiere rediseñar `feeds → weather` y transactional fuera | No |
+| **Servicios de red con DB propia** | Cada uno con su esquema, y **`feeds` hablando con `other` por API o eventos** | Alto. Requiere rediseñar `feeds → weather` y sacar transacciones fuera | No |
 
 Se va por la primera. La telemetría da lo mismo en los dos casos — un `service.name` por servicio
 — así que **nada se pierde por empezar aquí**, y la parte cara queda como evolución posterior,
@@ -962,19 +962,60 @@ auto-instrumentación de HTTP y Postgres sí. Se ajusta con datos reales, no ant
 número uno de que Prometheus se coma la memoria; eso va en **trazas** y **logs**, que no tienen
 ese límite.
 
-### 6.2 — Cortar `storage` (hoja, 190 líneas)
+### 6.2 — Telemetría del frontend (navegador)
+
+**Sí, y vale la pena por dos razones que no se obtienen de ninguna otra forma:**
+
+1. **Correlación de punta a punta.** Sin esto, una traza empieza en el request que entra al API.
+   No hay forma de ir de "el usuario vio esto" a "el backend hizo aquello". Con el SDK web, la
+   traza nace en el click y continúa en el servidor.
+2. **Core Web Vitals reales (RUM).** LCP, INP y CLS **de usuarios de verdad**. La Fase 3 pide
+   Web Vitals, y un dato de laboratorio no es un dato de RUM: se mide en condiciones que no se
+   pueden replicar en local.
+
+**Lo que sale casi gratis**, porque el frontend ya tiene el punto de enganche:
+
+- `request()` en `src/api/client.ts:48` es el **único** punto de salida de HTTP. Un span ahí
+  cubre todas las llamadas, sin tocar los 20 métodos de `api`.
+- Ya existen `ErrorBoundary` y `RouteErrorBoundary`: engancharlos da los errores no controlados
+  con la ruta y el usuario como contexto.
+
+**Lo que NO se hace**: `auto-instrumentations-web` al completo. Para una SPA añade instrumentación
+de XHR/fetch que el punto único ya cubre, y mucho ruido. El scope correcto es explícito:
+spans en navegación de ruta y en la llamada HTTP, captura de errores, y web-vitals como spans.
+
+**El precio, y es real**: el navegador tiene que alcanzar al collector, y **6.1.6 dice que la
+telemetría nunca va en la red `edge`**. Eso es correcto para el backend y falso para el
+navegador. Hay que romper la regla a propósito, de una de estas dos:
+
+| Opción | Cómo | Alcance |
+|---|---|---|
+| **Puerto en loopback** (recomendada en dev) | El collector publica `4318` en `127.0.0.1` y el front manda a `http://localhost:4318` | Solo para navegadores en la misma máquina. Es el caso de desarrollo |
+| **Collector en `edge`** | El collector se une a `edge` | Funciona para usuarios remotos, pero expone un endpoint de ingestion a internet: necesita CORS restringido a los orígenes del front y rate limiting |
+
+Se elige una, **explícitamente**, porque la regla de aislamiento de 6.1.6 se relaja a
+conciencia. El endpoint del collector es de escritura de telemetría, no de negocio, así que no
+expone datos, pero sí acepta carga de cualquiera que lo alcance.
+
+La URL del collector se compila con el mismo mecanismo que `VITE_API_URL` (que 1ddefa5 dejó de
+ser un build arg muerto): una variable `VITE_OTEL_EXPORTER_OTLP_ENDPOINT` en el build del front.
+
+**Cuándo**: después de 6.1, porque sin collector no hay a dónde enviar. Puede ir antes o
+después de los cortes de servicios sin afectar a los demás, ya que no toca el backend.
+
+### 6.3 — Cortar `storage` (hoja, 190 líneas)
 
 Primer corte porque **no importa a nadie**: separarlo no toca un solo import ajeno. Se convierte
 en servicio propio y `users` pasa a hablar con él. Se verifica que el upload y el borrado de
 avatares siguen funcionando, y las métricas por contenedor confirman que no se movió nada.
 
-### 6.3 — Cortar `cache` (hoja, 93 líneas)
+### 6.4 — Cortar `cache` (hoja, 93 líneas)
 
 Segundo, también hoja. **Ojo**: hoy `AppCacheModule` es `@Global()` y se registra en
 `AppModule`; hay que conservar ese comportamiento al moverlo o los servicios que lo injectan
 dejan de resolverlo.
 
-### 6.4 — Logs → Loki
+### 6.5 — Logs → Loki
 
 `loki` con retención definida y datasource en Grafana. El collector admite las dos formas de
 llevar los logs, así que este paso no bloquea a los anteriores:
@@ -984,7 +1025,7 @@ llevar los logs, así que este paso no bloquea a los anteriores:
 | **OTLP nativo** (app → collector → `/otlp` de Loki) | Sin agente y correlación limpia. El puente pino→OTLP es la pieza menos estandarizada |
 | **`filelog` en el collector** | Traditional, pero necesita acceso al store de podman |
 
-### 6.5 — `feeds` como servicio propio
+### 6.6 — `feeds` como servicio propio
 
 El único con trabajo real. Requiere, en este orden:
 
@@ -1001,9 +1042,6 @@ se rompió.
 ### Lo que esta fase NO hace
 
 - **No parte `auth`/`users` en servicios de red**, ni `dashboard` en solitario. Ver Fase 5.
-- **No instrumenta el frontend.** Una SPA aportaría poco frente a medir NOAA, Postgres y el
-  storage. RUM se añade después **desde el mismo collector**, que es justo lo que compra esta
-  arquitectura.
 - **No migra a base de datos por servicio.** Queda como evolution posterior.
 
 ### Beneficio que ya existe sin nada de esto
@@ -1011,7 +1049,7 @@ se rompió.
 Los `Logger` de Nest emiten `[Nest] 30 - 09/27/2026, 5:20:15 p.m. LOG [MailerService] ...`:
 **fecha local sin zona**, un único campo de texto, y no dice qué servicio la emitió. Eso no se
 indexa por tiempo de forma fiable. El JSON con UTC de 6.1.5 lo arregla aunque Loki llegue en
-6.4.
+6.5.
 
 ---
 
@@ -1024,7 +1062,7 @@ indexa por tiempo de forma fiable. El JSON con UTC de 6.1.5 lo arregla aunque Lo
 | 2 | ✅ Frontend con Error Boundaries, TanStack Query, Zod, colocation, splitting | Medio (refactor de data layer) |
 | 3 | ⬜ **Sin empezar.** Informe de a11y + Web Vitals. Requiere tu permiso | Bajo (auditoría) |
 | 5 | ⬜ **Sin empezar.** A1–A2 operación admin; B1–B3 costuras de despliegue | A1–A2 bajo · B3 medio |
-| 6 | ⬜ **Sin empezar.** 6.1 telemetría (app + infra) · 6.2 storage · 6.3 cache · 6.4 logs→Loki · 6.5 feeds | 6.1 bajo · **6.5 medio** |
+| 6 | ⬜ **Sin empezar.** 6.1 telemetría app+infra · 6.2 front · 6.3 storage · 6.4 cache · 6.5 logs→Loki · 6.6 feeds | bajo hasta 6.5 · **6.6 medio** |
 | 4 | ✅ **Cerrada.** 4.1–4.3: las premisas eran falsas; 4.4 = D1 reactivada | Bajo |
 
 **Fase 6 tiene orden obligatorio**: 6.1 antes que cualquier corte. Separar `storage`, `cache` o
