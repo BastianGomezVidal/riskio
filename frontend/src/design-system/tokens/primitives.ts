@@ -29,6 +29,11 @@ export const primitives = {
     blue: {
       500: "#3B82F6",
       600: "#2563EB",
+      // The only blue dark enough to carry text. 600 is 4.8:1 on white and
+      // 3.1:1 on the #D4D4D4 chip behind the selected tab; 700 clears 4.5:1 on
+      // every background a link actually sits on here, so links can use it
+      // without anyone having to remember which grey is behind which one.
+      700: "#1D4ED8",
     },
   },
 

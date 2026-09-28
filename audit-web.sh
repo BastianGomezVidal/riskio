@@ -28,6 +28,7 @@ cd "$ROOT"
 
 TARGET="${1:-http://localhost/}"
 CHROME_PATH="${CHROME_PATH:-/usr/bin/google-chrome}"
+COLLECTOR="${COLLECTOR:-http://localhost:4318}"   # receptor OTLP del collector
 OUT="$ROOT/.audit/out"
 
 # "good" thresholds at the 75th percentile, which is the bar Google publishes.
@@ -104,8 +105,15 @@ if [[ ! -d .audit/node_modules ]]; then
 fi
 node .audit/axe-audit.mjs "$TARGET" || rc=1
 
+step "Publicando el resultado como metricas"
+# Para que el tablero de Grafana tenga historia y no solo el "ahora". Si el
+# collector no esta, el script NO falla: la auditoria local ya ha servido para
+# decidir, y las metricas son una copia extra.
+node .audit/report-metrics.mjs "${COLLECTOR:-http://localhost:4318}" || true
+
 step "resumen"
 [[ $rc -eq 0 ]] && ok "todo dentro de umbrales" || warn "hay umbrales rotos o herramientas que fallaron"
 info "informes: $OUT/{lighthouse.json,axe.json}"
-info "INP no se mide aqui: requiere RUM real, y esas trazas aún no llegan a Jaeger"
+info "INP no se mide aqui: requiere RUM real, y las envia .audit/report-metrics.mjs"
+info "Grafana -> 'Web Vitals y accesibilidad' (http://localhost:3001)"
 exit $rc

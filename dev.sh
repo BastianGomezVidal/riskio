@@ -1,27 +1,83 @@
 #!/usr/bin/env bash
 #
-# dev.sh — the fast loop.
+# dev.sh — el bucle rapido de desarrollo.
 #
-# Containers for everything that does not change while you type: Postgres,
-# Redis, SeaweedFS, and the six backend services, all built once. The two things
-# you actually edit run on the host with hot reload: the API (nest --watch) and
-# the SPA (vite).
+# QUE HACE Y POR QUE ESTA PARTIDO ASI
 #
-# The full stack, built, is still what `podman-compose up --build` is for. This
-# script exists so that editing a file is a page refresh, not a 60 second
-# rebuild.
+# Editar un fichero era un rebuild de 60 segundos. Aqui los contenedores se
+# llevan lo que no cambia mientras escribes — Postgres, Redis, SeaweedFS y los
+# seis servicios backend, construidos una vez — y en el host quedan solo las dos
+# cosas que realmente editas: la API con `nest start --watch` y la SPA con vite.
+# Tocar un fichero pasa a ser recargar la pagina.
 #
-# Every variable below can be overridden from the environment, or by putting
-# them in .env.local (git-ignored) and running through `load_env`.
+# `podman-compose up --build` sigue siendo la forma de mirar la aplicacion
+# entera, construida y en modo produccion. Este script es para el bucle de
+# trabajo, no para enseñar la app.
 #
-#   ./dev.sh              infra + services + API + web   (the usual)
-#   ./dev.sh infra        only Postgres, Redis, SeaweedFS
-#   ./dev.sh services     the six backend services
-#   ./dev.sh api          only the API, watch mode
-#   ./dev.sh web          only the SPA
-#   ./dev.sh status       what is up
-#   ./dev.sh stop         stop what this script started
-#   ./dev.sh logs api     tail one process
+# LA API EN EL 3100, Y POR QUE
+#
+# El compose publica la API en 3000. Aqui va en 3100 a proposito: asi los dos
+# pueden estar levantados a la vez, con la app real mostrando el build de
+# produccion en el 80 y tu version en caliente en el 5173. Si compartieran
+# puerto, cambiar de uno a otro implicaria tirar uno abajo.
+#
+# LOS PUERTOS LOOPBACK DE LOS SERVICIOS
+#
+# Los seis servicios solo se alcanzaban por DNS de compose. Un proceso en el
+# host no resuelve `backend-auth`, asi que la API en watch no habria podido
+# llamar a nada. Por eso los seis publican ahora un puerto en 127.0.0.1: es lo
+# unico que ha cambiado en la exposicion, y sigue siendo solo local.
+#
+# EL .ENV MANDA, Y ESTO LO RESPETA
+#
+# El script carga `.env` y `.env.local`, y por eso las URLs se DERIVAN de los
+# puertos despues de cargarlos, no se fijan antes. Dos veces que se hizo al reves
+# y las dos salieron mal: `DATABASE_URL` llegaba con host `db`, que solo resuelve
+# dentro de compose, y la API moria con ENOTFOUND; y `VITE_API_URL` apuntaba al
+# stack de compose, asi que vite hablaba con la API del 3000 mientras la de
+# desarrollo escuchaba en el 3100 sin que nadie la usara. Si anades un valor
+# aqui, ponlo despues de `load_env`, no antes.
+#
+# MODOS DE USO
+#
+#   ./dev.sh              infra + servicios + API + web     (lo normal)
+#   ./dev.sh infra        solo Postgres, Redis y SeaweedFS
+#   ./dev.sh services     los seis servicios backend
+#   ./dev.sh api          solo la API, en watch
+#   ./dev.sh web          solo la SPA
+#   ./dev.sh status       que hay levantado
+#   ./dev.sh stop         pararcontainers (deja caer tambien los de compose)
+#
+#   tail -f .dev-logs/api.log     ver la API mientras recompila
+#   tail -f .dev-logs/web.log      ver vite
+#
+# VARIABLES
+#
+# Todas se pueden cambiar desde el entorno o desde `.env.local` (esta en
+# .gitignore). Las que se usan a menudo:
+#
+#   DEV_API_PORT=3100          puerto de la API en el host
+#   DEV_WEB_PORT=5173          puerto de vite
+#   AUTH_PORT=3008             puerto loopback del servicio de auth
+#   CACHE_PORT=3005            idem cache        FEEDS_PORT=3006   idem feeds
+#   WEATHER_PORT=3007          idem weather      DASHBOARD_PORT=3009 idem dashboard
+#   STORAGE_API_PORT=3004      idem storage. OJO: no es STORAGE_PORT, que ya es
+#                             el de SeaweedFS (8333). Mezclarlos fue el error
+#                             que hizo que auth recibiera el puerto de storage.
+#   DEV_VITE_API_URL=...       forzar la URL que ve la SPA (si no, se deriva)
+#   LOG_DIR=.dev-logs          donde van los logs de API y web
+#
+# NOTAS PRACTICAS
+#
+# - Ctrl-C para la API y la SPA; los containers se quedan levantados. `./dev.sh stop`
+#   para todo. Es deliberado: tardar 30 s en levantar la base de datos cada vez
+#   que se para a tomar un cafe es peor que dejar un postgres en memoria.
+# - La primera compilacion de nest tarda (~15-20 s). El script lo dice mientras
+#   espera, y comprueba que el PID siga vivo: un proceso muerto y un build lento
+#   se ven igual, y esperar 115 s a algo que ya no existe no es tener paciencia.
+# - Los containers se construyen una vez. Si tocas codigo de un servicio backend
+#   hay que reconstruirlo: `./dev.sh services` no lo hace por ti, porque rehacer
+#   las seis imagenes en cada arranque cuesta mas que lo que ahorra.
 #
 set -euo pipefail
 

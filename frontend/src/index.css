@@ -16,3 +16,29 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
+
+/*
+ * The storm photo behind the sign-in card, in CSS rather than as an inline
+ * style built from a JS import.
+ *
+ * It is the largest contentful paint on every public page, and where the URL
+ * lives decides when the browser hears about it. As an inline style the URL
+ * only exists once React has mounted AuthLayout, which is after the entry
+ * bundle has parsed and run — the fetch cannot start until then. In the
+ * render-blocking stylesheet the preload scanner finds it while it is still
+ * reading the CSS, so the image is already in flight while the JavaScript is
+ * still downloading.
+ *
+ * q62 rather than something higher because a 55% dark gradient sits on top of
+ * it: the detail the encoder is being asked to preserve is largely covered. It
+ * is 71 kB against the 164 kB of the JPEG it replaces.
+ */
+.auth-background {
+  background-image: linear-gradient(
+      rgb(2 6 23 / 0.55),
+      rgb(2 6 23 / 0.45)
+    ),
+    url("./assets/pictures/Kate_Storm.webp");
+  background-size: cover;
+  background-position: center;
+}

@@ -9,6 +9,13 @@ export const semantic = {
     textPlaceholder: primitives.colors.gray[500],
     borderDefault: primitives.colors.gray[300],
     primary: primitives.colors.blue[600],
+    // Deliberately not the same as `primary`. blue[600] is #1677ff, which is
+    // 4.1:1 on white and only 2.77:1 on the #D4D4D4 chip behind the selected
+    // tab in AuthHeader — below the 4.5:1 that WCAG AA asks of body text. It is
+    // still the right colour for a filled button, where the contrast is white
+    // text on a solid fill rather than blue text on a pale ground, so `primary`
+    // keeps it and only the link colour moves down to blue[700].
+    link: primitives.colors.blue[700],
     secondary: primitives.colors.gray[100],
     error: primitives.colors.red[600],
     success: primitives.colors.green[600],

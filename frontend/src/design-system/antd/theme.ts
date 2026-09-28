@@ -4,6 +4,7 @@ import { semantic } from "../tokens/semantic";
 export const antdTheme: ThemeConfig = {
   token: {
     colorPrimary: semantic.colors.primary,
+    colorLink: semantic.colors.link,
     colorText: semantic.colors.textPrimary,
     colorTextSecondary: semantic.colors.textSecondary,
     colorTextPlaceholder: semantic.colors.textPlaceholder,
