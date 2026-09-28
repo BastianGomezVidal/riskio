@@ -1,6 +1,12 @@
 import { z } from "zod";
 import type { StormsQuery } from "@/domain/storm";
 import type { ResetPasswordRequest } from "@/domain/auth";
+import { tracer, telemetryReady, NOOP_SPAN } from "@/observability/telemetry";
+import { context, trace } from "@opentelemetry/api";
+import { W3CTraceContextPropagator } from "@opentelemetry/core";
+
+const tracePropagator = new W3CTraceContextPropagator();
+import type { Span } from "@opentelemetry/api";
 import { getAccessToken } from "@/auth/session";
 import {
   dashboardSummarySchema,
@@ -50,39 +56,72 @@ async function request<S extends z.ZodTypeAny>(
   schema: S,
   init?: RequestInit,
 ): Promise<z.infer<S>> {
-  const response = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: buildHeaders(init),
+  // This is the single point where the app talks to the API, so a span here
+  // covers all twenty api methods. The exporter injects traceparent into the
+  // headers, which is what makes the browser span and the server span one
+  // trace rather than two.
+  return withSpan(`HTTP ${methodOf(init)} ${path}`, async (span) => {
+    const response = await fetch(`${API_URL}${path}`, {
+      ...init,
+      headers: buildHeaders(init),
+    });
+
+    span.setAttribute('http.status_code', response.status);
+    span.setAttribute('http.route', path);
+
+    if (!response.ok) {
+      throw await toApiError(response);
+    }
+
+    if (response.status === 204) {
+      return undefined as z.infer<S>;
+    }
+
+    const payload: unknown = await response.json().catch(() => {
+      throw new ApiContractError(
+        `Malformed response from ${path}: body was not JSON.`,
+        "",
+      );
+    });
+
+    const parsed = schema.safeParse(payload);
+    if (!parsed.success) {
+      const issues = parsed.error.issues
+        .map((i) => `${i.path.join(".") || "<root>"}: ${i.message}`)
+        .join("; ");
+      throw new ApiContractError(
+        `Response from ${path} did not match the expected shape: ${issues}`,
+        path,
+      );
+    }
+
+    return parsed.data;
   });
-
-  if (!response.ok) {
-    throw await toApiError(response);
-  }
-
-  if (response.status === 204) {
-    return undefined as z.infer<S>;
-  }
-
-  const payload: unknown = await response.json().catch(() => {
-    throw new ApiContractError(
-      `Malformed response from ${path}: body was not JSON.`,
-      "",
-    );
-  });
-
-  const parsed = schema.safeParse(payload);
-  if (!parsed.success) {
-    const issues = parsed.error.issues
-      .map((i) => `${i.path.join(".") || "<root>"}: ${i.message}`)
-      .join("; ");
-    throw new ApiContractError(
-      `Response from ${path} did not match the expected shape.`,
-      issues,
-    );
-  }
-
-  return parsed.data;
 }
+
+function methodOf(init?: RequestInit): string {
+  return (init?.method ?? 'GET').toUpperCase();
+}
+
+async function withSpan<T>(
+  name: string,
+  fn: (span: Span) => Promise<T>,
+): Promise<T> {
+  if (!telemetryReady) {
+    return fn(NOOP_SPAN);
+  }
+  return tracer.startActiveSpan(name, async (span) => {
+    try {
+      return await fn(span);
+    } catch (error) {
+      span.recordException(error as Error);
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
+}
+
 
 function buildHeaders(init?: RequestInit): Headers {
   const headers = new Headers(init?.headers);
@@ -97,6 +136,18 @@ function buildHeaders(init?: RequestInit): Headers {
   const token = getAccessToken();
   if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  // Carry the W3C trace context to the API. This is the line that makes a
+  // browser trace and a server trace one trace instead of two: the server
+  // reads traceparent and continues the same id. Injected here rather than by
+  // the fetch instrumentation, which stays disabled so the call is not
+  // counted twice.
+  const activeSpan = trace.getActiveSpan();
+  if (telemetryReady && activeSpan) {
+    tracePropagator.inject(context.active(), headers, {
+      set: (_carrier, key, value) => headers.set(key, value),
+    });
   }
 
   return headers;

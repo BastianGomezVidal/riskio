@@ -180,6 +180,10 @@ services:
       context: ./frontend
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+        # The browser is not inside the compose network, so it sends to the
+        # collector's loopback port. Empty disables browser tracing entirely:
+        # the SDK is compiled in either way, it just does not register.
+        VITE_OTEL_EXPORTER_OTLP_ENDPOINT: ${VITE_OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318}
     runtime: runc
     restart: unless-stopped
     ports:

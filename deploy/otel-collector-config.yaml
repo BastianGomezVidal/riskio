@@ -10,12 +10,25 @@
 
 receivers:
   # Application and worker traces and metrics.
+  #
+  # The browser sends here too, which is the one deliberate break in the
+  # "telemetry never joins edge" rule: a browser is not inside the compose
+  # network, so its OTLP endpoint has to be reachable and has to answer a
+  # preflight. Origins are listed explicitly rather than reflected, because this
+  # endpoint accepts writes from anything that reaches it.
   otlp:
     protocols:
       grpc:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - "http://localhost"
+            - "http://localhost:5173"
+            - "http://localhost:8080"
+          allowed_headers: ["Content-Type", "traceparent", "tracestate"]
+          max_age: 900
 
   # Infrastructure: the host itself. CPU, memory, disk, network and filesystem
   # for this machine, which is what tells you whether a slow request was the

@@ -11,6 +11,8 @@ import { QueryProvider } from "./data/QueryProvider";
 import "./index.css";
 import { ErrorBoundary } from "./global_components/ErrorBoundary/ErrorBoundary";
 import { AppFallback } from "./global_components/AppFallback/AppFallback";
+import "./observability/telemetry";
+import { reportWebVitals } from "./observability/web-vitals";
 
 /**
  * The root boundary sits inside the QueryClientProvider so its retry can drop
@@ -47,4 +49,7 @@ if (root) {
       </QueryProvider>
     </StrictMode>,
   );
+
+  // After the first render, so LCP has a value to report.
+  queueMicrotask(() => reportWebVitals());
 }
