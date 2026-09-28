@@ -29,6 +29,12 @@ import { Roles } from '../../auth/decorators/roles.decorator.js';
   description: 'Machine API token (created via POST /auth/tokens)',
   required: true,
 })
+/**
+ * RolesGuard is already registered globally, but ApiKeyGuard is not: the admin
+ * trigger is the one place that authenticates with a machine key rather than a
+ * browser token, and the globals check for a Bearer. So this stays, and with it
+ * this module's dependency on the authz module.
+ */
 @UseGuards(ApiKeyGuard, RolesGuard)
 @Roles('admin')
 @Controller('admin/ingest')

@@ -1480,7 +1480,7 @@ propiedad.
 | `cache` | interno | Sí, y además falla abierto |
 | `feeds` | `POST /admin/ingest/*` | Sí, servicio propio |
 | `weather` | `/storms*`, `/advisories/*` | **Sí** — servicio propio |
-| **`auth` + `users`** | `/auth/*`, `/users/*` | **No** — dentro del proceso de la API |
+| `auth` + `users` | `/auth/*`, `/users/*` | **Sí** — servicio propio |
 | **`dashboard`** | `/dashboard/summary` | **No** — y depende de `weather` |
 | `health` | `/health` | No, y está bien: debe morir con la API |
 
@@ -1571,3 +1571,60 @@ Cada paso se verifica con lo mismo que se ha usado hasta ahora: parar el servici
 extraído y comprobar que el resto de endpoints siguen en 200. Un test que arranque la API entera
 con `feeds`, `cache` y `storage` caídos **no** dice nada, y es el que ha dado falsa confianza
 hasta ahora.
+
+
+### Paso 2 — `auth-service`: **hecho**, y la premisa del plan era falsa
+
+`riskio-auth` es dueño de `JWT_SECRET`, de la tabla de usuarios, de `bcrypt` y de la emisión de
+tokens. La API no tiene ninguno de los tres.
+
+**Había escrito aquí que la API verificaría el JWT en local** para evitar un salto por petición.
+**Era falso, y comprobarlo cambió el diseño entero.** `JwtAuthGuard` no solo verifica la firma:
+exige *single-active-session*, comparando el `sessionId` del token con la sesión registrada en la
+fila del usuario. Eso es estado, y el estado está con los usuarios. Por tanto la API no podía
+dejar de leer esa tabla sin inventar otro almacén para las sesiones.
+
+La corrección fue convertir el guard en un **puerto**: `AuthChecker` para el token y
+`ApiKeyVerifier` para las API keys. El guard no sabe nada de dónde viene la respuesta, así que
+corre igual contra la base de datos (en el servicio de auth) o contra HTTP (en la API). Eso ya no
+es un refactor, es lo que hace posible la extracción.
+
+**El salto cae solo donde toca.** `if (isPublic) return true` está antes de cualquier consulta, así
+que login, registro y health nunca lo pagan. Las 13 rutas autenticadas sí.
+
+**Lo que seTlose**: `JWT_SECRET` seguía llegando a la API por `env_file: .env`, que no admite
+excepciones. Aunque el código no lo usara, el proceso lo tenía. La API ya no carga `.env` entero:
+recibe `DATABASE_URL` (para correr migraciones) y las URLs de los seis servicios. Comprobado sobre
+el contenedor: la API tiene **0** secretos y el servicio de auth tiene los 3.
+
+**Lo que la fuerza de las pruebas звёт**: cuatro DI, seis rounds, y un estudio entero de horas
+perdido. La causa fue iterar un error de resolución a la vez, con la suite de integración de 4
+minutos en medio. Debí cablear módulo, `AppModule`, proxy y helper de test **de una pasada** y
+verificar después. Los errores que costaron más:
+
+- `AuthzGuardsModule` reexportaba tokens que no poseía. Nest no lo permite, y **no avisa**: falla al
+  arrancar.
+- Un módulo **dinámico** hizo falta: el token tiene que estar en el mismo módulo que el guard,
+  porque Nest resuelve las dependencias de un provider en su propio contexto.
+- **`RolesGuard` global rompía el trigger de ingesta.** Corre antes que `ApiKeyGuard` de la ruta,
+  leía el rol del JWT de un `client` y rechazaba a un admin que llegaba con API key. El código
+  original solo registraba `JwtAuthGuard` global, y ahora se entiende por qué.
+- El proxy se saltaba toda petición sin cuerpo, o sea **todos los GET**, y `/users/me` acababa en
+  el 404 de Nest. Parecía un endpoint inexistente.
+- El health del servicio de auth quedó bajo su propio guard y contestaba 401 sin bearer token, así
+  que el contenedor nunca se marcaba sano.
+
+**Verificado, con los servicios parados de verdad**:
+
+| | |
+|---|---|
+| `auth` caído | `/users/me` y `/auth/tokens` 401, `/storms` y `/dashboard` 503, `/health` **200** |
+| `weather` caído | `/users/me`, `/auth/tokens` y `/dashboard` **200** |
+
+Que `auth` caído tumbe todo lo autenticado **es lo correcto**, no un defecto: si no se puede
+autenticar, no hay nada que servir. Lo que faltaba era que `/health` siguiera vivo — y lo hace,
+porque es público. 250/250 unitarias, 31/31 integración, `tsc` limpio.
+
+**Pendiente**: `weather`, `feeds` y `storage` siguen con `env_file: .env` y heredan los 3
+secretos que no usan. El aislamiento por credenciales está hecho para `auth`; para los otros tres
+es cuestión de quitarles `env_file` como se hizo con la API.

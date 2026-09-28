@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ApiAuthzModule } from '../../../common/authz/api-authz.module.js';
 import { IngestionController } from './ingestion.controller.js';
 import { FeedsClientService } from './feeds-client.service.js';
-import { AuthModule } from '../../auth/auth.module.js';
 
 /**
  * The manual ingestion trigger, and nothing else.
@@ -15,7 +15,10 @@ import { AuthModule } from '../../auth/auth.module.js';
  * AuthModule is imported for the guards, and that is the only reason it is.
  */
 @Module({
-  imports: [ConfigModule, AuthModule],
+  // The trigger needs ApiKeyGuard, which is not global, so it needs the module
+  // that provides it and the verifier behind it. A test overrides the two
+  // tokens for the local checkers rather than running an auth service.
+  imports: [ConfigModule, ApiAuthzModule],
   controllers: [IngestionController],
   providers: [FeedsClientService],
   exports: [FeedsClientService],

@@ -1,35 +1,33 @@
 import {
   CanActivate,
   ExecutionContext,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { JwtService } from '@nestjs/jwt';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from '../entities/user.entity.js';
-import { AuthPrincipal, Role } from '../auth.roles.js';
+import { AUTH_CHECKER, type AuthChecker } from '../../../common/authz/authz.ports.js';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 
 /**
  * Authenticates requests carrying a Bearer JWT access token.
  *
  * Registered globally via APP_GUARD. Routes marked with @Public() skip
- * the check entirely.
+ * the check entirely, which is why login, registration and health never depend
+ * on authentication being available.
  *
- * Beyond signature verification, this guard enforces single-active-session:
- * the token's `sessionId` must match the user's `currentSessionId`. A newer
- * login invalidates any previous one, and older tokens return 401.
+ * The check itself is delegated to an {@link AuthChecker}. It used to be done
+ * here against a `Repository<User>`, which is what made extracting the auth
+ * service impossible: the guard needs the recorded session on every request,
+ * and that state lives with the users. Whichever process runs this guard now
+ * asks whoever owns the users — locally in the auth service, over HTTP in the
+ * API.
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
-    private readonly jwt: JwtService,
+    @Inject(AUTH_CHECKER) private readonly checker: AuthChecker,
     private readonly reflector: Reflector,
-
-    @InjectRepository(User)
-    private readonly usersRepository: Repository<User>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -49,42 +47,7 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Missing Bearer token');
     }
 
-    let payload: {
-      sub: string;
-      email: string;
-      role: Role;
-      sessionId?: string;
-    };
-
-    try {
-      payload = await this.jwt.verifyAsync(token);
-    } catch {
-      throw new UnauthorizedException('Invalid or expired token');
-    }
-
-    if (!payload.sub) {
-      throw new UnauthorizedException('Invalid token payload');
-    }
-
-    const user = await this.usersRepository.findOne({
-      where: { id: payload.sub },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    if (!payload.sessionId || payload.sessionId !== user.currentSessionId) {
-      throw new UnauthorizedException(
-        'Your session was closed because you signed in on another device or browser.',
-      );
-    }
-
-    request.user = {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-    } satisfies AuthPrincipal;
+    request.user = await this.checker.check(token);
 
     return true;
   }

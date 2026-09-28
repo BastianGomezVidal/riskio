@@ -7,11 +7,10 @@ import { AuthModule } from '../auth/auth.module.js';
 import { StorageModule } from '../storage/storage.module.js';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([User]),
-    AuthModule,
-    StorageModule,
-  ],
+  // No authz module: the controller relies on the globally registered guard,
+  // and pulling one in here would have meant this module needing the checker
+  // token in its own context.
+  imports: [TypeOrmModule.forFeature([User]), AuthModule, StorageModule],
   controllers: [UsersController],
   providers: [UsersService],
   exports: [UsersService],

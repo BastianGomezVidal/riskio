@@ -205,3 +205,78 @@ export const weatherEnvValidationSchema = Joi.object({
   CACHE_SERVICE_TIMEOUT_MS: Joi.number().default(1_000),
   CACHE_SERVICE_COOLDOWN_MS: Joi.number().default(10_000),
 });
+
+/**
+ * Environment contract for the auth service.
+ *
+ * JWT_SECRET is required here and, since the extraction, **nowhere else**. The
+ * API used to need it to verify signatures on every request; it now asks this
+ * service for a decision instead, which is the whole reason the guard was
+ * rewritten. If a second process ever needs the secret again, that is the
+ * coupling this arrangement exists to remove.
+ */
+export const authEnvValidationSchema = Joi.object({
+  DATABASE_URL: Joi.string().uri().required(),
+
+  JWT_SECRET: Joi.string().min(16).required(),
+  JWT_EXPIRES_IN: Joi.string().default('15m'),
+
+  ADMIN_EMAILS: Joi.string().allow('').default(''),
+  PUBLIC_BASE_URL: Joi.string().uri().default('http://localhost:3000'),
+  FRONTEND_URL: Joi.string().uri().default('http://localhost:5173'),
+
+  GOOGLE_CLIENT_ID: Joi.string().allow('').default(''),
+  GOOGLE_CLIENT_SECRET: Joi.string().allow('').default(''),
+  MICROSOFT_CLIENT_ID: Joi.string().allow('').default(''),
+  MICROSOFT_CLIENT_SECRET: Joi.string().allow('').default(''),
+
+  MAIL_TRANSPORT: Joi.string().valid('log', 'smtp').default('log'),
+  MAIL_FROM: Joi.string().default('Riskio <no-reply@riskio.local>'),
+  SMTP_HOST: Joi.string().allow('').default(''),
+  SMTP_PORT: Joi.number().default(587),
+  SMTP_USER: Joi.string().allow('').default(''),
+  SMTP_PASSWORD: Joi.string().allow('').default(''),
+  SMTP_SECURE: Joi.boolean().default(false),
+
+  STORAGE_API_URL: Joi.string().uri().default('http://backend-storage:3004'),
+  STORAGE_API_TIMEOUT_MS: Joi.number().default(5_000),
+
+  CACHE_SERVICE_URL: Joi.string().uri().default('http://backend-cache:3005'),
+  CACHE_SERVICE_TIMEOUT_MS: Joi.number().default(1_000),
+  CACHE_SERVICE_COOLDOWN_MS: Joi.number().default(10_000),
+});
+
+/**
+ * Environment contract for the gateway.
+ *
+ * The API validates against this instead of the full schema, and the list is
+ * the point rather than a side effect. It needs a database to run migrations
+ * and a URL for every service, and it needs nothing else: not the signing
+ * secret, not the OAuth credentials, not the mailer.
+ *
+ * `env_file: .env` put JWT_SECRET in the API's environment regardless of what
+ * any schema said, which is why removing it from the code was not enough. The
+ * API no longer loads .env wholesale, so the secret is only where it is used.
+ */
+export const apiEnvValidationSchema = Joi.object({
+  /** Only to run migrations. The API has no entities and reads no tables. */
+  DATABASE_URL: Joi.string().uri().required(),
+
+  CORS_ORIGINS: Joi.string().allow('').default(''),
+
+  STORAGE_API_URL: Joi.string().uri().default('http://backend-storage:3004'),
+  STORAGE_API_TIMEOUT_MS: Joi.number().default(5_000),
+
+  CACHE_SERVICE_URL: Joi.string().uri().default('http://backend-cache:3005'),
+  CACHE_SERVICE_TIMEOUT_MS: Joi.number().default(1_000),
+  CACHE_SERVICE_COOLDOWN_MS: Joi.number().default(10_000),
+
+  FEEDS_SERVICE_URL: Joi.string().uri().default('http://backend-feeds:3006'),
+  FEEDS_SERVICE_TIMEOUT_MS: Joi.number().default(120_000),
+
+  WEATHER_SERVICE_URL: Joi.string().uri().default('http://backend-weather:3007'),
+  WEATHER_SERVICE_TIMEOUT_MS: Joi.number().default(5_000),
+
+  AUTH_SERVICE_URL: Joi.string().uri().default('http://backend-auth:3008'),
+  AUTH_SERVICE_TIMEOUT_MS: Joi.number().default(5_000),
+});

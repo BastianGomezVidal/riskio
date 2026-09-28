@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -9,9 +8,6 @@ import { PasswordResetToken } from './entities/password-reset-token.entity.js';
 import { AuthService } from './auth.service.js';
 import { AuthController } from './auth.controller.js';
 import { MailerService } from './mailer.service.js';
-import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
-import { ApiKeyGuard } from './guards/api-key.guard.js';
-import { RolesGuard } from './guards/roles.guard.js';
 import { OAuthService } from './oauth/oauth.service.js';
 import { parseDurationToSeconds } from './auth.utils.js';
 
@@ -32,18 +28,14 @@ import { parseDurationToSeconds } from './auth.utils.js';
     }),
   ],
   controllers: [AuthController],
-  providers: [
-    AuthService,
-    OAuthService,
-    MailerService,
-    JwtAuthGuard,
-    ApiKeyGuard,
-    RolesGuard,
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
-    },
-  ],
-  exports: [AuthService, JwtAuthGuard, ApiKeyGuard, RolesGuard, JwtModule],
+  /**
+   * No APP_GUARD here, and the removal is deliberate rather than a leftover.
+   * The guard used to be registered globally because this module was the API's
+   * own. Now this service sits behind the API, which has already resolved the
+   * principal on the way in, so guarding again would mean a second round trip
+   * to answer a question the caller already settled.
+   */
+  providers: [AuthService, OAuthService, MailerService],
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

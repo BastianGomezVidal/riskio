@@ -9,9 +9,12 @@ import { TestFeedsModule } from './test-feeds.module.js';
 import { FeedsClientService } from '../../src/domain/feeds/ingestion/feeds-client.service.js';
 import { IngestionService } from '../../src/domain/feeds/ingestion/ingestion.service.js';
 import { WeatherClientService } from '../../src/domain/dashboard/weather-client.service.js';
+import { AUTH_CHECKER, API_KEY_VERIFIER } from '../../src/common/authz/authz.ports.js';
+import { LocalAuthChecker } from '../../src/auth-service/local-auth-checker.service.js';
+import { LocalApiKeyVerifier } from '../../src/auth-service/local-api-key-verifier.service.js';
 import { StormsService } from '../../src/domain/weather/storms/storms.service.js';
 import { AdvisoriesService } from '../../src/domain/weather/advisories/advisories.service.js';
-import { AuthModule } from '../../src/domain/auth/auth.module.js';
+import { TestAuthModule } from './test-auth.module.js';
 import { DashboardModule } from '../../src/domain/dashboard/dashboard.module.js';
 import { HealthModule } from '../../src/health/health.module.js';
 import { AppCacheModule } from '../../src/domain/cache/cache.module.js';
@@ -41,6 +44,12 @@ export interface ProviderOverride<T> {
 export async function createTestApp(
   overrides: ProviderOverride<unknown>[] = [],
 ): Promise<INestApplication> {
+  let auth: () => {
+    checker: () => LocalAuthChecker;
+    verifier: () => LocalApiKeyVerifier;
+  } = () => {
+    throw new Error('the auth checkers were used before the container existed');
+  };
   let weather: () => {
     storms: () => StormsService;
     advisories: () => AdvisoriesService;
@@ -85,7 +94,9 @@ export async function createTestApp(
       // The writers moved out of IngestionModule and out of the API with the
       // ingestion, so seeding has to import the module that owns them now.
       TestFeedsModule,
-      AuthModule,
+      // The auth domain, in process: the guards run against the local
+      // checker instead of calling a service that a test does not have.
+      TestAuthModule,
       DashboardModule,
       HealthModule,
     ],
@@ -109,6 +120,20 @@ export async function createTestApp(
      * process. Resolved on first call because a TestingModule override cannot
      * inject, and the container does not exist until compile() returns.
      */
+    /**
+     * The trigger's guards are built in IngestionModule's context, which binds
+     * the tokens from the API's authz module — the HTTP ones. A test has no auth
+     * service, so the tokens are pointed at the local checkers instead. This is
+     * the seam the two ports exist to provide.
+     */
+    .overrideProvider(AUTH_CHECKER)
+    .useValue({
+      check: (token: string) => auth().checker().check(token),
+    })
+    .overrideProvider(API_KEY_VERIFIER)
+    .useValue({
+      verify: (apiKey: string) => auth().verifier().verify(apiKey),
+    })
     .overrideProvider(WeatherClientService)
     .useValue({
       activeStorms: () => weather().storms().findMany({ tab: 'active' } as never) as unknown as Promise<unknown[]>,
@@ -127,6 +152,10 @@ export async function createTestApp(
 
   const moduleRef = await builder.compile();
   ingestion = () => moduleRef.get(IngestionService);
+  auth = () => ({
+    checker: () => moduleRef.get(LocalAuthChecker),
+    verifier: () => moduleRef.get(LocalApiKeyVerifier),
+  });
   weather = () => ({
     storms: () => moduleRef.get(StormsService),
     advisories: () => moduleRef.get(AdvisoriesService),

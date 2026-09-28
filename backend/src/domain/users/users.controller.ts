@@ -25,13 +25,19 @@ import {
 import { UsersService } from './users.service.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { UserProfileDto } from './dto/user-profile.dto.js';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import type { AuthPrincipal } from '../auth/auth.roles.js';
 
 @ApiTags('users')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+/**
+ * No @UseGuards here. The guard is registered globally by whichever process
+ * mounts this module — the auth service, and the API for its own routes — so
+ * naming it on the controller only added a second thing to wire up. What it
+ * really added was a dependency on the checker token being visible from this
+ * module's context, which is why the users module needed the authz module
+ * imported and the tokens exported, for a guard that was already running.
+ */
 @Controller('users')
 export class UsersController {
   constructor(private readonly users: UsersService) {}

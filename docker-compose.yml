@@ -41,6 +41,37 @@ x-weather-client-env: &weather-client-env
   WEATHER_SERVICE_URL: http://backend-weather:3007
   WEATHER_SERVICE_TIMEOUT_MS: ${WEATHER_SERVICE_TIMEOUT_MS:-5000}
 
+# Where the API asks "may this request proceed?". It holds no JWT_SECRET and
+# reads no users table, so this URL is the whole of its access to authentication.
+# Only the auth service holds JWT_SECRET, and it needs the OAuth and mailer
+# settings with it. Kept as a named block so the API's environment can be read
+# at a glance and seen not to include any of this.
+x-api-only-env: &api-only-env
+  DATABASE_URL: ${DATABASE_URL}
+  CORS_ORIGINS: ${CORS_ORIGINS:-}
+
+x-auth-env-only: &auth-env-only
+  JWT_SECRET: ${JWT_SECRET}
+  JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+  ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3000}
+  FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+  MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+  MAIL_TRANSPORT: ${MAIL_TRANSPORT:-log}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  MAIL_FROM: ${MAIL_FROM:-Riskio <no-reply@riskio.local>}
+
+x-auth-client-env: &auth-client-env
+  AUTH_SERVICE_URL: http://backend-auth:3008
+  AUTH_SERVICE_TIMEOUT_MS: ${AUTH_SERVICE_TIMEOUT_MS:-5000}
+
 x-cache-client-env: &cache-client-env
   CACHE_SERVICE_URL: http://backend-cache:3005
   # Short, because every call sits in the request path. A cache hit measured
@@ -159,9 +190,13 @@ services:
       dockerfile: Dockerfile
     runtime: runc
     restart: unless-stopped
-    env_file: .env
+    # No env_file on purpose. The API is a gateway: a database URL to run
+    # migrations, a list of service URLs and CORS. Loading .env wholesale put
+    # JWT_SECRET, the OAuth credentials and the mailer password in a process
+    # that uses none of them, and no amount of removing them from the code
+    # changed that.
     environment:
-      <<: [*storage-client-env, *cache-client-env, *feeds-client-env, *weather-client-env, *backend-env]
+      <<: [*storage-client-env, *cache-client-env, *feeds-client-env, *weather-client-env, *auth-client-env, *api-only-env]
       PORT: 3000
     ports:
       - "${BACKEND_API_PORT:-3000}:3000"
@@ -191,6 +226,48 @@ services:
       # /dashboard. /storms itself is served by the weather service directly.
       backend-weather:
         condition: service_healthy
+      # Auth being unavailable means nothing can be authenticated, and that is
+      # the intended behaviour rather than a failure to route around: the API
+      # cannot verify a token on its own any more.
+      backend-auth:
+        condition: service_healthy
+
+  # Own service: accounts, sessions, machine tokens and the user profile. The
+  # only process that holds JWT_SECRET or reads the users table, and the only
+  # one that can hash a password.
+  backend-auth:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    runtime: runc
+    command: ["npm", "run", "start:auth"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: [*cache-client-env, *storage-client-env, *auth-env-only]
+      AUTH_SERVICE_PORT: 3008
+      OTEL_SERVICE_NAME: ${OTEL_AUTH_SERVICE_NAME:-riskio-auth}
+    networks:
+      - core
+    depends_on:
+      db:
+        condition: service_healthy
+      backend-cache:
+        condition: service_started
+      backend-storage:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3008/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   # Own service: the read side of storms and advisories, which is what
   # /storms, /storms/:atcfId and /advisories/* are served from. The dashboard
