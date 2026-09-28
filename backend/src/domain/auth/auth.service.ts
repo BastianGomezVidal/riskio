@@ -390,9 +390,19 @@ export class AuthService {
       return user;
     }
 
-    const promoted = this.resolveRole(email);
-    if (promoted === 'admin' && user.role !== 'admin') {
-      user.role = promoted;
+    /**
+     * Role is re-resolved on every login, in both directions.
+     *
+     * This used to only promote, which meant removing an email from
+     * ADMIN_EMAILS did nothing to an account that had already been promoted:
+     * the row kept `admin` and the config quietly stopped matching reality. The
+     * list is meant to be the source of truth for who is an admin, so a change
+     * to it has to take effect rather than only applying to people who had not
+     * logged in since.
+     */
+    const resolved = this.resolveRole(email);
+    if (resolved !== user.role) {
+      user.role = resolved;
       await this.usersRepository.save(user);
     }
 

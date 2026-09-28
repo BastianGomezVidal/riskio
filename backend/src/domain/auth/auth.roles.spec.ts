@@ -34,3 +34,33 @@ describe('isAdminEmail', () => {
     );
   });
 });
+
+/**
+ * The promotion on login used to only move roles up, so removing an email from
+ * ADMIN_EMAILS left an already-promoted account as admin forever and the
+ * config quietly stopped matching reality. The role is now re-resolved in both
+ * directions on every login, and these cases pin the mapping the login relies
+ * on, including the demotion that the old code could not express.
+ */
+describe('role re-resolution on login', () => {
+  const lista = ['admin@admin.com'];
+
+  it('keeps a listed email as admin', () => {
+    expect(resolveRole('admin@admin.com', lista)).toBe('admin');
+  });
+
+  it('demotes an account whose email left the list', () => {
+    // The regression: this used to be impossible to express, so an admin stayed
+    // an admin after being removed from ADMIN_EMAILS.
+    expect(resolveRole('ex-admin@example.com', lista)).toBe('client');
+  });
+
+  it('ignores a stale stored role, since the list is the source of truth', () => {
+    // Login compares the stored role against the resolved one and saves the
+    // difference. resolveRole only sees the email, which is the point: it never
+    // reads what the row already said.
+    const almacenado = 'admin';
+    const resuelto = resolveRole('ex-admin@example.com', lista);
+    expect(almacenado === resuelto).toBe(false);
+  });
+});

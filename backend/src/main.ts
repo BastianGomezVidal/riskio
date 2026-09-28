@@ -48,6 +48,31 @@ async function bootstrap(): Promise<void> {
     .addTag('ingestion', 'Manual ingestion triggers')
     .addTag('auth', 'Account registration, login and API tokens')
     .addTag('health', 'Liveness and readiness probes')
+    /**
+     * Without these the Authorize button does not exist, and the seven
+     * operations annotated `@ApiBearerAuth()` were pointing at a scheme that
+     * was never registered — references to nothing.
+     */
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description:
+          'Access token from POST /auth/login. Works for any account: the ' +
+          'admin role is only needed by the /admin endpoints.',
+      },
+      'bearer',
+    )
+    /**
+     * The admin-only endpoints also require this header. It is a second thing
+     * to paste, which is why the two schemes are separate rather than the
+     * bearer token alone being treated as sufficient.
+     */
+    .addApiKey(
+      { type: 'apiKey', name: 'x-api-key', in: 'header' },
+      'api-key',
+    )
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);

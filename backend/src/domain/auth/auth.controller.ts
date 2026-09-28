@@ -88,10 +88,23 @@ export class AuthController {
   @Public()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Reset an account password to a temporary one' })
+  /**
+   * Documented as what it does, which is not what it used to do. It used to
+   * write a temporary password onto the account and return it in the response;
+   * it now mails a single-use reset link. The old text was not a leftover, it
+   * described a behaviour that had been removed, and an API client built from
+   * this document would have waited for a password that never arrived.
+   */
+  @ApiOperation({
+    summary: 'Email a single-use password reset link',
+    description:
+      'Always returns 200, whether or not the address is registered, so the ' +
+      'endpoint cannot be used to enumerate accounts. In local development the ' +
+      'link is written to the log instead of being mailed (MAIL_TRANSPORT=log).',
+  })
   @ApiOkResponse({
     description:
-      'Password reset; the response includes the temporary password (no mailer configured)',
+      'Accepted. Whether a link was actually sent is never disclosed.',
     type: ForgotPasswordResponseDto,
   })
   @ApiNotFoundResponse({ description: 'No account matches the email' })

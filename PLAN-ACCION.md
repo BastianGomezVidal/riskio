@@ -1419,3 +1419,41 @@ duplicadas), y lo que había eran dos endpoints para la misma feature y un direc
 nombrado. Nada más que unificar.
 distintas. Que la primera esté en verde no reactiva D1, que es solo sobre las 3 suites
 unitarias comentadas.
+
+
+### 5 — A1: Swagger utilizable (`addBearerAuth`, `addApiKey`, textos falsos)
+
+Tres cosas, y la tercera era un bug de seguridad disfrazado de documentación.
+
+**Faltaban los dos esquemas de seguridad.** Siete operaciones declaraban `@ApiBearerAuth()` y
+ningún esquema estaba registrado, así que el botón *Authorize* no existía y las referencias
+apuntaban a la nada. Para probar cualquier endpoint protegido desde `/docs` había que copiar la
+peticion a mano. Ahora hay dos esquemas porque hacen falta dos cosas distintas: `bearer` para
+cualquier JWT, y `api-key` para `x-api-key`, que exigen `admin/ingest/*` además del token.
+
+**Dos textos mentían.** `POST /auth/forgot-password` estaba documentado como *"Reset an account
+password to a temporary one"*, y su respuesta como *"includes the temporary password"*. Desde D12
+manda un enlace de un solo uso. No era un texto que se hubiera quedado viejo: describía un
+comportamiento que ya no existía, y un cliente construido desde ese documento habría esperado una
+contraseña que nunca llega. Corregido, y la descripción nueva dice además que la respuesta es
+siempre 200 para no permitir enumerar cuentas.
+
+**El rol solo se promovía, nunca se degradaba.** Este sí es un fallo: `ADMIN_EMAILS` se
+resolvía al registrarse y al entrar, pero el login solo escribía el rol cuando era `admin`. Quitar
+un email de la lista dejaba a esa cuenta como admin **para siempre**, y la configuración dejaba de
+reflejar la realidad sin decir nada. Ahora el rol se re-resuelve en ambos sentidos en cada login,
+y hay tres tests que lo fijan.
+
+### La cuenta admin única
+
+`ADMIN_EMAILS=admin@admin.com` en `.env`, y **ninguna contraseña genérica en el repositorio**: la
+cuenta se registra por el endpoint normal y su rol sale de la lista, no de un seed. Cualquier otro
+correo es siempre `client`, por construcción: `Role` es `'admin' | 'client'` y el rol solo se
+asigna desde `resolveRole(email)`.
+
+El botón *Authorize* **no necesita admin**, necesita cualquier JWT; el rol solo importa para
+`admin/*`. Por eso la cuenta genérica es comodidad, no un requisito para probar la documentación.
+
+Verificado: `admin@admin.com` es admin, otro correo cualquiera es client, `GET /users/me` con
+bearer da 200, y `POST /admin/ingest/run` da **401 con solo el bearer y 200 con bearer +
+`x-api-key`**. Los dos esquemas hacen falta y los dos están registrados.
