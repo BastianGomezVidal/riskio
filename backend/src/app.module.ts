@@ -4,13 +4,12 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { envValidationSchema } from './config/env.validation.js';
-import { StormsModule } from './domain/weather/storms/storms.module.js';
-import { AdvisoriesModule } from './domain/weather/advisories/advisories.module.js';
 import { IngestionModule } from './domain/feeds/ingestion/ingestion.module.js';
 import { AuthModule } from './domain/auth/auth.module.js';
 import { UsersModule } from './domain/users/users.module.js';
 import { HealthModule } from './health/health.module.js';
 import { DashboardModule } from './domain/dashboard/dashboard.module.js';
+import { WeatherProxyModule } from './domain/weather/weather-proxy.module.js';
 import { AppCacheModule } from './domain/cache/cache.module.js';
 import { ObservabilityModule } from './config/observability.module.js';
 import { TraceErrorInterceptor } from './common/interceptors/trace-error.interceptor.js';
@@ -41,8 +40,6 @@ import { TraceErrorInterceptor } from './common/interceptors/trace-error.interce
       }),
     }),
     ScheduleModule.forRoot(),
-    StormsModule,
-    AdvisoriesModule,
     // Provides the manual-trigger endpoints and the client that forwards to
     // the feeds service. The ingestion itself is not here any more: the cron,
     // the NOAA client, the parsers and every write live in backend-feeds.
@@ -51,6 +48,7 @@ import { TraceErrorInterceptor } from './common/interceptors/trace-error.interce
     UsersModule,
     HealthModule,
     DashboardModule,
+    WeatherProxyModule,
     AppCacheModule,
     ObservabilityModule,
   ],

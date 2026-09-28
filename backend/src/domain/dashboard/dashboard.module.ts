@@ -1,19 +1,19 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Storm } from '../weather/storms/entities/storm.entity.js';
-import { AdvisoriesModule } from '../weather/advisories/advisories.module.js';
 import { DashboardController } from './dashboard.controller.js';
 import { DashboardService } from './dashboard.service.js';
+import { WeatherClientModule } from './weather-client.module.js';
 
 /**
  * Dashboard read-model module.
  *
- * Reads storms directly and delegates "latest advisory per storm" to
- * AdvisoriesService so the query lives in one place.
+ * Reads storms and advisories over HTTP from the weather service. It used to
+ * hold a `Repository<Storm>` and the whole AdvisoriesService, which is why the
+ * dashboard could not be extracted before weather was: it was the one consumer
+ * keeping that domain inside the API.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Storm]), AdvisoriesModule],
   controllers: [DashboardController],
+  imports: [WeatherClientModule],
   providers: [DashboardService],
 })
 export class DashboardModule {}

@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { Repository } from 'typeorm';
 import { DashboardService } from './dashboard.service.js';
+import { WeatherClientService } from './weather-client.service.js';
 import { Storm } from '../weather/storms/entities/storm.entity.js';
 import { Advisory } from '../weather/advisories/entities/advisory.entity.js';
 import { ForecastPoint } from '../weather/advisories/entities/forecast-point.entity.js';
@@ -64,21 +65,24 @@ function makeAdvisory(
 }
 
 describe('DashboardService', () => {
-  let stormsFind: ReturnType<typeof vi.fn>;
-  let findLatestPerStorm: ReturnType<typeof vi.fn>;
+  // Typed with a call signature so they can be invoked. The bare
+  // ReturnType<typeof vi.fn> is Mock<Procedure | Constructable>, which TS
+  // refuses to call, and that is a type looseness unrelated to what is tested.
+  let stormsFind: Mock<() => Promise<unknown>>;
+  let findLatestPerStorm: Mock<(atcfIds: string[]) => Promise<unknown>>;
   let service: DashboardService;
 
   beforeEach(() => {
-    stormsFind = vi.fn();
-    findLatestPerStorm = vi.fn();
+    stormsFind = vi.fn<() => Promise<unknown>>();
+    findLatestPerStorm = vi.fn<(atcfIds: string[]) => Promise<unknown>>();
 
-    const stormsRepo = {
-      find: stormsFind,
-    } as unknown as Repository<Storm>;
-
-    const advisoriesService = {
-      findLatestPerStorm,
-    } as unknown as AdvisoriesService;
+    // The dashboard reads through the weather service now, so the seam the
+    // tests stub is a client, not a repository and a service. The repository
+    // shape disappeared when the read moved over the network.
+    const weather = {
+      activeStorms: () => stormsFind(),
+      latestAdvisoriesPerStorm: (atcfIds: string[]) => findLatestPerStorm(atcfIds),
+    } as unknown as WeatherClientService;
 
     // getSummary is served through CacheService; the stub always calls
     // through so these tests exercise the real computation.
@@ -87,7 +91,7 @@ describe('DashboardService', () => {
         fn(),
     } as unknown as CacheService;
 
-    service = new DashboardService(stormsRepo, advisoriesService, cache);
+    service = new DashboardService(weather, cache);
   });
 
   it('returns an empty summary when no storms exist', async () => {
@@ -108,20 +112,23 @@ describe('DashboardService', () => {
     expect(findLatestPerStorm).not.toHaveBeenCalled();
   });
 
-  it('queries only active storms, most recently seen in feed first', async () => {
+  /**
+   * The active-storms query no longer lives here. It moved to the weather
+   * service together with the domain, so what is left to assert is that the
+   * dashboard asks for it exactly once and takes the answer as given — the
+   * ordering and the limit are now the weather service's business, and a test
+   * here asserting them would be asserting someone else's implementation.
+   */
+  it('asks the weather service for the active storms', async () => {
     stormsFind.mockResolvedValue([makeStorm()]);
     findLatestPerStorm.mockResolvedValue([]);
 
     await service.getSummary();
 
-    expect(stormsFind).toHaveBeenCalledWith({
-      where: { isActive: true },
-      order: { lastSeenInFeedAt: 'DESC' },
-      take: 100,
-    });
+    expect(stormsFind).toHaveBeenCalledTimes(1);
   });
 
-  it('delegates latest-per-storm lookup to the advisories service', async () => {
+  it('asks for the latest advisories of exactly those storms', async () => {
     const storm = makeStorm();
     stormsFind.mockResolvedValue([storm]);
     findLatestPerStorm.mockResolvedValue([]);
@@ -131,12 +138,32 @@ describe('DashboardService', () => {
     expect(findLatestPerStorm).toHaveBeenCalledWith(['EP142026']);
   });
 
+  it('does not ask for advisories when there are no storms', async () => {
+    // An empty storm list means an empty atcfId list, and the client turns
+    // that into a no-op rather than a request with an empty query string.
+    stormsFind.mockResolvedValue([]);
+    findLatestPerStorm.mockResolvedValue([]);
+
+    await service.getSummary();
+
+    expect(findLatestPerStorm).not.toHaveBeenCalled();
+  });
+
   it('maps each storm to its latest advisory and forecast points', async () => {
     const storm = makeStorm();
-    const advisory = makeAdvisory(storm, {
-      id: 'adv-9',
-      forecastPoints: [makePoint(), makePoint({ id: 'pt-2' })],
-    });
+    /**
+     * issuedAt as an ISO string, which is what the weather service actually
+     * returns: JSON has no Date. A fixture with a real Date here would let the
+     * test pass while the service was quietly relying on a shape the network
+     * never delivers.
+     */
+    const advisory = {
+      ...makeAdvisory(storm, {
+        id: 'adv-9',
+        forecastPoints: [makePoint(), makePoint({ id: 'pt-2' })],
+      }),
+      issuedAt: new Date('2026-09-10T02:33:27Z').toISOString(),
+    };
 
     stormsFind.mockResolvedValue([storm]);
     findLatestPerStorm.mockResolvedValue([advisory]);
@@ -147,7 +174,7 @@ describe('DashboardService', () => {
     expect(result.storms[0].latestAdvisory).toEqual({
       id: 'adv-9',
       advisoryNumber: 2,
-      issuedAt: advisory.issuedAt.toISOString(),
+      issuedAt: advisory.issuedAt,
       forecastPoints: advisory.forecastPoints,
     });
   });

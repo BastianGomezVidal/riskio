@@ -17,6 +17,7 @@
     "start:prod": "node --import ./dist/instrumentation.js dist/main.js",
     "start:storage": "node --import ./dist/instrumentation.js dist/storage-service/main.js",
     "start:cache": "node --import ./dist/instrumentation.js dist/cache-service/main.js",
+    "start:weather": "node --import ./dist/instrumentation.js dist/weather-service/main.js",
     "lint": "oxlint src/ test/",
     "test": "vitest run",
     "test:watch": "vitest",

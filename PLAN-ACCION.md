@@ -1479,19 +1479,67 @@ propiedad.
 | `storage` | avatares (vía `users`) | Sí, servicio propio |
 | `cache` | interno | Sí, y además falla abierto |
 | `feeds` | `POST /admin/ingest/*` | Sí, servicio propio |
-| **`weather`** | `/storms*`, `/advisories/*` | **No** — dentro del proceso de la API |
+| `weather` | `/storms*`, `/advisories/*` | **Sí** — servicio propio |
 | **`auth` + `users`** | `/auth/*`, `/users/*` | **No** — dentro del proceso de la API |
 | **`dashboard`** | `/dashboard/summary` | **No** — y depende de `weather` |
 | `health` | `/health` | No, y está bien: debe morir con la API |
 
-### Objetivo
+### Paso 1 — `weather-service`: **hecho**
 
-- **`weather-service`** — `/storms*`, `/advisories/*`. Dueño de la lectura de tormentas,
-  advisories y warnings.
+`riskio-weather` es dueño de la lectura de tormentas, advisories y warnings. `feeds-service`
+escribe esas tablas y este las lee: es el único par escritor/lector del sistema.
+
+El dominio **no se movió de carpeta**. `feeds-service` importa estas entidades para sus writers y
+la API todavía necesita los DTOs, así que reubicar veinte ficheros daría tidiness y costaría
+churn. La frontera que importa es la de red, y esa está.
+
+**`/dashboard` ahora lee por HTTP**, a través de un `WeatherClientService`. Eso no fue un
+detalle: el dashboard era el último consumidor que mantenía el dominio `weather` dentro de la API.
+Al moverse el dominio, el dashboard ya no puede tener un `Repository<Storm>`.
+
+**Dos cosas que el salto de redcoxigió pagar**, y que no se ven mirando el código:
+
+- **Las fechas dejan de ser `Date`.** El DTO promete `Date` y el JSON entrega strings. La primera
+  versión hacía `...storm` y compilaba: cada fecha del response pasaba a ser string y solo el
+  esquema OpenAPI seguía afirmando lo contrario. Ahora se convierten explícitamente con `asDate`.
+- **`LatestAdvisoryDto.forecastPoints` era la entidad `ForecastPoint` de TypeORM**, o sea una fila
+  de base de datos dentro de un cuerpo de respuesta. Era inofensivo en proceso y dejó de serlo al
+  cruzar la red: la entidad lleva una relación `advisory` que no significa nada serializada. Es
+  ahora un DTO propio. Los nombres de campo no cambian, así que nada aguas abajo se mueve.
+
+**El proxy del gateway.** El navegador llama a `/storms` en la API porque es el único origen que
+tiene configurado, y eso dejó de servir al moverse el dominio. La API reenvía esas rutas con un
+controller de ~20 líneas: sin queries, sin mapeo de entidades y sin conexión a la base de datos. Es
+literalmente el rol de gateway. Cuesta un salto extra en el camino del navegador para tormentas, y
+conviene nombrarlo en vez de fingir que el navegador ya no toca la API. Un fallo de weather sale
+como **502 diciendo qué servicio es**, no como un 500 genérico.
+
+**Verificado, con el servicio parado de verdad**:
+
+| Con `weather` caído | |
+|---|---|
+| `GET /storms` | **502** |
+| `GET /users/me` | 200 |
+| `GET /auth/tokens` | 200 |
+| `GET /health` | 200 |
+| `POST /admin/ingest` | 401 (falta la API key, no es por weather) |
+
+Y al restaurarlo, todo vuelve a 200 con 9 tormentas servidas.
+
+Un detalle que casi dio una medición falsa: la primera vez que paré weather, `/dashboard` devolvió
+**200** con el servicio caído. Era la caché (30 s) enmascarando el fallo. Sin esperar a que
+expirara, la conclusión habría sido "el dashboard sobrevive a weather", que es exactamente lo
+contrario de lo cierto. Volviendo a medir con el TTL expirado: **500 en 2 s**, y 200 al
+restaurarlo. Un 500, además, debería ser un 503 con nombre de servicio; queda apuntado.
+
+### Objetivo (resto)
+
+- **`auth-service`**
 - **`auth-service`** — `/auth/*` y `/users/*` en un solo servicio, porque `users` depende de
   `auth` por el login, el registro y el token; separarlos no aportaría nada.
 - **`dashboard-service`** — `/dashboard/summary`, llamando a `weather` por HTTP. Va el último
-  porque es el único que necesita hablar con otro servicio de datos, no solo con Postgres.
+  porque es el único que necesita hablar con otro servicio de datos, no solo con Postgres. Con
+  esto `/dashboard` deja de salir por la API, que es lo que hoy hace.
 - **`riskio-api` queda como gateway**: enruta y no tiene lógica de negocio ni conexión a la base
   de datos. La redirección de la API web no cambia: el `compose` publica un puerto y el resto
   vive en la red `core`.
@@ -1513,8 +1561,7 @@ behind con él, y la API solo lee usuarios cuando hace falta.
 
 ### Orden
 
-1. `weather-service`. Es lectura pura de Postgres, no tiene guards, y `dashboard` es su único
-   consumidor: el salto que introduce es acotado yKnown.
+1. ~~`weather-service`~~ — **hecho**.
 2. `auth-service`, con la verificación local del JWT desde el primer commit. El riesgo real aquí
    no es técnico, es que toca el camino de cada petición.
 3. `dashboard-service`, cuando `weather` ya sea un servicio y haya a quién llamar.

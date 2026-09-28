@@ -35,6 +35,12 @@ x-feeds-client-env: &feeds-client-env
   # to hang the request.
   FEEDS_SERVICE_TIMEOUT_MS: ${FEEDS_SERVICE_TIMEOUT_MS:-120000}
 
+# Where the API reads storms from. It has no database connection for weather any
+# more, which is the point: the dashboard's storms come over HTTP.
+x-weather-client-env: &weather-client-env
+  WEATHER_SERVICE_URL: http://backend-weather:3007
+  WEATHER_SERVICE_TIMEOUT_MS: ${WEATHER_SERVICE_TIMEOUT_MS:-5000}
+
 x-cache-client-env: &cache-client-env
   CACHE_SERVICE_URL: http://backend-cache:3005
   # Short, because every call sits in the request path. A cache hit measured
@@ -155,7 +161,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      <<: [*storage-client-env, *cache-client-env, *feeds-client-env, *backend-env]
+      <<: [*storage-client-env, *cache-client-env, *feeds-client-env, *weather-client-env, *backend-env]
       PORT: 3000
     ports:
       - "${BACKEND_API_PORT:-3000}:3000"
@@ -181,6 +187,45 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      # The dashboard reads storms from here, so the API needs it to answer
+      # /dashboard. /storms itself is served by the weather service directly.
+      backend-weather:
+        condition: service_healthy
+
+  # Own service: the read side of storms and advisories, which is what
+  # /storms, /storms/:atcfId and /advisories/* are served from. The dashboard
+  # reads it over HTTP, so the API holds no repository for these tables.
+  backend-weather:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    runtime: runc
+    command: ["npm", "run", "start:weather"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *cache-client-env
+      WEATHER_SERVICE_PORT: 3007
+      OTEL_SERVICE_NAME: ${OTEL_WEATHER_SERVICE_NAME:-riskio-weather}
+    networks:
+      - core
+    depends_on:
+      db:
+        condition: service_healthy
+      backend-cache:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3007/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   # Own service: the only process that reads NOAA and writes storms,
   # advisories, forecast points and warnings. It also holds the cron, which is

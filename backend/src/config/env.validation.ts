@@ -190,3 +190,18 @@ export const feedsEnvValidationSchema = Joi.object({
   CACHE_SERVICE_TIMEOUT_MS: Joi.number().default(1_000),
   CACHE_SERVICE_COOLDOWN_MS: Joi.number().default(10_000),
 });
+
+/**
+ * Environment contract for the weather service.
+ *
+ * Its own schema, like the other extracted services: this one reads storms and
+ * advisories and signs nothing. It needs a database and, for the storm listing,
+ * the cache — and it needs neither the NOAA settings, which belong to feeds,
+ * nor the storage ones, which belong to storage.
+ */
+export const weatherEnvValidationSchema = Joi.object({
+  DATABASE_URL: Joi.string().uri().required(),
+  CACHE_SERVICE_URL: Joi.string().uri().default('http://backend-cache:3005'),
+  CACHE_SERVICE_TIMEOUT_MS: Joi.number().default(1_000),
+  CACHE_SERVICE_COOLDOWN_MS: Joi.number().default(10_000),
+});

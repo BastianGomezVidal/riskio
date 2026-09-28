@@ -3,12 +3,14 @@ import { Test } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
-import { StormsModule } from '../../src/domain/weather/storms/storms.module.js';
-import { AdvisoriesModule } from '../../src/domain/weather/advisories/advisories.module.js';
+import { TestWeatherModule } from './test-weather.module.js';
 import { IngestionModule } from '../../src/domain/feeds/ingestion/ingestion.module.js';
 import { TestFeedsModule } from './test-feeds.module.js';
 import { FeedsClientService } from '../../src/domain/feeds/ingestion/feeds-client.service.js';
 import { IngestionService } from '../../src/domain/feeds/ingestion/ingestion.service.js';
+import { WeatherClientService } from '../../src/domain/dashboard/weather-client.service.js';
+import { StormsService } from '../../src/domain/weather/storms/storms.service.js';
+import { AdvisoriesService } from '../../src/domain/weather/advisories/advisories.service.js';
 import { AuthModule } from '../../src/domain/auth/auth.module.js';
 import { DashboardModule } from '../../src/domain/dashboard/dashboard.module.js';
 import { HealthModule } from '../../src/health/health.module.js';
@@ -39,6 +41,12 @@ export interface ProviderOverride<T> {
 export async function createTestApp(
   overrides: ProviderOverride<unknown>[] = [],
 ): Promise<INestApplication> {
+  let weather: () => {
+    storms: () => StormsService;
+    advisories: () => AdvisoriesService;
+  } = () => {
+    throw new Error('the weather services were used before the container existed');
+  };
   let ingestion: () => IngestionService = () => {
     throw new Error('the ingestion service was used before the container existed');
   };
@@ -72,8 +80,7 @@ export async function createTestApp(
       }),
       ScheduleModule.forRoot(),
       AppCacheModule,
-      StormsModule,
-      AdvisoriesModule,
+      TestWeatherModule,
       IngestionModule,
       // The writers moved out of IngestionModule and out of the API with the
       // ingestion, so seeding has to import the module that owns them now.
@@ -95,6 +102,19 @@ export async function createTestApp(
      * does not exist until compile() returns. Resolving it on first call is the
      * only way to have both.
      */
+    /**
+     * Same seam as the feeds client: the dashboard reaches storms over HTTP in
+     * production and there is no weather service in a test, so the client is
+     * pointed at the real StormsService and AdvisoriesService running in this
+     * process. Resolved on first call because a TestingModule override cannot
+     * inject, and the container does not exist until compile() returns.
+     */
+    .overrideProvider(WeatherClientService)
+    .useValue({
+      activeStorms: () => weather().storms().findMany({ tab: 'active' } as never) as unknown as Promise<unknown[]>,
+      latestAdvisoriesPerStorm: (atcfIds: string[]) =>
+        weather().advisories().findLatestPerStorm(atcfIds) as unknown as Promise<unknown[]>,
+    })
     .overrideProvider(FeedsClientService)
     .useValue({
       ingestAllBasins: () => ingestion().ingestAllBasins(),
@@ -107,6 +127,10 @@ export async function createTestApp(
 
   const moduleRef = await builder.compile();
   ingestion = () => moduleRef.get(IngestionService);
+  weather = () => ({
+    storms: () => moduleRef.get(StormsService),
+    advisories: () => moduleRef.get(AdvisoriesService),
+  });
 
   const app = moduleRef.createNestApplication();
   app.useGlobalPipes(
