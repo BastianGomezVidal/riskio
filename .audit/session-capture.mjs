@@ -57,7 +57,12 @@ const calls = [];
 let phase = "arranque";
 
 const isOtel = (url) => /:4318\//.test(url) || /\/v1\/(traces|metrics)$/.test(url);
-const isApi = (url) => /:\d{4,5}\/(auth|users|dashboard|storms)/.test(url);
+// Matches both the absolute form (a different port, which is cross-origin and
+// therefore preflighted) and the same-origin form (/api/... proxied by nginx),
+// so the count does not quietly change meaning when the topology changes.
+const isApi = (url) =>
+  /:\d{4,5}\/(auth|users|dashboard|storms)/.test(url) ||
+  /\/api\/(auth|users|dashboard|storms)/.test(url);
 const kindOf = (url) => (isOtel(url) ? "otlp" : isApi(url) ? "api" : "asset");
 const rel = (url) => url.replace(BASE, "/").replace(/^https?:\/\/[^/]+/, (m) => m.replace(/:\d+$/, ""));
 

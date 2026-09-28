@@ -506,7 +506,19 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+        # Relative, so the API is same-origin and needs no CORS preflight. The
+        # SPA's nginx proxies /api/ to the gateway and strips the prefix.
+        #
+        # Note the precedence: podman-compose substitutes from .env, so a
+        # VITE_API_URL in .env wins over the default below. If the default here
+        # and the value in .env disagree, .env is what gets built and the
+        # default is a lie. Keep both on /api unless you are deliberately
+        # pointing the SPA at a host somewhere else.
+        #
+        # This is a local-topology win: with the app and the API on different
+        # hosts in production, preflights come back by design and the thing to
+        # fix there is CORS with credentials.
+        VITE_API_URL: ${VITE_API_URL:-/api}
         # The browser is not inside the compose network, so it sends to the
         # collector's loopback port. Empty disables browser tracing entirely:
         # the SDK is compiled in either way, it just does not register.

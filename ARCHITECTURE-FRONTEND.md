@@ -281,21 +281,21 @@ del menú, no `page.goto`).
 AUDIT_EMAIL=... AUDIT_PASSWORD=... node .audit/session-capture.mjs
 ```
 
-### Resultado
+### Resultado (API same-origin vía `/api`)
 
 | Fase | HTTP | preflight | API | OTLP | assets |
 |---|---|---|---|---|---|
 | `arranque` (portada `/`) | 33 | 0 | 0 | 0 | 33 |
-| `login` (enviar credenciales) | 15 | 4 | 2 | 2 | 7 |
+| `login` (enviar credenciales) | 13 | 2 | 2 | 2 | 7 |
 | `dashboard` (navegar) | **0** | 0 | 0 | 0 | 0 |
-| `storms` (navegar) | 6 | 1 | 1 | 1 | 3 |
-| **total** | **54** | **5** | **3** | **3** | **43** |
+| `storms` (navegar) | 5 | 0 | 1 | 1 | 3 |
+| **total** | **51** | **2** | **3** | **3** | **43** |
 
 Las tres únicas llamadas a la API de negocio de toda la sesión son:
 
-1. `POST /auth/login`
-2. `GET /dashboard/summary`
-3. `GET /storms?tab=active&sort=newest`
+1. `POST /api/auth/login`
+2. `GET /api/dashboard/summary`
+3. `GET /api/storms?tab=active&sort=newest`
 
 ### Tres cosas que el número esconde
 
@@ -310,19 +310,41 @@ explícitamente porque el mismo recorrido medido con `page.goto` entre fases da
 pedirse `/users/me` y `/dashboard/summary`. El método de medición cambia el
 número por un factor de dos.
 
-**Cada llamada a la API cuesta 2 peticiones HTTP.** La app se sirve desde
-`localhost:80` y llama a `http://localhost:3000`, luego es cross-origin y cada
-llamada lleva un `OPTIONS` previo (204) además de la llamada real (200). Son
-3 preflight por las 3 llamadas de negocio, más 2 por los `POST` al collector.
+### Same-origin: por qué la API va por `/api`
 
-Eso son 6 saltos de red para 3 datos, y es el mayor coste evitable de la sesión.
-`frontend/nginx.conf` no tiene `location /api/`: sirve solo estáticos. Con un
-proxy a la API en el mismo origen, los 3 preflight desaparecen y las llamadas
-pasan de `200` con doble round-trip a uno solo.
+La app antes llamaba a `http://localhost:3000` mientras se servía desde
+`localhost:80`, o sea cross-origin, y **cada llamada llevaba un `OPTIONS`
+previo**: 6 round-trips para 3 datos. `frontend/nginx.conf` no tenía
+`location /api/`; ahora proxea al gateway y `VITE_API_URL` es `/api`.
 
-> Nota: `nginx`.proxy es solo una mejora de topología **local**. En producción
-> el criterio es otro: si API y front viven en dominios distintos, los preflight
-> son inevitables por diseño y lo que procede es consolidar en CORS con
-> credenciales, no perseguir el cero.
+| | antes | después |
+|---|---|---|
+| preflight CORS | 5 | **2** |
+| peticiones por datos | 11 | **5** |
+| total HTTP | 54 | **51** |
+
+Los 2 preflight que quedan son los `POST` a `/v1/metrics` y `/v1/traces`: el
+collector es **otro contenedor**, así que no se puede proxear por el mismo
+nginx sin cambiar la topología. Son los de telemetría, no los de la app.
+
+Dos detalles que no son negociables si esto se toca:
+
+- **La barra final en `proxy_pass` carga el prefijo.** `/api/auth/login` tiene
+  que llegar al gateway como `/auth/login`; el gateway sirve sus rutas en la
+  raíz, sin prefijo global. Sin la barra, 404.
+- **`client_max_body_size 2m` explícito.** nginx corta en 1 MB por defecto y
+  `FileInterceptor` del avatar permite 2 MB. Sin alinearlos, cualquier avatar
+  de más de 1 MB muere con 413 en el proxy y el backend ni lo ve.
+
+> Nota: esto es una mejora de **topología local**. En producción, si el front y
+> la API viven en dominios distintos, los preflight vuelven por diseño y lo que
+> procede es consolidar CORS con credenciales, no perseguir el cero.
+>
+> Y una trampa al medir: `http://localhost:3000` **sigue apareciendo** dentro del
+> bundle aunque la app ya no lo use, porque es la rama muerta del
+> `import.meta.env.VITE_API_URL ?? "http://localhost:3000"` de
+> `api/client.ts:24`. Grepear el bundle no demuestra nada; hay que mirar las
+> peticiones reales.
+
 
 
