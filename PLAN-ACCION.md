@@ -801,6 +801,102 @@ con un `ARG`/`ENV` en el `Dockerfile`.
 
 ---
 
+## Fase 5 — Administración operable y costuras de despliegue
+
+> Creada el 2026-09-27 a partir de dos preguntas: *"¿qué puede hacer un admin con lo que ya
+> existe?"* y *"¿qué servicios se pueden separar sin problemas?"*. Son **dos vías
+> independientes**: nada de la vía A bloquea a la B, y viceversa. La razón es que el trabajo de
+> arquitectura no debe impedir el trabajo que da valor.
+
+### La vía A — lo que un admin puede hacer hoy
+
+**Lo que ya existe y es alcanzable**: `POST /admin/ingest/run` dispara la ingesta de todas las
+cuencas o de una, y devuelve un reporte (tormentas vistas e insertadas, advisories nuevos y
+omitidos, puntos escritos, geometrías y segmentos de aviso, errores no fatales). Eso es
+**información de operaciones real**, y es la única que hay.
+
+**El bucle roto**: `/admin/ingest` está protegido por `ApiKeyGuard` + `@Roles('admin')`, así que
+sin un API token devuelve 401. El token se crea con `POST /auth/tokens` usando un JWT… que la
+app no tiene forma de emitir. Para usar el endpoint admin del propio proyecto hay que llamar a
+la API a mano.
+
+**Y dos cosas que no existen**, listadas aquí para que la decisión sea explícita, no un olvido:
+
+| Falta | Qué daría |
+|---|---|
+| **Historial de ingesta** | Hoy el scheduler solo loguea. No hay forma de saber qué se procesó ni cuándo, salvo leer el log del contenedor. |
+| **Gestión de usuarios** | Solo existe `GET /users/me`. No hay listar usuarios, promover a admin ni desactivar. `ADMIN_EMAILS` es una variable de entorno. |
+
+### La vía B — qué se puede separar, y qué no
+
+Grafo de dependencias **en runtime** (imports de valor, sin tests), medido sobre el código:
+
+```
+auth       → users
+users      → auth, storage
+dashboard  → cache, weather
+weather    → cache
+feeds      → auth, cache, weather
+storage    → (nadie)
+cache      → (nadie)
+```
+
+**Es un DAG, no un ciclo.** El `weather → feeds` que parecía existir es un `import type`
+(`ForecastPointDto`), que desaparece al compilar, y un import dentro de un
+`integration-spec.ts`. En producción **no existe**. Eso abre la costura de la ingesta.
+
+#### Se pueden separar
+
+| Paso | Qué | Por qué es seguro | Coste |
+|---|---|---|---|
+| **B1** | `storage` como servicio propio | 190 líneas, **no importa a nadie**. Habla S3 y ya. Hoja limpia del grafo | Mecánico |
+| **B2** | `cache` como servicio propio | 93 líneas, `@Global`, sin dependencias | Mecánico |
+| **B3** | `feeds` sin dependencias de salida | Perfil distinto (golpea NOAA cada 10 min) y ya corre en proceso propio desde D15 | El único con trabajo real |
+
+**B3 en concreto** requiere: mover `ForecastPointDto` al lado de quien lo usa; que la ingesta
+escriba sus propias filas en vez de llamar a `StormsService`/`AdvisoriesService`; y que deje de
+importar `auth`. Con eso `feeds → {}` y es extraíble sin tocar la app.
+
+#### NO se separan
+
+- **`auth` + `users` como servicio de identidad (estilo Kerberos).** Hay ciclo real
+  `auth ↔ users`, y cada request de cada servicio_validaría el JWT contra ese servicio: una
+  llamada de red, o validación local con clave compartida — que para entonces ya no es un
+  servicio de auth, es un emisor de tokens. Con 7.323 líneas de backend no se justifica.
+- **`dashboard` en solitario.** Solo lee `weather` y `cache`; sin ingesta no tiene nada propio.
+
+**Por qué no partir más ahora**: microservicios sobre base de datos compartida no son
+microservicios, son un monolito distribuido — despliegue distribuido **más** acoplamiento por
+tablas, y una transacción distribuida que hoy no hace falta. Con un equipo pequeño, el coste de
+operación supera el beneficio.
+
+### Los pasos, en orden de ejecución
+
+| # | Paso | Vía | Riesgo | Verificación |
+|---|---|---|---|---|
+| **A1** | Swagger utilizable: `addBearerAuth()` + `addApiKey()`, y corregir el decorador de `forgot-password` que describe el flujo borrado | A | Bajo | `Authorize` funciona para ambos esquemas; `/docs-json` ya no menciona "temporary password" |
+| **A2** | UI de API tokens **solo para admins** en Settings: listar, crear (valor mostrado una vez), revocar | A | Bajo | El card no aparece para `client`; crear un token lo hace usable en `/admin/ingest` |
+| **A3** | Decidir el historial de ingesta | A | — | Decisión de producto, no código |
+| **A4** | Decidir la gestión de usuarios | A | — | Decisión de producto, con riesgo de seguridad si se hace mal |
+| **B1** | Extraer `storage` | B | Bajo | Es hoja: no toca ningún import ajeno. Regresión en avatares |
+| **B2** | Extraer `cache` | B | Bajo | Ídem. Cuidado: hoy es `@Global`, hay que preservar ese comportamiento |
+| **B3** | `feeds` sin dependencias de salida | B | **Medio** | El grafo queda en `feeds → {}`. Ingesta y lectura siguen dando los mismos datos |
+
+**Por qué este orden.** A1 va primero porque es lo más barato y arregla algo que hoy **miente**:
+el Swagger publica que la respuesta incluye la contraseña temporal, y eso ya no existe. A2 cierra
+el bucle de la credencial y es la opción que elegiste. B1 y B2 son hojas del grafo, así que son
+mecánicos y no bloquean nada. B3 va al final porque es el único con riesgo real y porque su
+beneficio (aislar fallos de ingesta y escalar por separado) no urge mientras NOAA sea la única
+fuente.
+
+**Fuera de alcance de la Fase 5**: partir `auth`/`users` en servicios de red, partir
+`dashboard`, y cualquier esquema de base de datos compartida. Ver *"NO se separan"* arriba.
+
+**Cierra además**: **D16** (lo resuelve A2). **D4** queda con su punto de linter abierto, que no
+requiere decisión.
+
+---
+
 ## Resumen de entregables por fase
 
 | Fase | Entregable | Riesgo |
@@ -809,7 +905,8 @@ con un `ARG`/`ENV` en el `Dockerfile`.
 | 1 | ✅ **Completa**: 1.1, 1.2, 1.3 hechos. 1.4 redirigido a D5 (sin paso) | Bajo |
 | 2 | ✅ Frontend con Error Boundaries, TanStack Query, Zod, colocation, splitting | Medio (refactor de data layer) |
 | 3 | ⬜ **Sin empezar.** Informe de a11y + Web Vitals. Requiere tu permiso | Bajo (auditoría) |
-| 4 | ⬜ **Sin empezar.** 4.1–4.3 duplicados; 4.4 = D1, aplazada | Medio (toca imports) |
+| 5 | ⬜ **Sin empezar.** A1–A2 operación admin; B1–B3 costuras de despliegue | A1–A2 bajo · B3 medio |
+| 4 | ✅ **Cerrada.** 4.1–4.3: las premisas eran falsas; 4.4 = D1 reactivada | Bajo |
 
 Fases 0, 1 y 2 ejecutadas (2026-09-26). La 2 dejó el bundle de entrada en 25 kB y el
 comportamiento verificado contra el stack en ejecución.
