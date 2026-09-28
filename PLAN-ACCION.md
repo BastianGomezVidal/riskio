@@ -136,7 +136,7 @@ detalle.
 | ~~D11~~ | Specs de integración caídos | — | — | **Resuelta** (`0955a80`, `2dd0b3e`) |
 | D12 | `generateTemporaryPassword` sin uso tras el flujo de token | 🟡 Código muerto, aún testeado | — | Abierta, decisión tuya |
 | D13 | Un `204` precede al `200` en GETs del dashboard | 🟠 Sin explicar | — | Anotada, sin investigar |
-| D14 | Capa de mensajería entera sin uso tras cerrar D5 | 🟡 ~7 archivos muertos | — | Abierta, decisión tuya |
+| ~~D14~~ | Capa de mensajería sin uso | — | — | **Resuelta** (`77198c2`) |
 | **D1** | Specs de backend comentados (3 suites, ~34 tests) | 🔴 Sin red de seguridad | 4.4 | **Aplazada** por decisión |
 | D7 | `VITE_API_URL` era un build arg muerto | 🟠 Solo funcionaba en local | — | **Resuelta** (`1ddefa5`) |
 | ~~D5~~ | `InMemoryBroker` no cruza procesos: avatares huérfanos | — | — | **Resuelta** (`557b6f1`) |
@@ -240,8 +240,13 @@ existiendo. Verificado contra el stack: avatar subido, cuenta borrada, y el obje
 a 3 en el bucket mientras el usuario pasó a 0 filas. Seis tests lo fijan.
 
 > **Lo que dejó esto abierto (D14)**: la capa de mensajería completa —interfaz, token, módulo
-> y tres adapters (memory, SQS, Kafka)— ya no la consume nadie. Borrarla entera es una decisión
-> mayor que la que tomé aquí; la dejé en pie porque el arreglo de D5 no la requería.
+> y tres adapters (memory, SQS, Kafka)— ya no la consumía nadie. Se retiró en `77198c2` con tu
+> visto bueno, llevándose `kafkajs` y `@aws-sdk/client-sqs`, que no tenían otro uso.
+>
+> Con ella salió `BROKER_DRIVER` del esquema de entorno, y eso importa: validaba
+> `memory|redis`, y `redis` se aceptaba **sin adapter detrás**, así que un `.env` con esa
+> variable arrancaba y luego perdía eventos en silencio. Era la misma trampa de D5 una capa más
+> arriba. Ahora esa configuración falla de forma ruidosa en vez de aparentar que funciona.
 
 **Opciones**:
 
