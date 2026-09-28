@@ -311,16 +311,14 @@ describe('IngestionScheduler', () => {
    * per interval, doubling the requests to NHC and the writes, and defeating
    * the reason the worker exists: keeping polling alive across an API restart.
    */
+  /**
+   * Replaces the tests for the `IS_WORKER` guard, which guarded against the
+   * API and the worker sharing this scheduler. The scheduler now lives only in
+   * the feeds service, so there is no second process to hold it and the guard
+   * would only be a way to accidentally stop ingestion.
+   */
   describe('process role', () => {
-    const original = process.env.IS_WORKER;
-
-    afterEach(() => {
-      if (original === undefined) delete process.env.IS_WORKER;
-      else process.env.IS_WORKER = original;
-    });
-
-    it('polls when it is the worker', async () => {
-      process.env.IS_WORKER = 'true';
+    it('polls regardless of any process role flag', async () => {
       const { scheduler, ingestAllBasins } = makeScheduler([]);
 
       await scheduler.pollAllBasins();
@@ -328,22 +326,23 @@ describe('IngestionScheduler', () => {
       expect(ingestAllBasins).toHaveBeenCalledTimes(1);
     });
 
-    it('does not poll in the HTTP API', async () => {
+    it('polls even with IS_WORKER unset, which is how the feeds service runs', async () => {
+      // The previous implementation returned early unless IS_WORKER was 'true'.
+      // Since the feeds service does not set it, a leftover guard would stop
+      // ingestion entirely rather than fail a test — which is why this sets the
+      // variable aside explicitly rather than relying on it being absent.
+      const original = process.env.IS_WORKER;
       delete process.env.IS_WORKER;
-      const { scheduler, ingestAllBasins } = makeScheduler([]);
+      try {
+        const { scheduler, ingestAllBasins } = makeScheduler([]);
 
-      await scheduler.pollAllBasins();
+        await scheduler.pollAllBasins();
 
-      expect(ingestAllBasins).not.toHaveBeenCalled();
-    });
-
-    it('does not poll when IS_WORKER is anything else', async () => {
-      process.env.IS_WORKER = 'false';
-      const { scheduler, ingestAllBasins } = makeScheduler([]);
-
-      await scheduler.pollAllBasins();
-
-      expect(ingestAllBasins).not.toHaveBeenCalled();
+        expect(ingestAllBasins).toHaveBeenCalledTimes(1);
+      } finally {
+        if (original === undefined) delete process.env.IS_WORKER;
+        else process.env.IS_WORKER = original;
+      }
     });
   });
 });

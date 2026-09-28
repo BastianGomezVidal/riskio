@@ -1182,8 +1182,40 @@ El único con trabajo real. Requiere, en este orden:
    **solo un tipo**). — **hecho**
 2. Que la ingesta **escriba sus propias filas** en vez de llamar a `StormsService` y
    `AdvisoriesService`. — **hecho**
-3. Que deje de importar `auth`. — pendiente: lo decide la extracción, porque el `auth` solo lo
-   necesita el *controller* del disparo manual, y ese se queda en la API.
+3. Que deje de importar `auth`. — **hecho**: el `auth` se queda en la API, con el controller del
+   disparo manual, y el servicio de feeds no lo importa.
+
+### 6.6 — `feeds` como servicio propio — **hecho**
+
+`riskio-feeds`, cuarto servicio propio. Es el único proceso que lee NOAA y escribe tormentas,
+advisories, forecast points y warnings. El cron vive aquí, y con él desaparece `backend-worker`:
+`IS_WORKER` solo lo usaba el scheduler, así que aquel contenedor existía únicamente para que el
+cron sobreviviera a un reinicio de la API. Ahora el scheduler está junto a la ingesta que
+dispara, y la compuerta habría sido solo una forma de parar la ingesta por accidente.
+
+**El disparo manual se queda en la API.** `auth`, los guards de api-key y de rol, y las
+anotaciones de Swagger viven allí; mover el controller habría significado mover o duplicar todo
+eso. La API llama a `feeds-service` por HTTP, igual que hace con storage y cache. Por eso `feeds`
+ya no importa `auth`: era el último requisito del plan.
+
+La **base de datos sigue siendo compartida**, tal y como dice el plan: la API lee esas mismas
+tablas porque responde preguntas sobre tormentas, y un esquema por servicio está explícitamente
+fuera de alcance. Lo que cambia es quién **escribe**, y ahora es un solo proceso.
+
+El `FeedsClientService` **no falla abierto**, al contrario que el cliente de caché. Un disparo
+manual que reportase éxito sin haber insertado nada es exactamente el fallo que la herramienta de
+fixtures existe para hacer visible, así que el error sube al llamante.
+
+**Lo que costó de verdad**, y que no era código: el override `compose.dev-ingest.yml` apuntaba
+`NHC_BASE_URL` solo a `backend-api`. Tras mover la ingesta, la API deja de tocar ningún feed, así
+que las primeras ejecuciones **`tenían éxito contra el NOAA de verdad y no probaban nada** — sin
+error, sin aviso. El aviso fue ver `advisoriesInserted: 0` con 11 puntos escritos, o sea datos
+reales. El override ahora cubre también a `backend-feeds`, y a propósito también a la API, para
+que si los fixtures desaparecen el disparo falle en voz alta en vez de salirse con NOAA.
+
+Verificado: dos rondas seguidas con la herramienta de fixtures, `advisoriesInserted: 1` en las
+dos, a través del salto API → HTTP → feeds. Cuatro trazas en Jaeger contienen `riskio-api` **y**
+`riskio-feeds`. 246/246 unitarias, 31/31 integración, `tsc` limpio.
 
 #### Herramienta de ingesta de desarrollo (`npm run dev:fixtures`)
 

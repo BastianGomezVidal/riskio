@@ -8,7 +8,8 @@ import {
   ApiHeader,
   getSchemaPath,
 } from '@nestjs/swagger';
-import { IngestionService, IngestReport } from './ingestion.service.js';
+import { FeedsClientService } from './feeds-client.service.js';
+import type { IngestReportDto as IngestReport } from './dto/ingest-report.dto.js';
 import { IngestReportDto } from './dto/ingest-report.dto.js';
 import { BasinParamDto } from './dto/basin-param.dto.js';
 import { ApiKeyGuard } from '../../auth/guards/api-key.guard.js';
@@ -32,7 +33,7 @@ import { Roles } from '../../auth/decorators/roles.decorator.js';
 @Roles('admin')
 @Controller('admin/ingest')
 export class IngestionController {
-  constructor(private readonly ingestion: IngestionService) {}
+  constructor(private readonly feeds: FeedsClientService) {}
 
   // Ingest all basins on demand; returns one report per basin.
   @Post('run')
@@ -47,7 +48,7 @@ export class IngestionController {
   })
   @ApiBadRequestResponse({ description: 'Invalid request' })
   async runAll(): Promise<IngestReport[]> {
-    return this.ingestion.ingestAllBasins();
+    return this.feeds.ingestAllBasins();
   }
 
   /**
@@ -64,6 +65,6 @@ export class IngestionController {
   })
   @ApiBadRequestResponse({ description: 'Unknown basin' })
   runOne(@Param() basinParam: BasinParamDto): Promise<IngestReport> {
-    return this.ingestion.ingestBasin(basinParam.basin);
+    return this.feeds.ingestBasin(basinParam.basin);
   }
 }

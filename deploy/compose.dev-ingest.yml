@@ -50,11 +50,18 @@ services:
       # browser. The API reaches it over the `core` network by service name.
       - "127.0.0.1:${FIXTURES_PORT:-8099}:8099"
 
+  # The process that actually reads NOAA. This is the override that matters:
+  # the API forwards the manual trigger over HTTP and never touches a feed
+  # itself, so pointing the API at the fixtures while this one kept reading NOAA
+  # would produce runs that succeed against the real thing and prove nothing.
+  backend-feeds:
+    environment:
+      NHC_BASE_URL: http://fixtures:8099
+
   backend-api:
     environment:
-      # Overrides the value from .env and docker-compose.yml. The fixtures are
-      # reachable by service name on `core`, which avoids depending on
-      # host.containers.internal.
+      # Also here, so `POST /admin/ingest/*` fails loudly if the fixtures are
+      # gone rather than silently succeeding against NOAA.
       NHC_BASE_URL: http://fixtures:8099
 
 volumes:

@@ -167,3 +167,26 @@ export const cacheEnvValidationSchema = Joi.object({
   /** Default TTL for entries that do not state one. */
   CACHE_DEFAULT_TTL_MS: Joi.number().default(60_000),
 });
+
+/**
+ * Environment contract for the feeds service.
+ *
+ * Its own schema, like the storage and cache services: this process signs no
+ * tokens and has no users, so requiring JWT_SECRET and ADMIN_EMAILS here would
+ * mean shipping secrets it cannot use.
+ *
+ * What it does need is a database and NOAA. It does not need STORAGE_* (the
+ * storage service owns those) and it does not need REDIS_URL (the cache service
+ * owns that one) — both of which is the point of extracting those two first.
+ */
+export const feedsEnvValidationSchema = Joi.object({
+  DATABASE_URL: Joi.string().uri().required(),
+
+  NHC_BASE_URL: Joi.string().uri().default('https://www.nhc.noaa.gov'),
+  NHC_TIMEOUT_MS: Joi.number().default(10_000),
+
+  // The cache is reached over HTTP, so this is a URL and not a connection.
+  CACHE_SERVICE_URL: Joi.string().uri().default('http://backend-cache:3005'),
+  CACHE_SERVICE_TIMEOUT_MS: Joi.number().default(1_000),
+  CACHE_SERVICE_COOLDOWN_MS: Joi.number().default(10_000),
+});

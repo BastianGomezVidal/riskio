@@ -9,12 +9,12 @@ import { IngestionService } from '../ingestion.service.js';
  * will fetch the RSS feed again and retry any storm that failed during the
  * previous run.
  *
- * Runs only in the worker. Both `main.ts` and `main.worker.ts` bootstrap the
- * same `AppModule`, so without this guard the HTTP API also held the cron and
- * every basin was polled twice per interval: twice the requests to NHC and
- * twice the writes. The writes are idempotent, so nothing was corrupted, but
- * it also defeated the reason the worker exists at all — keeping the polling
- * alive across an API restart.
+ * The `IS_WORKER` guard is gone, and that is the point of the extraction. It
+ * existed because `main.ts` and `main.worker.ts` bootstrapped the same
+ * AppModule, so the API also held the cron and every basin was polled twice per
+ * interval. This scheduler now lives in the feeds service alone, next to the
+ * ingestion it drives, and nothing else has a copy — so there is nothing left
+ * to guard against.
  */
 @Injectable()
 export class IngestionScheduler {
@@ -34,11 +34,6 @@ export class IngestionScheduler {
    */
   @Cron('0 */10 * * * *')
   async pollAllBasins(): Promise<void> {
-    if (process.env.IS_WORKER !== 'true') {
-      this.logger.log('not the worker, skipping scheduled ingest');
-      return;
-    }
-
     const started = Date.now();
 
     this.logger.log('scheduled-ingest start');

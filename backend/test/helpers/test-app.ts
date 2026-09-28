@@ -6,6 +6,9 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { StormsModule } from '../../src/domain/weather/storms/storms.module.js';
 import { AdvisoriesModule } from '../../src/domain/weather/advisories/advisories.module.js';
 import { IngestionModule } from '../../src/domain/feeds/ingestion/ingestion.module.js';
+import { TestFeedsModule } from './test-feeds.module.js';
+import { FeedsClientService } from '../../src/domain/feeds/ingestion/feeds-client.service.js';
+import { IngestionService } from '../../src/domain/feeds/ingestion/ingestion.service.js';
 import { AuthModule } from '../../src/domain/auth/auth.module.js';
 import { DashboardModule } from '../../src/domain/dashboard/dashboard.module.js';
 import { HealthModule } from '../../src/health/health.module.js';
@@ -36,6 +39,10 @@ export interface ProviderOverride<T> {
 export async function createTestApp(
   overrides: ProviderOverride<unknown>[] = [],
 ): Promise<INestApplication> {
+  let ingestion: () => IngestionService = () => {
+    throw new Error('the ingestion service was used before the container existed');
+  };
+
   const builder = Test.createTestingModule({
     imports: [
       ConfigModule.forRoot({
@@ -68,17 +75,38 @@ export async function createTestApp(
       StormsModule,
       AdvisoriesModule,
       IngestionModule,
+      // The writers moved out of IngestionModule and out of the API with the
+      // ingestion, so seeding has to import the module that owns them now.
+      TestFeedsModule,
       AuthModule,
       DashboardModule,
       HealthModule,
     ],
-  });
+  })
+    /**
+     * The API reaches the feeds service over HTTP, and a test has no such
+     * service. Point the client at the real IngestionService running in this
+     * process, so the controller spec keeps asserting real writes, real report
+     * shape and real idempotency. The HTTP hop itself is covered by
+     * feeds-client.service.spec.ts, with a mocked fetch.
+     *
+     * The indirection through `ingestion` is not ceremony: a TestingModule
+     * override cannot inject dependencies into its factory, and the container
+     * does not exist until compile() returns. Resolving it on first call is the
+     * only way to have both.
+     */
+    .overrideProvider(FeedsClientService)
+    .useValue({
+      ingestAllBasins: () => ingestion().ingestAllBasins(),
+      ingestBasin: (basin: never) => ingestion().ingestBasin(basin),
+    });
 
   for (const { provide, useValue } of overrides) {
     builder.overrideProvider(provide).useValue(useValue);
   }
 
   const moduleRef = await builder.compile();
+  ingestion = () => moduleRef.get(IngestionService);
 
   const app = moduleRef.createNestApplication();
   app.useGlobalPipes(

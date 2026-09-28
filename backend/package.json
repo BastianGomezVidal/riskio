@@ -15,7 +15,6 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node --import ./dist/instrumentation.js dist/main.js",
-    "start:worker": "node --import ./dist/instrumentation.js dist/main.worker.js",
     "start:storage": "node --import ./dist/instrumentation.js dist/storage-service/main.js",
     "start:cache": "node --import ./dist/instrumentation.js dist/cache-service/main.js",
     "lint": "oxlint src/ test/",
@@ -32,7 +31,8 @@
     "migration:run": "npm run typeorm -- migration:run -d src/database/data-source.ts",
     "migration:revert": "npm run typeorm -- migration:revert -d src/database/data-source.ts",
     "migration:show": "npm run typeorm -- migration:show -d src/database/data-source.ts",
-    "dev:fixtures": "node scripts/dev-fixtures.mjs"
+    "dev:fixtures": "node scripts/dev-fixtures.mjs",
+    "start:feeds": "node --import ./dist/instrumentation.js dist/feeds-service/main.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1141.0",

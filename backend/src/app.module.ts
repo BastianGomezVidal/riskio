@@ -43,6 +43,9 @@ import { TraceErrorInterceptor } from './common/interceptors/trace-error.interce
     ScheduleModule.forRoot(),
     StormsModule,
     AdvisoriesModule,
+    // Provides the manual-trigger endpoints and the client that forwards to
+    // the feeds service. The ingestion itself is not here any more: the cron,
+    // the NOAA client, the parsers and every write live in backend-feeds.
     IngestionModule,
     AuthModule,
     UsersModule,

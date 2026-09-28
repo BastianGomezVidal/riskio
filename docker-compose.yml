@@ -26,6 +26,15 @@ x-storage-env: &storage-env
 # What the API knows about caching: only the address of the service. Kept apart
 # from x-backend-env for the same reason as the storage one — a merge key is the
 # easiest place in this file to accidentally hand out a connection string.
+# Where the API finds the feeds service. Its own anchor for the same reason as
+# the others: a merge key is the easiest place to hand out a connection.
+x-feeds-client-env: &feeds-client-env
+  FEEDS_SERVICE_URL: http://backend-feeds:3006
+  # A real run fetches several NOAA feeds and writes rows, so this is generous
+  # on purpose. Short enough that a wedged service is reported rather than left
+  # to hang the request.
+  FEEDS_SERVICE_TIMEOUT_MS: ${FEEDS_SERVICE_TIMEOUT_MS:-120000}
+
 x-cache-client-env: &cache-client-env
   CACHE_SERVICE_URL: http://backend-cache:3005
   # Short, because every call sits in the request path. A cache hit measured
@@ -146,7 +155,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      <<: [*storage-client-env, *cache-client-env, *backend-env]
+      <<: [*storage-client-env, *cache-client-env, *feeds-client-env, *backend-env]
       PORT: 3000
     ports:
       - "${BACKEND_API_PORT:-3000}:3000"
@@ -172,6 +181,51 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  # Own service: the only process that reads NOAA and writes storms,
+  # advisories, forecast points and warnings. It also holds the cron, which is
+  # why backend-worker is gone — that container existed only to keep the
+  # scheduler alive across an API restart, and now the scheduler lives next to
+  # the ingestion it drives.
+  backend-feeds:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    runtime: runc
+    command: ["npm", "run", "start:feeds"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: [*cache-client-env, *backend-env]
+      FEEDS_SERVICE_PORT: 3006
+      OTEL_SERVICE_NAME: ${OTEL_FEEDS_SERVICE_NAME:-riskio-feeds}
+    networks:
+      # core only, and no published port: nothing outside compose asks for an
+      # ingestion run. The API does, over HTTP.
+      - core
+    depends_on:
+      db:
+        condition: service_healthy
+      # Best-effort on the cache: the HTTP cache client fails open, so an
+      # absent cache service must not stop ingestion from running. Anything with
+      # a `condition` here would do the opposite of that.
+      backend-cache:
+        condition: service_started
+    healthcheck:
+      # Readiness really queries the database. A feeds service that cannot write
+      # accepts trigger requests and then stores nothing, and the API waits for
+      # this to be healthy, so a green stack could be ingesting nothing.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3006/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   # Own service, and the only holder of a Redis connection. Nothing waits for it
   # to be healthy: the API degrades to uncached reads instead of refusing to
@@ -243,30 +297,6 @@ services:
       retries: 5
       start_period: 10s
 
-  backend-worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    runtime: runc
-    command: ["npm", "run", "start:worker"]
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      <<: [*storage-client-env, *cache-client-env, *backend-env]
-      IS_WORKER: "true"
-      # A distinct service name, or the worker's traces and the API's are
-      # indistinguishable in Jaeger. The worker is the one that talks to NOAA,
-      # which makes it the more interesting of the two.
-      OTEL_SERVICE_NAME: ${OTEL_WORKER_SERVICE_NAME:-riskio-worker}
-    networks:
-      # core only: the worker has no HTTP listener, so nothing outside needs
-      # to reach it.
-      - core
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
 
   frontend:
     build:
