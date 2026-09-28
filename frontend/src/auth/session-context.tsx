@@ -35,8 +35,48 @@ interface SessionContextValue {
 
 export const SessionContext = createContext<SessionContextValue | null>(null);
 
-const IDLE_TIMEOUT_MS = 30 * 1000; // 30s temporal
-const IDLE_WARNING_MS = 10 * 1000; // 10s temporal
+/**
+ * Idle sign-out, in milliseconds.
+ *
+ * These were 30s and 10s, marked "temporal" and never revisited. Thirty
+ * seconds is not a session: anyone reading a page, or watching a storm map
+ * without touching the mouse, was signed out. It is 15 minutes now, which is
+ * long enough to walk away from a desk and short enough that an unattended
+ * machine does not keep a token alive all afternoon.
+ *
+ * Overridable per environment through the Vite env, because a value that is
+ * wrong for one deployment is usually right for another and a rebuild should
+ * not be the way to find out.
+ */
+const IDLE_TIMEOUT_MS = readDuration(
+  import.meta.env.VITE_IDLE_TIMEOUT_MS,
+  15 * 60 * 1000,
+);
+const IDLE_WARNING_MS = readDuration(
+  import.meta.env.VITE_IDLE_WARNING_MS,
+  60 * 1000,
+);
+
+/**
+ * Reads a millisecond duration from the environment.
+ *
+ * Two traps, both of which produce the same symptom this change is fixing.
+ * Vite only substitutes `import.meta.env.NAME` statically, so a computed key
+ * like `import.meta.env[name]` compiles to undefined in a production build and
+ * silently falls back — hence the call sites pass the value, not the name.
+ * And these arrive as strings, where `Number("")` is 0, so a variable declared
+ * but left empty would mean "sign out immediately".
+ */
+function readDuration(raw: string | undefined, fallbackMs: number): number {
+  if (raw === undefined || raw === null || String(raw).trim() === "") {
+    return fallbackMs;
+  }
+
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallbackMs;
+
+  return parsed;
+}
 
 function userFromClaims(): User | null {
   const token = getAccessToken();
@@ -66,9 +106,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     hasValidSession() ? userFromClaims() : null,
   );
   const [warningOpen, setWarningOpen] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(
-    Math.round(IDLE_WARNING_MS / 1000),
-  );
+  /**
+   * Absolute moment the session ends, not a number of seconds remaining.
+   * A countdown that decrements its own state cannot notice that its timers
+   * were throttled while the tab was hidden, so it would happily display ten
+   * seconds while the session was already gone.
+   */
+  const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -126,12 +171,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     enabled: user != null,
     idleTimeoutMs: IDLE_TIMEOUT_MS,
     warningMs: IDLE_WARNING_MS,
-    onWarning: () => {
-      setSecondsLeft(Math.round(IDLE_WARNING_MS / 1000));
+    onWarning: (deadline) => {
+      setExpiresAt(deadline);
+      setNow(Date.now());
       setWarningOpen(true);
     },
     onActivity: () => {
       setWarningOpen(false);
+      setExpiresAt(null);
     },
     onExpire: () => {
       signOut();
@@ -140,16 +187,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Countdown inside the warning modal.
+  /**
+   * Countdown inside the warning modal, derived from the deadline.
+   *
+   * The interval only re-reads the clock; it does not count. So a throttled
+   * background tab resumes showing the real remaining time instead of a stale
+   * one, and the number on screen and the moment of sign-out cannot disagree.
+   */
   useEffect(() => {
-    if (!warningOpen) return;
+    if (!warningOpen || expiresAt === null) return;
 
-    const interval = setInterval(() => {
-      setSecondsLeft((s) => Math.max(0, s - 1));
-    }, 1000);
+    setNow(Date.now());
+    // 250ms rather than 1000: the displayed value is whole seconds, and a
+    // once-a-second tick would keep showing "10" for a full extra second after
+    // the real remaining time had already dropped to 9. Cheap here — the
+    // countdown state lives above the modal, and `children` is a prop whose
+    // identity does not change, so the page below does not re-render.
+    const interval = setInterval(() => setNow(Date.now()), 250);
 
     return () => clearInterval(interval);
-  }, [warningOpen]);
+  }, [warningOpen, expiresAt]);
+
+  const secondsLeft =
+    expiresAt === null
+      ? 0
+      : Math.max(0, Math.ceil((expiresAt - now) / 1000));
 
   const value = useMemo<SessionContextValue>(
     () => ({

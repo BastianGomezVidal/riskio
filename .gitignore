@@ -43,3 +43,6 @@ contexto.txt
 # advisory counter, and a committed one would make the next advisory number
 # depend on who cloned the repo last.
 backend/.dev-fixtures/
+
+# Salidas de dev.sh
+.dev-logs/

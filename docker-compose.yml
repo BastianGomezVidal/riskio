@@ -256,6 +256,12 @@ services:
         condition: service_started
       backend-storage:
         condition: service_started
+    # Loopback only, and only so `dev.sh` can run the API on the host in
+    # watch mode: a process outside the compose network cannot resolve
+    # `backend-auth` and friends by DNS. Nothing outside this machine
+    # can reach these.
+    ports:
+      - "127.0.0.1:${AUTH_PORT:-3008}:3008"
     healthcheck:
       test:
         [
@@ -294,6 +300,12 @@ services:
         condition: service_healthy
       backend-cache:
         condition: service_started
+    # Loopback only, and only so `dev.sh` can run the API on the host in
+    # watch mode: a process outside the compose network cannot resolve
+    # `backend-auth` and friends by DNS. Nothing outside this machine
+    # can reach these.
+    ports:
+      - "127.0.0.1:${WEATHER_PORT:-3007}:3007"
     healthcheck:
       test:
         [
@@ -341,6 +353,12 @@ services:
       # a `condition` here would do the opposite of that.
       backend-cache:
         condition: service_started
+    # Loopback only, and only so `dev.sh` can run the API on the host in
+    # watch mode: a process outside the compose network cannot resolve
+    # `backend-auth` and friends by DNS. Nothing outside this machine
+    # can reach these.
+    ports:
+      - "127.0.0.1:${FEEDS_PORT:-3006}:3006"
     healthcheck:
       # Readiness really queries the database. A feeds service that cannot write
       # accepts trigger requests and then stores nothing, and the API waits for
@@ -376,6 +394,12 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    # Loopback only, and only so `dev.sh` can run the API on the host in
+    # watch mode: a process outside the compose network cannot resolve
+    # `backend-auth` and friends by DNS. Nothing outside this machine
+    # can reach these.
+    ports:
+      - "127.0.0.1:${CACHE_PORT:-3005}:3005"
     healthcheck:
       test:
         [
@@ -416,6 +440,12 @@ services:
         condition: service_started
       backend-weather:
         condition: service_healthy
+    # Loopback only, and only so `dev.sh` can run the API on the host in
+    # watch mode: a process outside the compose network cannot resolve
+    # `backend-auth` and friends by DNS. Nothing outside this machine
+    # can reach these.
+    ports:
+      - "127.0.0.1:${DASHBOARD_PORT:-3009}:3009"
     healthcheck:
       test:
         [
@@ -450,6 +480,12 @@ services:
     depends_on:
       storage:
         condition: service_healthy
+    # Loopback only, and only so `dev.sh` can run the API on the host in
+    # watch mode: a process outside the compose network cannot resolve
+    # `backend-auth` and friends by DNS. Nothing outside this machine
+    # can reach these.
+    ports:
+      - "127.0.0.1:${STORAGE_PORT:-3004}:3004"
     healthcheck:
       # Readiness really talks to the bucket, so the API is never started
       # against a storage service that accepts uploads it cannot store.

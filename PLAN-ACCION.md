@@ -1735,3 +1735,65 @@ integración, `tsc` limpio, build del frontend en verde.
 **Lo que sigue sin red de seguridad**: el frontend no tiene vitest, ni RTL, ni un solo test. Esta
 UI entra sin cobertura, y el backend tampoco cubre estos endpoints en la suite de integración.
 Es la carencia más grande que queda, y es de infraestructura de test, no de producto.
+
+
+### `dev.sh`:containers para lo que no cambia, hot reload para lo que editas
+
+Editar un fichero era un rebuild de 60 s. Ahora `./dev.sh` levanta Postgres, Redis, SeaweedFS
+y los seis servicios backend como contenedores construidos una vez, y ejecuta en el host lo
+único que se edita: la API con `nest start --watch` en `:3100` y la SPA con vite en `:5173`.
+
+Compose sigue siendo para mirar la aplicación entera, construida. El script lleva la API en
+`:3100` precisamente para que ambos puedan convivir.
+
+**Para que la API del host alcanzara a los servicios hubo que publicarlos.** Solo estaban
+publicados db, redis, storage y el propio API: un proceso fuera de la red de compose no
+resuelve `backend-auth` por DNS. Los seis llevan ahora puerto en `127.0.0.1`, que no amplía
+exposición. Se insertaron con un parser de líneas, no con sustituciones: el tercer intento por
+cadenas volvió a meter un puerto en el servicio equivocado, porque `  backend-storage:` también
+aparece dentro de un `depends_on` con más sangría.
+
+**Dos errores que costaron una vuelta cada uno, ambos de la misma familia:** el script carga
+`.env`, y `.env` gana.
+
+- `DATABASE_URL` llegaba con host `db`, que solo resuelve dentro de compose. La API moría con
+  `ENOTFOUND db`. Ahora se reconstruye desde las partes con `localhost`, sin heredar.
+- `VITE_API_URL` y `FRONTEND_URL` de `.env` apuntaban al stack de compose, así que vite
+  hablaba con la API de `:3000` mientras la de desarrollo escuchaba en `:3100` sin uso. Las
+  URLs ahora se **derivan** de los puertos después de cargar `.env`, no se fijan antes.
+
+**Y el script espera con polling, no con `sleep`.** La primera versión esperó 115 s a un
+proceso que ya estaba muerto, porque un proceso muerto y un build lento se ven igual. Ahora
+`wait_for_watchdog` comprueba que el PID siga vivo en cada vuelta y, si no, imprime las últimas
+líneas del log y aborta.
+
+**Verificado**: la API en `:3100` responde `/users/me`, `/auth/tokens`, `/storms` y
+`/dashboard/summary` en 200, o sea que alcanza los seis servicios por sus puertos publicados.
+Vite sirve en `:5173`. **No** llegué a observar un evento de recarga de Nest; el comando es el
+propio `start:dev` del proyecto, pero eso no es lo mismo que haberlo visto recargar.
+
+### Inactividad: 30 segundos, y dos relojes
+
+Eran `IDLE_TIMEOUT_MS = 30 * 1000` y `IDLE_WARNING_MS = 10 * 1000`, marcadas `// temporal` y
+nunca revisadas. Treinta segundos no es una sesión: cualquiera que lea una página sin tocar el
+ratón quedaba fuera. Ahora son 15 min y 60 s, y ambos son variables de entorno
+(`VITE_IDLE_TIMEOUT_MS`, `VITE_IDLE_WARNING_MS`) con default sensato.
+
+El síntoma que reportó el usuario —el modal marcaba menos de un segundo y deslogueaba— era otro
+problema: **el contador y el expiry eran dos relojes independientes**. `setSecondsLeft(s => s-1)`
+cada 1000 ms por un lado, y un `setTimeout` distinto disparaba el deslogueo por otro. El
+navegador **limita los timers de una pestaña oculta** a aproximadamente una vez por minuto, así
+que el contador se congelaba en "10 segundos" mientras el logout ocurría igualmente: modal
+enseñando diez y ejection inmediata.
+
+Ahora hay **un solo reloj**: el modal recibe el instante absoluto (`expiresAt`) en el que la
+sesión termina, y el intervalo solo vuelve a leer la hora. Una pestaña throttleada al volver
+muestra el tiempo real que queda, y el número en pantalla y el momento del deslogueo no pueden
+discrepar.
+
+Un detalle de Vite que casi se cuela: `import.meta.env[CLAVE]` con clave dinámica **no** se
+sustituye en el build de producción, así que la variable habría caído siempre al default sin
+error alguno. Por eso el acceso es estático y la función recibe el valor, no el nombre. El
+build con `VITE_IDLE_TIMEOUT_MS=600000`confirmed que el literal llega al bundle.
+
+**Pendiente**: desplegar el frontend con este arreglo.

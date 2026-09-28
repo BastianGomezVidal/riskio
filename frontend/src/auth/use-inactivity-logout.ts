@@ -7,8 +7,18 @@ interface Options {
   warningMs?: number;
   /** Called when the idle timeout is reached. Usually signOut + redirect. */
   onExpire: () => void;
-  /** Called when the warning threshold is reached. Show your modal here. */
-  onWarning?: () => void;
+  /**
+   * Called when the warning threshold is reached, with the absolute
+   * timestamp at which the session will actually end.
+   *
+   * The deadline is passed rather than a duration because a modal counting
+   * down with its own interval and a logout fired by a separate timeout are
+   * two clocks, and they disagree. Browsers throttle timers in hidden tabs to
+   * roughly once a minute, so the countdown froze at "10 seconds" while the
+   * expiry fired on time and signed the user out mid-count. Deriving both from
+   * one deadline makes that impossible.
+   */
+  onWarning?: (expiresAt: number) => void;
   /** Called whenever activity is detected (useful to dismiss the warning). */
   onActivity?: () => void;
   /** When false, the hook does nothing. Default: true. */
@@ -66,9 +76,10 @@ export function useInactivityLogout({
       clearTimers();
 
       const warningDelay = Math.max(0, idleTimeoutMs - warningMs);
+      const expiresAt = Date.now() + idleTimeoutMs;
 
       warningTimerRef.current = setTimeout(() => {
-        warningRef.current?.();
+        warningRef.current?.(expiresAt);
       }, warningDelay);
 
       expireTimerRef.current = setTimeout(() => {
