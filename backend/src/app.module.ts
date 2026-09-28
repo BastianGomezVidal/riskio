@@ -6,11 +6,10 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { apiEnvValidationSchema } from './config/env.validation.js';
 import { IngestionModule } from './domain/feeds/ingestion/ingestion.module.js';
 import { HealthModule } from './health/health.module.js';
-import { DashboardModule } from './domain/dashboard/dashboard.module.js';
 import { WeatherProxyModule } from './domain/weather/weather-proxy.module.js';
+import { DashboardProxyModule } from './domain/dashboard/dashboard-proxy.module.js';
 import { ApiAuthzModule } from './common/authz/api-authz.module.js';
 import { AuthProxyMiddleware } from './domain/auth/auth-proxy.middleware.js';
-import { AppCacheModule } from './domain/cache/cache.module.js';
 import { ObservabilityModule } from './config/observability.module.js';
 import { TraceErrorInterceptor } from './common/interceptors/trace-error.interceptor.js';
 
@@ -45,10 +44,9 @@ import { TraceErrorInterceptor } from './common/interceptors/trace-error.interce
     // the NOAA client, the parsers and every write live in backend-feeds.
     IngestionModule,
     HealthModule,
-    DashboardModule,
     WeatherProxyModule,
+    DashboardProxyModule,
     ApiAuthzModule,
-    AppCacheModule,
     ObservabilityModule,
   ],
   providers: [

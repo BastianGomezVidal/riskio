@@ -264,12 +264,7 @@ export const apiEnvValidationSchema = Joi.object({
 
   CORS_ORIGINS: Joi.string().allow('').default(''),
 
-  STORAGE_API_URL: Joi.string().uri().default('http://backend-storage:3004'),
-  STORAGE_API_TIMEOUT_MS: Joi.number().default(5_000),
 
-  CACHE_SERVICE_URL: Joi.string().uri().default('http://backend-cache:3005'),
-  CACHE_SERVICE_TIMEOUT_MS: Joi.number().default(1_000),
-  CACHE_SERVICE_COOLDOWN_MS: Joi.number().default(10_000),
 
   FEEDS_SERVICE_URL: Joi.string().uri().default('http://backend-feeds:3006'),
   FEEDS_SERVICE_TIMEOUT_MS: Joi.number().default(120_000),
@@ -279,4 +274,23 @@ export const apiEnvValidationSchema = Joi.object({
 
   AUTH_SERVICE_URL: Joi.string().uri().default('http://backend-auth:3008'),
   AUTH_SERVICE_TIMEOUT_MS: Joi.number().default(5_000),
+  DASHBOARD_SERVICE_URL: Joi.string().uri().default('http://backend-dashboard:3009'),
+  DASHBOARD_SERVICE_TIMEOUT_MS: Joi.number().default(5_000),
+});
+
+/**
+ * Environment contract for the dashboard service.
+ *
+ * Note what is missing: DATABASE_URL. This service owns no table and reads
+ * none — the summary is assembled from the weather service over HTTP and cached
+ * through the cache service. It is the only service here with no database
+ * credentials at all, and the env contract is what keeps that true.
+ */
+export const dashboardEnvValidationSchema = Joi.object({
+  CACHE_SERVICE_URL: Joi.string().uri().default('http://backend-cache:3005'),
+  CACHE_SERVICE_TIMEOUT_MS: Joi.number().default(1_000),
+  CACHE_SERVICE_COOLDOWN_MS: Joi.number().default(10_000),
+
+  WEATHER_SERVICE_URL: Joi.string().uri().default('http://backend-weather:3007'),
+  WEATHER_SERVICE_TIMEOUT_MS: Joi.number().default(5_000),
 });

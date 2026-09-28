@@ -392,6 +392,43 @@ services:
   # Own service, own credentials, own blast radius. The API talks to it over
   # HTTP and no longer holds the S3 keys; the bucket policy and the shape of a
   # public URL live here and nowhere else.
+  # Own service: the dashboard summary. The only service here with no database
+  # credentials at all — the summary is assembled from the weather service over
+  # HTTP and cached for 30s, so it owns no table and reads none. The env
+  # contract is what keeps it that way.
+  backend-dashboard:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    runtime: runc
+    command: ["npm", "run", "start:dashboard"]
+    restart: unless-stopped
+    environment:
+      <<: *cache-client-env
+      WEATHER_SERVICE_URL: http://backend-weather:3007
+      WEATHER_SERVICE_TIMEOUT_MS: ${WEATHER_SERVICE_TIMEOUT_MS:-5000}
+      DASHBOARD_SERVICE_PORT: 3009
+      OTEL_SERVICE_NAME: ${OTEL_DASHBOARD_SERVICE_NAME:-riskio-dashboard}
+    networks:
+      - core
+    depends_on:
+      backend-cache:
+        condition: service_started
+      backend-weather:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3009/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   backend-storage:
     build:
       context: ./backend

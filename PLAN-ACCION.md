@@ -1644,6 +1644,51 @@ Cada servicio recibe ahora exactamente lo que usa:
 
 Comprobado sobre los contenedores en marcha, no sobre el fichero.
 
+### Paso 4 — `dashboard-service`: **hecho**, y la API por fin es un gateway
+
+El resumen del dashboard es un read model de tormentas y advisories, ambos propiedad de
+`weather`. Se mueve entero, incluida su caché de 30 segundos, y con él desaparece el último
+dominio dentro de la API.
+
+Es **el único servicio sin credenciales de base de datos**, y su contrato de entorno es lo que
+lo mantiene así: no declara `DATABASE_URL`, así que si alguien le añade una lectura directa, el
+proceso no arranca en vez de empezar a duplicar la propiedad de los datos.
+
+**Lo que dejó alMove**: el contrato de entorno de la API se encogió de 14 variables a 9.
+`CACHE_SERVICE_*` y `STORAGE_API_*` desaparecieron porque ya no las usaba nadie, y `AppCacheModule`
+saldió del `AppModule` muerto. La API conserva `DATABASE_URL` solo para migraciones y las URLs de
+los seis servicios. Ya no lee, no escribe y no cachea: **solo reenvía**.
+
+**Verificado**: con el dashboard parado, `/users/me` y `/storms` siguen en 200 y
+`/dashboard/summary` da 502 nombrando al servicio. 250/250 y 31/31.
+
+**Tres formas de perder una ruta, las tres cometidas aquí**, y por eso conviene escribirlas:
+
+1. **`replace` de cadenas que no casa, y `tsc` en verde igual.** Al registrar el proxy busqué
+   `WeatherProxyController,` con cuatro espacios, cuando estaba registrado vía su propio módulo.
+   El `replace` no hizo nada, no hubo error, y la ruta apareció como 404. Lo que faltaba era
+   **mirar el resultado del `replace`**, que es gratis.
+2. **Generar código con `sed`/`python` en vez de escribirlo.** El proxy del dashboard salió de
+   clonar el de weather con sustituciones, y quedó apuntando a `WEATHER_SERVICE_URL` con mensajes
+   que decían "weather". `tsc` lo daba por bueno. Reescrito a mano, que es más rápido.
+3. **`@All('/dashboard')` no es un prefijo.** Casa `/dashboard` y nada más; `/dashboard/summary`
+   caía en el 404 de Nest con el servicio upstream respondiendo 200. Se arregla con un
+   `*splat`. Y **apilar dos decoradores de ruta en el mismo método no registra las dos**: el
+   primer intento con `@All` + `@All('/dashboard/*splat')` mapeó una sola ruta y(Cancellation)
+   parece un fallo de red. Dos métodos, dos rutas.
+
+**Los siete servicios, y qué owns cada uno**:
+
+| Servicio | Escribe | Si cae |
+|---|---|---|
+| `api` | — (gateway) | todo cae |
+| `auth` | usuarios, sesiones, tokens | todo autenticado cae; `/health` sigue |
+| `weather` | — | `/storms` 502; el resto intacto |
+| `feeds` | tormentas, advisories, puntos | ingesta parada; lecturas intactas |
+| `cache` | — | falla abierto, sin caché |
+| `storage` | avatares | subida falla; el resto sigue |
+| `dashboard` | — | `/dashboard` 502; el resto intacto |
+
 **La regla que sale de esto**, y que conviene no olvidar al añadir un servicio nuevo: un
 `env_file` compartido es un `env_file` que reparte secretos a quien no los necesita. Si el servicio
 no usa la clave, hay que escribirla en su bloque de `environment`, aunque el valor venga de `.env`

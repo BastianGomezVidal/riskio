@@ -34,7 +34,8 @@
     "migration:revert": "npm run typeorm -- migration:revert -d src/database/data-source.ts",
     "migration:show": "npm run typeorm -- migration:show -d src/database/data-source.ts",
     "dev:fixtures": "node scripts/dev-fixtures.mjs",
-    "start:feeds": "node --import ./dist/instrumentation.js dist/feeds-service/main.js"
+    "start:feeds": "node --import ./dist/instrumentation.js dist/feeds-service/main.js",
+    "start:dashboard": "node --import ./dist/instrumentation.js dist/dashboard-service/main.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1141.0",
