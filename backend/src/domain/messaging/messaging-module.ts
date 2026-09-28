@@ -4,7 +4,6 @@ import { KafkaBroker } from './behaviors/kafka.broker.js';
 import { SqsBroker } from './behaviors/sqs-broker.js';
 import { InMemoryBroker } from './behaviors/im-memoy.broker.js';
 import { MESSAGE_BROKER } from './adapter/types/message-broker.token.js';
-import { OrphanCleanupConsumer } from './orphan-cleanup.consumer.js';
 import { StorageModule } from '../storage/storage.module.js';
 
 @Module({
@@ -26,7 +25,6 @@ import { StorageModule } from '../storage/storage.module.js';
         }
       },
     },
-    OrphanCleanupConsumer,
   ],
   exports: [MESSAGE_BROKER],
 })

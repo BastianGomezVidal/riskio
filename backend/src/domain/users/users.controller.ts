@@ -96,8 +96,8 @@ export class UsersController {
   @ApiOperation({
     summary: 'Delete the current account',
     description:
-      'Permanently deletes the account and its API tokens. The avatar ' +
-      'file is removed from storage via the messaging broker.',
+      'Permanently deletes the account and its API tokens, and removes the ' +
+      'avatar from storage once the transaction has committed.',
   })
   @ApiNoContentResponse({ description: 'Account deleted' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT' })

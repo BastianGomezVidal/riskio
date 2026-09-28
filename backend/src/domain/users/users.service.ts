@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -12,20 +13,18 @@ import { UserProfileDto } from './dto/user-profile.dto.js';
 import { STORAGE_SERVICE } from '../storage/storage.tokens.js';
 import type { StorageService } from '../storage/storage.service.js';
 import { MESSAGE_BROKER } from '../messaging/adapter/types/message-broker.token.js';
-import { OrphanCleanupConsumer } from '../messaging/orphan-cleanup.consumer.js';
 import type { IMessageBroker } from '../messaging/adapter/interface/messaging-broker.js';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
 
     @Inject(STORAGE_SERVICE)
     private readonly storage: StorageService,
-
-    @Inject(MESSAGE_BROKER)
-    private readonly broker: IMessageBroker,
   ) {}
 
   async findById(id: string): Promise<UserProfileDto> {
@@ -96,18 +95,37 @@ export class UsersService {
       throw new NotFoundException(`User ${id} not found`);
     }
 
+    const avatarKey = user.avatarUrl
+      ? this.storage.extractKey(user.avatarUrl)
+      : null;
+
     await this.usersRepository.manager.transaction(async (manager) => {
-      // Enqueue avatar cleanup (only if there is one).
-      if (user.avatarUrl) {
-        const key = this.storage.extractKey(user.avatarUrl);
-        if (key) {
-          await this.broker.publish(OrphanCleanupConsumer.topic(), {
-            type: 'avatar',
-            key,
-          });
-        }
-      }
       await manager.remove(user);
     });
+
+    // The avatar is deleted after the transaction commits, not inside it.
+    //
+    // This used to go through the broker, which never delivered: the API
+    // publishes and the worker consumes, each with its own in-memory queue, so
+    // every deleted account left its avatar behind (D5). Calling storage
+    // directly removes the hop that could not work.
+    //
+    // Order matters. Deleting inside the transaction would destroy the avatar
+    // even if the row removal then rolled back, losing data for an account that
+    // still exists. This way a database failure leaves the avatar alone, and a
+    // storage failure leaves an orphan — recoverable, unlike a deleted file
+    // for a live user.
+    if (avatarKey) {
+      try {
+        await this.storage.delete(avatarKey);
+      } catch (err) {
+        // Surfaced as a log line rather than an error: the account is already
+        // gone, and failing the request now would tell the user their deletion
+        // did not happen when it did.
+        this.logger.error(
+          `Account ${id} deleted but its avatar ${avatarKey} could not be: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
   }
 }
