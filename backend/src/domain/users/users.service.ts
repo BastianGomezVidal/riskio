@@ -94,7 +94,7 @@ export class UsersService {
     }
 
     const avatarKey = user.avatarUrl
-      ? this.storage.extractKey(user.avatarUrl)
+      ? await this.storage.extractKey(user.avatarUrl)
       : null;
 
     await this.usersRepository.manager.transaction(async (manager) => {

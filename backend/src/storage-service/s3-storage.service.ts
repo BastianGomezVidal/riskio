@@ -9,7 +9,7 @@ import {
   PutBucketPolicyCommand,
   NotFound,
 } from '@aws-sdk/client-s3';
-import type { StorageService } from './storage.service.js';
+import type { StorageService } from '../domain/storage/storage.service.js';
 
 @Injectable()
 export class S3StorageService
@@ -126,22 +126,27 @@ export class S3StorageService
     return `${this.publicUrl}/${key}`;
   }
 
-  extractKey(url: string): string | null {
+  /**
+   * Trivially synchronous work, but the contract is async because the API
+   * reaches this over HTTP. Kept async so the two implementations are
+   * interchangeable, which is what lets a test swap one for the other.
+   */
+  async extractKey(url: string): Promise<string | null> {
     const prefix = `${this.publicUrl}/`;
     if (!url.startsWith(prefix)) return null;
     return url.slice(prefix.length);
   }
 
   /**
-   * Optional health check. Runs once on startup to log connectivity.
-   * Not wired into /health yet — kept here for future use.
+   * Readiness. Unlike the `ping` this replaces, the error is rethrown: a
+   * readiness probe that logs and then reports success is worse than no probe,
+   * because it tells the orchestrator to send traffic that cannot be stored.
    */
-  async ping(): Promise<void> {
-    try {
-      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
-      this.logger.log('Storage bucket reachable');
-    } catch (err) {
-      this.logger.warn(`Storage bucket not reachable: ${err}`);
-    }
+  async assertBucketReachable(): Promise<void> {
+    await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+  }
+
+  bucketName(): string {
+    return this.bucket;
   }
 }

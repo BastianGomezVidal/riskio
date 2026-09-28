@@ -57,7 +57,7 @@ describe('UsersService.deleteMe', () => {
     };
 
     const storage = {
-      extractKey: (url: string) =>
+      extractKey: async (url: string) =>
         url ? `avatars/${url.split('/').pop()}` : null,
       delete: async (key: string) => {
         if (failStorage) throw new Error('storage unreachable');
@@ -109,7 +109,7 @@ describe('UsersService.deleteMe', () => {
         {
           provide: STORAGE_SERVICE,
           useValue: {
-            extractKey: () => AVATAR_KEY,
+            extractKey: async () => AVATAR_KEY,
             delete: async () => {
               order.push('avatar deleted');
             },
@@ -159,7 +159,7 @@ describe('UsersService.deleteMe', () => {
         },
         {
           provide: STORAGE_SERVICE,
-          useValue: { extractKey: () => null, delete: async () => {} },
+          useValue: { extractKey: async () => null, delete: async () => {} },
         },
       ],
     }).compile();
@@ -179,7 +179,7 @@ describe('UsersService.deleteMe', () => {
         },
         {
           provide: STORAGE_SERVICE,
-          useValue: { extractKey: () => null, delete: async () => {} },
+          useValue: { extractKey: async () => null, delete: async () => {} },
         },
       ],
     }).compile();

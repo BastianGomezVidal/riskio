@@ -1,9 +1,15 @@
 /**
- * Storage abstraction over S3-compatible services.
+ * Storage contract, as the rest of the system sees it.
  *
- * Implemented by S3StorageService, which speaks both MinIO (local dev)
- * and AWS S3 (production) via the same SDK. Only configuration changes
- * between environments.
+ * Three operations, and the shape is chosen by what callers actually need:
+ * upload bytes and get back a URL, delete by key, and turn a URL back into a
+ * key. There is deliberately no "build a URL from a key" here — the public URL
+ * belongs to whichever bucket is configured, so callers ask for it instead of
+ * assembling it and getting it subtly wrong for a different endpoint.
+ *
+ * Two implementations, on purpose: S3StorageService inside the storage service,
+ * and an HTTP client in the API. The API never holds storage credentials, and
+ * the storage service never holds a database connection.
  */
 export interface StorageService {
   /**
@@ -18,9 +24,12 @@ export interface StorageService {
   /** Delete a file from the bucket. Silently succeeds if not present. */
   delete(key: string): Promise<void>;
 
-  /** Get the public URL of a file without checking existence. */
-  getUrl(key: string): string;
-
-  /** Extract the object key from a full public URL, or null if it does not match. */
-  extractKey(url: string): string | null;
+  /**
+   * Extract the object key from a full public URL, or null if it does not match.
+   *
+   * Async because it is a network call now that the implementation lives in
+   * another service, and a URL can no longer be sliced locally without
+   * duplicating a format that the storage service owns.
+   */
+  extractKey(url: string): Promise<string | null>;
 }

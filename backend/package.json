@@ -16,6 +16,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node --import ./dist/instrumentation.js dist/main.js",
     "start:worker": "node --import ./dist/instrumentation.js dist/main.worker.js",
+    "start:storage": "node --import ./dist/instrumentation.js dist/storage-service/main.js",
     "lint": "oxlint src/ test/",
     "test": "vitest run",
     "test:watch": "vitest",

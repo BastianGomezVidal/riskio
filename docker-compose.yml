@@ -19,6 +19,14 @@ x-storage-env: &storage-env
   # STORAGE_ENDPOINT on purpose, and the only one that needs a host-visible port.
   STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:-http://localhost:${STORAGE_PORT:-8333}/${STORAGE_BUCKET:-riskio-avatars}}
 
+# What the API gets instead of the credentials above. Separate anchor on
+# purpose: the API used to merge in the S3 keys, and the whole point of the
+# storage service is that it does not any more. Merging them back in would be
+# a one-line mistake that undoes the extraction without failing anything.
+x-storage-client-env: &storage-client-env
+  STORAGE_API_URL: http://backend-storage:3004
+  STORAGE_API_TIMEOUT_MS: ${STORAGE_API_TIMEOUT_MS:-5000}
+
 x-backend-env: &backend-env
   DATABASE_URL: ${DATABASE_URL}
   CACHE_DRIVER: ${CACHE_DRIVER:-redis}
@@ -121,7 +129,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      <<: [*storage-env, *backend-env]
+      <<: [*storage-client-env, *backend-env]
       PORT: 3000
     ports:
       - "${BACKEND_API_PORT:-3000}:3000"
@@ -143,10 +151,48 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      storage:
+      backend-storage:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  # Own service, own credentials, own blast radius. The API talks to it over
+  # HTTP and no longer holds the S3 keys; the bucket policy and the shape of a
+  # public URL live here and nowhere else.
+  backend-storage:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    runtime: runc
+    command: ["npm", "run", "start:storage"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *storage-env
+      STORAGE_API_PORT: 3004
+      OTEL_SERVICE_NAME: ${OTEL_STORAGE_SERVICE_NAME:-riskio-storage}
+    networks:
+      # core only, and no published port: nothing outside the compose network
+      # has any business uploading to a bucket, and an unauthenticated
+      # write endpoint reachable from the host is a hole, not a convenience.
+      - core
+    depends_on:
+      storage:
+        condition: service_healthy
+    healthcheck:
+      # Readiness really talks to the bucket, so the API is never started
+      # against a storage service that accepts uploads it cannot store.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3004/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   backend-worker:
     build:
@@ -157,7 +203,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      <<: [*storage-env, *backend-env]
+      <<: [*storage-client-env, *backend-env]
       IS_WORKER: "true"
       # A distinct service name, or the worker's traces and the API's are
       # indistinguishable in Jaeger. The worker is the one that talks to NOAA,
@@ -169,8 +215,6 @@ services:
       - core
     depends_on:
       db:
-        condition: service_healthy
-      storage:
         condition: service_healthy
       redis:
         condition: service_healthy

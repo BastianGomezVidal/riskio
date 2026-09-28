@@ -1020,11 +1020,48 @@ ser un build arg muerto): una variable `VITE_OTEL_EXPORTER_OTLP_ENDPOINT` en el 
 **Cuándo**: después de 6.1, porque sin collector no hay a dónde enviar. Puede ir antes o
 después de los cortes de servicios sin afectar a los demás, ya que no toca el backend.
 
-### 6.3 — Cortar `storage` (hoja, 190 líneas)
+### 6.3 — Cortar `storage` (190 líneas) — **hecho**
 
-Primer corte porque **no importa a nadie**: separarlo no toca un solo import ajeno. Se convierte
-en servicio propio y `users` pasa a hablar con él. Se verifica que el upload y el borrado de
-avatares siguen funcionando, y las métricas por contenedor confirman que no se movió nada.
+Primer corte porque **no importa a nadie**: separarlo no toca un solo import ajeno. Y así fue,
+`users.service.ts` no cambió de imports en absoluto.
+
+**El contrato bajó de 4 métodos a 3.** `getUrl` salió porque nadie fuera de la propia
+implementación lo usaba, y `extractKey` pasó a ser asíncrono: es una llamada de red ahora, y
+mantenerlo síncrono obligaría a los llamantes a duplicar localmente el formato de la URL pública,
+que es justo lo que se quería evitar al mover el servicio.
+
+**Lo que se consiguió de verdad**, medido sobre los contenedores en marcha, no sobre el YAML:
+`riskio_backend-api` tiene **0** variables `STORAGE_ACCESS_KEY`/`SECRET_KEY` y
+`riskio_backend-storage` tiene las 2. La API ya no puede leer ni escribir el bucket ni aunque la
+comprometan; su peor caso es hablar con tres endpoints HTTP en la red interna. El bucket, la
+política y el formato de la URL viven en un contenedor que no tiene datos de usuarios.
+
+Decisiones que quedaron tomadas y conviene no re-litigar:
+
+- **Bytes en base64 dentro de JSON**, no multipart. Los avatares son pequeños y un segundo
+  content type con su parser de streaming cuesta más que el 33 % de sobrecarga. Si algún día
+  esto lleva ficheros grandes, la respuesta es multipart.
+- **Sin CORS, sin Swagger, sin `ValidationPipe`.** Nada en un navegador habla con este servicio.
+  `ValidationPipe` con `whitelist: true` sobre un `interface` en vez de un DTO borraría todos los
+  campos y rechazaría todas las subidas, así que el controller valida a mano.
+- **El health check habla con el bucket.** Un probe que solo mira el proceso daría por bueno un
+  servicio que acepta subidas que luego no puede guardar. Por eso se sustituyó el `ping()` que
+  se tragaba los errores.
+- **Una sola instancia de S3**: la clase se registra y se aliasea al token con `useExisting`.
+  Registrarla dos veces habría creado dos clientes S3.
+- **Una imagen, tres entrypoints** vía `command`, como ya hacía el worker.
+
+**Verificado de extremo a extremo**: alta de avatar 201, URL pública sirviendo el fichero
+(`200`, `image/png`, 69 bytes), borrado de la cuenta 204 y el objeto dando 404 después. El
+servicio nuevo registra las tres llamadas con sus códigos. Y en Jaeger, una sola traza contiene
+`riskio-api` **y** `riskio-storage` con el handler `POST /files` al otro lado: el salto es
+transparente para la telemetría porque la auto-instrumentación de `fetch` inyecta el
+`traceparent` solo.
+
+**Trampa a tener presente**: la API tiene `env_file: .env` y hoy `.env` no trae nada de
+`STORAGE_*`, así que la separación se sostiene. Si alguien las añade ahí, entran también en la
+API y la extracción se deshace **sin que nada falle ni avise**. La separación real está en el
+compose, con dos anchors distintos a propósito.
 
 ### 6.4 — Cortar `cache` (hoja, 93 líneas)
 

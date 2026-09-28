@@ -114,3 +114,37 @@ export const envValidationSchema = Joi.object({
 
     return value;
   });
+
+/**
+ * Environment contract for the storage service.
+ *
+ * A separate schema on purpose, not a laxer version of the full one. The full
+ * schema requires `DATABASE_URL` and `JWT_SECRET`, and the storage service
+ * genuinely has neither: it holds no rows and signs no tokens. Pointing it at
+ * the full schema would mean either shipping a database URL and a JWT secret
+ * to a process that cannot use them, or loosening `.required()` across the
+ * whole application to accommodate one service.
+ *
+ * The keys that stay are the S3 ones, because this is now the only process that
+ * reads them. The API no longer gets STORAGE_ACCESS_KEY or STORAGE_SECRET_KEY
+ * at all, which is the actual point of moving the service out.
+ */
+export const storageEnvValidationSchema = Joi.object({
+  STORAGE_DRIVER: Joi.string().default('s3'),
+  STORAGE_ENDPOINT: Joi.string().allow('').default(''),
+  STORAGE_REGION: Joi.string().default('us-east-1'),
+  STORAGE_BUCKET: Joi.string().default('riskio-avatars'),
+  STORAGE_ACCESS_KEY: Joi.string().default('any'),
+  STORAGE_SECRET_KEY: Joi.string().default('any'),
+  STORAGE_PUBLIC_URL: Joi.string()
+    .uri()
+    .default('http://localhost:8333/riskio-avatars'),
+
+  /**
+   * Where the API finds this service. Only the API reads it, and only because
+   * it no longer speaks S3 itself.
+   */
+  STORAGE_API_URL: Joi.string().uri().default('http://storage:3004'),
+  /** Per-request timeout, so a wedged storage service cannot hang a request. */
+  STORAGE_API_TIMEOUT_MS: Joi.number().default(5_000),
+});
