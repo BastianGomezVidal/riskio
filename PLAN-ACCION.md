@@ -131,21 +131,23 @@ detalle.
 
 | # | Qué es | Impacto | Dónde se arregla | Estado |
 |---|---|---|---|---|
-| **D10** | Una migración aplicada en la BD **nunca existió en el repo** | 🔴 El despliegue no es reproducible | — | **Resuelta** (`0955a80`) |
-| D6 | `forgot-password` resetea la contraseña y no la entrega | — | 4.7 | **Resuelta** (`cf4f2e5`, `e646477`, `608ce38`) |
-| ~~D11~~ | Specs de integración caídos | — | — | **Resuelta** (`0955a80`, `2dd0b3e`) |
-| D15 | Ingesta NHC duplicada: API y worker corroboraban a la vez | 🟠 Doble tráfico a NOAA | — | **Resuelta** (`64e9445`) |
-| ~~D12~~ | `generateTemporaryPassword` sin uso | — | — | **Resuelta** (`b74b0ad`) |
-| D13 | Un `204` precede al `200` en GETs del dashboard | 🟠 Sin explicar | — | Anotada, sin investigar |
-| ~~D14~~ | Capa de mensajería sin uso | — | — | **Resuelta** (`77198c2`) |
 | **D1** | Specs de backend comentados (3 suites, ~34 tests) | 🔴 Sin red de seguridad | 4.4 | **Aplazada** por decisión |
-| D7 | `VITE_API_URL` era un build arg muerto | 🟠 Solo funcionaba en local | — | **Resuelta** (`1ddefa5`) |
-| ~~D5~~ | `InMemoryBroker` no cruza procesos: avatares huérfanos | — | — | **Resuelta** (`557b6f1`) |
-| **D2** | Carpetas duplicadas en backend | 🟡 Mantenimiento doble | 4.1 | Abierta |
-| **D3** | Carpetas duplicadas en frontend | 🟡 Una de las dos queda vieja | 4.2 | Parcialmente cerrada en 2.4 |
-| **D8** | `api.health()` / `api.tokens()` sin uso | 🟡 Contrato que nada valida | 4.6 *(propuesto)* | Abierta, sin paso |
+| D2 | Carpetas duplicadas en backend | 🟡 Mantenimiento doble | 4.1 | Abierta |
+| D3 | Carpetas duplicadas en frontend | 🟡 Una de las dos queda vieja | 4.2 | Parcialmente cerrada en 2.4 |
 | D4 | Observaciones sueltas | — | — | 2 de 3 resueltos |
+| D8 | `api.health()` / `api.tokens()` sin uso | 🟡 Contrato que nada valida | 4.6 *(propuesto)* | **Abierta, sin paso** |
 | D9 | `manualChunks` compila verde y mata la app | — No hay bug activo | — | Precaución, no deuda |
+| D5 | `InMemoryBroker` no cruza procesos | 🟠 Avatares huérfanos | 4.5 | **Resuelta** (`557b6f1`) |
+| D6 | `forgot-password` no entregaba la contraseña | 🔴 Usuario sin acceso a la cuenta | 4.7 | **Resuelta** (`cf4f2e5`, `e646477`, `608ce38`) |
+| D7 | `VITE_API_URL` era un build arg muerto | 🟠 Solo funcionaba en local | — | **Resuelta** (`1ddefa5`) |
+| D10 | Migración aplicada que nunca existió en el repo | 🔴 Despliegue no reproducible | — | **Resuelta** (`0955a80`) |
+| D11 | Specs de integración caídos | 🟠 Cobertura inexistente | — | **Resuelta** (`0955a80`, `2dd0b3e`) |
+| D12 | `generateTemporaryPassword` sin uso | 🟡 Código muerto | — | **Resuelta** (`b74b0ad`) |
+| D13 | `204` antes de los GET del dashboard | — No era un bug | — | **Resuelta** |
+| D14 | Capa de mensajería sin uso | 🟡 ~350 líneas muertas | — | **Resuelta** (`77198c2`) |
+| D15 | Ingesta NHC duplicada en dos procesos | 🟠 Doble tráfico a NOAA | — | **Resuelta** (`64e9445`) |
+
+**Abiertas: 4** (D1 aplazada, D2, D3, D8). **Cerradas: 10.** D9 es una precaución, no deuda.
 
 ### D1 — Specs de backend con tests comentados (⏸ aplazado por decisión)
 
@@ -422,7 +424,7 @@ aplazado, `findOne` de storms y `getSummary` de dashboard se quedan sin red de s
 conteo de tests verdes (objetivo: 209/209) hace la meta más difícil de seguir. Es una decisión
 tuya: borrarla, o dejarla como utilidad disponible.
 
-### D13 — Un `204` precede al `200` en los GET del dashboard
+### ~~D13 — Un `204` precede al `200` en los GET del dashboard~~ **Resuelta**: no era un bug
 
 **Observado** el 2026-09-27 al trazar la navegación con el panel de red de Chrome, no por
 lectura de código. Cada petición de datos del dashboard aparece **dos veces**:
@@ -443,9 +445,26 @@ anómalo, y hay varias causas posibles con consecuencias muy distintas:
 - Si el servidor responde 204 a propósito en alguna ruta, hay una discrepancia entre el
   contrato y lo que el cliente espera.
 
-**Cómo investigarlo**: repetir la traza distinguiendo el método (OPTIONS vs GET) y mirando la
-pestaña Network a mano, en vez de por script. Después, comprobar en el backend si alguna ruta
-devuelve 204 por diseño.
+**Cómo se resolvió**: repetí la traza registrando el **método** de cada petición, que es lo que
+faltaba, y el resultado fue:
+
+```
+OPTIONS 204 /auth/login          ← preflight CORS
+POST    200 /auth/login          ← la petición real
+GET     200 /dashboard/summary
+OPTIONS 204 /dashboard/summary   ← preflight CORS
+```
+
+**Era el preflight, no un GET con 204.** Nunca hubo una respuesta 204 a un GET. Mi lectura
+anterior contó las dos filas de una misma petición como si fueran dos respuestas.
+
+**Por qué salta**: el cliente manda `Authorization: Bearer` (`frontend/src/api/client.ts:102`),
+un header que no es "simple". Peticiones cruzadas de origen (el SPA en `:80`, la API en
+`:3000`) con un header no simple exigen preflight, y el 204 sin cuerpo es la respuesta correcta
+de `enableCors`. Con JWT es inevitable; no hay nada que arreglar.
+
+**Lección**: al leer el panel de red hay que mirar el método de cada fila. El status por sí solo
+no dice nada, y un 204 tiene dos lecturas muy distintas según quién lo devolvió.
 
 ### ~~D15 — La ingesta NHC corría duplicada~~ **Resuelta** (`64e9445`)
 
@@ -762,14 +781,17 @@ El usuario se quejó dos veces de comprobaciones lentas.
 
 ### Si retomar
 
-1. **D1** — las 3 suites unitarias (D1). Con la integración ya verde, es la cobertura que
-   falta. Sigue aplazada por decisión tuya; es lo que bloquea tocar storms/dashboard.
-2. **D13** — el `204` antes de cada `GET` del dashboard. Anómalo y sin explicar.
+1. **D1** — las 3 suites unitarias comentadas. Con la integración ya en verde (37 tests), es la
+   cobertura que falta. Sigue aplazada por decisión tuya, y es lo que bloquea tocar storms y
+   dashboard con seguridad.
+2. **D8** — `api.health()` y `api.tokens()` no los llama nadie. Borrado de bajo riesgo.
 3. **Fase 3** — auditorías a11y y Web Vitals. No es código, es un informe. Requiere tu permiso.
-4. **Fase 4.1–4.3** — unificar carpetas duplicadas. Mantenimiento, no urgencia.
+4. **Fase 4.1–4.3** — unificar carpetas duplicadas (`history`/`storm-history`/`weather/storms`
+   en backend; `helpers/` vs `domain/` y la pregunta de `pages/` en frontend). Mantenimiento.
 
-Resueltos y cerrados: D5, D6, D7, D10, D11, D12, D14, D15. Solo queda D13, una investigación concreta.
 
-**Nota de cobertura**: la integración (37 tests, verde) y la unitaria (175) son suites
+**Nota de cobertura**: integración (37 tests, verde) y unitaria (182: 179 verdes, 3 fallos de
+D1, 1 skip) son suites distintas. Que la primera esté en verde no reactiva D1, que es solo
+sobre las 3 suites unitarias comentadas.
 distintas. Que la primera esté en verde no reactiva D1, que es solo sobre las 3 suites
 unitarias comentadas.
