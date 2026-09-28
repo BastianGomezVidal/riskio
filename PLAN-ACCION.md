@@ -134,6 +134,7 @@ detalle.
 | **D10** | Una migración aplicada en la BD **nunca existió en el repo** | 🔴 El despliegue no es reproducible | — | **Resuelta** (`0955a80`) |
 | D6 | `forgot-password` resetea la contraseña y no la entrega | — | 4.7 | **Resuelta** (`cf4f2e5`, `e646477`, `608ce38`) |
 | ~~D11~~ | Specs de integración caídos | — | — | **Resuelta** (`0955a80`, `2dd0b3e`) |
+| D15 | Ingesta NHC duplicada: API y worker corroboraban a la vez | 🟠 Doble tráfico a NOAA | — | **Resuelta** (`64e9445`) |
 | D12 | `generateTemporaryPassword` sin uso tras el flujo de token | 🟡 Código muerto, aún testeado | — | Abierta, decisión tuya |
 | D13 | Un `204` precede al `200` en GETs del dashboard | 🟠 Sin explicar | — | Anotada, sin investigar |
 | ~~D14~~ | Capa de mensajería sin uso | — | — | **Resuelta** (`77198c2`) |
@@ -445,6 +446,28 @@ anómalo, y hay varias causas posibles con consecuencias muy distintas:
 **Cómo investigarlo**: repetir la traza distinguiendo el método (OPTIONS vs GET) y mirando la
 pestaña Network a mano, en vez de por script. Después, comprobar en el backend si alguna ruta
 devuelve 204 por diseño.
+
+### ~~D15 — La ingesta NHC corría duplicada~~ **Resuelta** (`64e9445`)
+
+**Síntoma**: cadaCuenca se consultaba **dos veces** por intervalo de 10 minutos.
+
+**Causa**: `main.ts` y `main.worker.ts` arrancan el mismo `AppModule`, que incluye
+`IngestionModule` con su `@Cron('0 */10 * * * *')`. El scheduler no tenía guarda de rol, así
+que el proceso con HTTP y el worker lo ejecutaban ambos. `IS_WORKER` ya no existía en el
+código: solo lo usaba el consumer de D5, que se eliminó.
+
+**Por qué importa más de lo que parece**: los escrituras son idempotentes, así que no había
+corrupción. Pero el propósito declarado del worker (`main.worker.ts`: "para que el polling
+siga vivo aunque el contenedor del API se reinicie") quedaba anulado, porque el API hacía el
+polling equally. No era solo tráfico duplicado: era el worker justificado en falso.
+
+**Cómo se cerró**: guarda `IS_WORKER !== 'true'` en el handler, con tres tests de rol.
+
+> **Aprendizaje sobre el proceso**: al añadir el spec del scheduler lo escribí encima del
+> archivo que ya existía, sin leerlo, y perdí 11 tests. Lo detectó el conteo (184 esperados
+> contra 173 obtained), no el build ni los tipos. Los tests se restauraron y el `beforeEach`
+> compartido ahora fija `IS_WORKER='true'`, para que las aserciones del handler no puedan pasar
+> contra una ejecución saltada por la guarda.
 
 ### D9 — Precaución, no deuda: `manualChunks` compila verde y mata la app al cargar
 
