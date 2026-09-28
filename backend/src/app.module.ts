@@ -11,7 +11,6 @@ import { UsersModule } from './domain/users/users.module.js';
 import { HealthModule } from './health/health.module.js';
 import { DashboardModule } from './domain/dashboard/dashboard.module.js';
 import { HistoryModule } from './domain/storm-history/storm-history.module.js';
-import { MessagingModule } from './domain/messaging/messaging-module.js';
 import { AppCacheModule } from './domain/cache/cache.module.js';
 
 /**
@@ -48,7 +47,6 @@ import { AppCacheModule } from './domain/cache/cache.module.js';
     HealthModule,
     DashboardModule,
     HistoryModule,
-    MessagingModule,
     AppCacheModule,
   ],
 })

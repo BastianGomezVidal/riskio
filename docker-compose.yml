@@ -23,9 +23,6 @@ x-backend-env: &backend-env
   DATABASE_URL: ${DATABASE_URL}
   CACHE_DRIVER: ${CACHE_DRIVER:-redis}
   REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-  # The broker is only used to hand off avatar cleanup (see PLAN-ACCION.md,
-  # deuda D5). Ingestion does not use it: it is a plain @Cron poll.
-  BROKER_DRIVER: ${BROKER_DRIVER:-memory}
   # Outbound email, used only for the password reset link. `log` keeps the link
   # in the backend log instead of sending it, which is fine locally and unsafe
   # anywhere else. Set MAIL_TRANSPORT=smtp plus the SMTP_* values to send for

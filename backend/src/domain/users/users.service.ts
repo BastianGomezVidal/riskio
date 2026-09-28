@@ -12,8 +12,6 @@ import { UpdateUserDto } from './dto/update-user.dto.js';
 import { UserProfileDto } from './dto/user-profile.dto.js';
 import { STORAGE_SERVICE } from '../storage/storage.tokens.js';
 import type { StorageService } from '../storage/storage.service.js';
-import { MESSAGE_BROKER } from '../messaging/adapter/types/message-broker.token.js';
-import type { IMessageBroker } from '../messaging/adapter/interface/messaging-broker.js';
 
 @Injectable()
 export class UsersService {

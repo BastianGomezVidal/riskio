@@ -20,7 +20,7 @@ Cambios recientes relacionados con infra: eliminación de `minio`, `minio-init-b
 Variables relevantes (API/worker):
 - `STORAGE_DRIVER: s3`, `STORAGE_ENDPOINT: http://storage:8333` (comunicación interna entre contenedores)
 - `STORAGE_PUBLIC_URL: http://localhost:${STORAGE_PORT:-8333}/riskio-avatars` (acceso público desde navegador)
-- `DATABASE_URL`, `REDIS_URL: redis://redis:6379`, `CACHE_DRIVER: redis`, `BROKER_DRIVER: memory`, `IS_WORKER: "true"` (worker)
+- `DATABASE_URL`, `REDIS_URL: redis://redis:6379`, `CACHE_DRIVER: redis`, `IS_WORKER: "true"` (worker)
 
 Healthchecks:
 - `db`: `pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}` (10s/5s/5)
@@ -109,7 +109,6 @@ flowchart LR
 | **Credenciales hardcodeadas** | `STORAGE_ACCESS_KEY:any`, `STORAGE_SECRET_KEY:any` repetidos en API y worker (inline). | Bajo (dev/local) | Extraer a `.env` compartido o usar YAML anchors/x-common para evitar duplicidad. No exponer en entornos no-local. |
 | **STORAGE_PUBLIC_URL asume localhost** | Funciona en dev host. En rootless/podman o acceso remoto puede variar (quirk detectado: curl a localhost desde host puede dar reset). | Medio | Parametrizar por entorno (dev/prod). En prod usar proxy/CDN o mismo origen (reverse proxy). Documentar este comportamiento. |
 | **Duplicidad de `environment`** | Bloques STORAGE_* idénticos entre `backend-api` y `backend-worker`. | Bajo | Usar `x-common-storage: &common-storage` (YAML anchors) + extender, o heredar vía `.env`. Reduce drift. |
-| **BROKER_DRIVER=memory** | Colas/jobs en memoria. Si API/worker reinician o escalan réplicas, jobs en memoria se pierden. | Medio (dependiendo de jobs) | Evaluar `BROKER_DRIVER=redis` si los jobs de ingest/background no pueden perderse (BullMQ/Agenda). Redis ya existe. |
 | **Red implícita única** | Usa red por defecto de compose (todos en misma red). Sin aislamiento interno vs público. | Bajo | Crear red dedicada (`app_internal` sin exposición innecesaria + `public` opcional). Útil para hardening y claridad. |
 | **Exposición de puertos** | `redis:6379`, `storage:8333` expuestos al host (útiles para debug con `redis-cli`/boto3). | Bajo (dev local) | En entornos compartidos/CI limitar a `127.0.0.1:${PORT}:PORT` o quitar exposición si solo servicios Docker los consumen. |
 | `runtime: runc` | Explícito en todos los servicios. | Muy bajo | Prescindible (podman usa su runtime por defecto). No perjudica, puede simplificarse. |
@@ -169,17 +168,16 @@ x-common-storage: &common-storage
 
 Aplicar `<<: *common-storage` en `backend-api` y `backend-worker`. Esto reduce repetición y riesgo de drift.
 
-### 7.3 Broker con Redis (si aplica)
+### 7.3 Cola de mensajes: eliminada
 
-Si los jobs en background deben persistir ante reinicios o hay múltiples workers, evaluar:
+No hay broker. La capa entera (`domain/messaging`, con adapters de memory, SQS y Kafka) se
+retiró porque su único uso era entregar la limpieza de avatares huérfanos, y esa entrega
+nunca funcionó: la API publicaba y el worker consumía, cada uno con su cola en memoria, así
+que el evento no cruzaba procesos. `UsersService` borra el avatar directamente contra
+`STORAGE_SERVICE`. La ingesta de NHC nunca pasó por el broker: es un `@Cron`.
 
-```yaml
-environment:
-  BROKER_DRIVER: redis
-  REDIS_URL: redis://redis:6379
-```
-
-Actualmente `BROKER_DRIVER: memory`. Solo cambiar si hay requisitos de durabilidad de jobs (no crítico para dev).
+Si alguna vez hace falta asincronía real, el punto de entrada es Redis (ya está en el stack)
+con BullMQ o Agenda, no un broker propio.
 
 ### 7.4 Endpoints/public URL por entorno
 

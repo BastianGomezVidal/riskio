@@ -70,14 +70,6 @@ export const envValidationSchema = Joi.object({
     .default('redis://redis:6379'),
 
   /**
-   * Message queue backend. Only `memory` is wired up: the broker is used solely to
-   * hand off avatar cleanup, and `InMemoryBroker` does not cross processes anyway
-   * (D5 in PLAN-ACCION.md). `redis` stays valid so a `.env` carrying it fails loudly
-   * at that documented gap rather than at an unrelated startup assert.
-   */
-  BROKER_DRIVER: Joi.string().valid('memory', 'redis').default('memory'),
-
-  /**
    * Outbound email. Only the password-reset link uses it today.
    *
    * `log` writes the message to the backend log instead of sending it. That is

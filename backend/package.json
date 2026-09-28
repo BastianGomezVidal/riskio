@@ -33,7 +33,6 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1141.0",
-    "@aws-sdk/client-sqs": "^3.1141.0",
     "@aws-sdk/s3-request-presigner": "^3.1141.0",
     "@keyv/redis": "^5.1.6",
     "@nestjs/cache-manager": "^12.0.0",
@@ -55,7 +54,6 @@
     "class-validator": "^0.15.1",
     "fast-xml-parser": "^5.11.1",
     "joi": "^18.2.8",
-    "kafkajs": "^2.2.4",
     "keyv": "^5.6.0",
     "nodemailer": "^10.0.11",
     "pg": "^8.23.0",
