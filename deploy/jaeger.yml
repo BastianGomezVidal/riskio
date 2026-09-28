@@ -11,13 +11,32 @@
 # OTLP is served on the standard 4317/4318, so the collector's otlp/jaeger
 # exporter keeps working unchanged, and the query UI stays on 16686 so the
 # Grafana datasource and the browser keep their URLs.
+#
+# Storage layout, and why it is this way:
+#
+#   Two different names appear below and they are not interchangeable. `badger`
+#   under jaeger_storage.backends REGISTERS a storage backend; `traces: badger`
+#   and `trace_storage: badger` SELECT that registered one. Renaming one of
+#   them breaks the link, and the failure surfaces as "cannot find factory for
+#   trace storage <name>" at startup rather than as an empty store.
+#
+#   The path is /badger/*, set explicitly. The default is relative to the
+#   binary and resolves to /cmd/jaeger/data/keys, which works but hides the
+#   location. `directory` is not the key -- the key is `directories`, with
+#   `keys` and `values` under it, and passing `directory` is rejected by
+#   `validate`.
+#
+#   Those directories must be writable by uid 10001. A fresh podman volume is
+#   root:root 0755, so without `:U` on the mount, Jaeger dies at startup with
+#   "Error Creating Dir ... permission denied".
+#
+#   ttl.spans matches the 15d Prometheus retention in deploy/prometheus.yml, so
+#   traces and metrics are not silently kept for different lengths of time.
 service:
   extensions: [jaeger_storage, jaeger_query, healthcheckv2]
   telemetry:
     logs:
       level: info
-    http:
-      endpoint: 0.0.0.0:16686
   pipelines:
     traces:
       receivers: [otlp]
@@ -37,30 +56,23 @@ processors:
 
 exporters:
   jaeger_storage_exporter:
-    trace_storage: some_storage
+    trace_storage: badger
 
 extensions:
   jaeger_storage:
     backends:
-      some_storage:
-        # UNVERIFIED. Traces are stored and queryable, but nothing is written
-        # here: /jaeger/sqlite stays empty, /tmp stays empty, and no storage
-        # path is ever logged.
-        #
-        # What was tried, all of it starting cleanly and all of it writing
-        # nothing: badger with directory and ephemeral:false, badger renamed to
-        # the name the log reports, and this sqlite path. The v2 logs always say
-        # "Initializing storage 'some_storage'" regardless of what this file
-        # says, which suggests the extension is not reading backends at all.
-        #
-        # Worth knowing before trusting a clean startup here: v2 does not
-        # validate its config. A file with a made-up top-level key still starts
-        # and logs "Everything is ready", so absence of errors is not evidence
-        # that any of this was applied.
-        sqlite:
-          path: /jaeger/sqlite/traces.db
+      badger:
+        badger:
+          directories:
+            keys: /badger/keys
+            values: /badger/data
+          ephemeral: false
+          ttl:
+            spans: 360h
   jaeger_query:
     storage:
-      backends: [some_storage]
+      traces: badger
   healthcheckv2:
     use_v2: true
+    http:
+      endpoint: 0.0.0.0:13133

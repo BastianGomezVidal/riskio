@@ -543,15 +543,23 @@ services:
       - "127.0.0.1:${OTEL_PORT:-4318}:4318"
 
   jaeger:
-    # v2, not the v1 all-in-one: v1 went end-of-life in December 2025. It also
-    # could not be made to keep traces at all — badger's directory is not
-    # configurable there, so it wrote to a temp dir and lost everything on
-    # restart. v2 configures storage in YAML. See deploy/jaeger.yml.
+    # v2, not the v1 all-in-one: v1 went end-of-life in December 2025. v2
+    # configures storage in YAML, and the query API is /api/v3.
     image: docker.io/jaegertracing/jaeger:2.21.0
     restart: unless-stopped
+    # The config is mounted but not read unless the process is told to read it.
+    # The image ships no /etc/jaeger directory at all and its entrypoint takes
+    # no arguments, so without this flag Jaeger runs on the defaults compiled
+    # into the binary and logs "Initializing storage 'some_storage'" no matter
+    # what the file says. A correctly mounted file is not a used file.
+    command: ["--config=file:/etc/jaeger/config.yml"]
     volumes:
       - ./deploy/jaeger.yml:/etc/jaeger/config.yml:ro,z
-      - jaeger_data:/jaeger/sqlite
+      # Matches directories.keys / directories.values in deploy/jaeger.yml.
+      # :U is not optional: the process runs as uid 10001 and a fresh podman
+      # volume is root:root 0755, so without it Jaeger dies at startup with
+      # "Error Creating Dir ... permission denied".
+      - jaeger_data:/badger:U,z
     ports:
       - "127.0.0.1:${JAEGER_PORT:-16686}:16686"
     networks:
