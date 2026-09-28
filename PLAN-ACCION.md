@@ -131,12 +131,12 @@ detalle.
 
 | # | Qué es | Impacto | Dónde se arregla | Estado |
 |---|---|---|---|---|
-| **D1** | Specs de backend comentados (3 suites, ~34 tests) | 🔴 Sin red de seguridad | 4.4 | **Aplazada** por decisión |
 | D2 | Carpetas duplicadas en backend | 🟡 Mantenimiento doble | 4.1 | Abierta |
 | D3 | Carpetas duplicadas en frontend | 🟡 Una de las dos queda vieja | 4.2 | Parcialmente cerrada en 2.4 |
 | D4 | Observaciones sueltas | — | — | 2 de 3 resueltos |
 | D9 | `manualChunks` compila verde y mata la app | — No hay bug activo | — | Precaución, no deuda |
 | D16 | `/auth/tokens` sin consumidor: ni UI ni spec | 🟠 Feature sin terminar | — | Abierta, decisión de producto |
+| D1 | Specs de backend comentados (3 suites) | 🔴 Sin red de seguridad | 4.4 | **Resuelta** (`2bcc948`) |
 | D5 | `InMemoryBroker` no cruza procesos | 🟠 Avatares huérfanos | 4.5 | **Resuelta** (`557b6f1`) |
 | D6 | `forgot-password` no entregaba la contraseña | 🔴 Usuario sin acceso a la cuenta | 4.7 | **Resuelta** (`cf4f2e5`, `e646477`, `608ce38`) |
 | D7 | `VITE_API_URL` era un build arg muerto | 🟠 Solo funcionaba en local | — | **Resuelta** (`1ddefa5`) |
@@ -148,10 +148,38 @@ detalle.
 | D14 | Capa de mensajería sin uso | 🟡 ~350 líneas muertas | — | **Resuelta** (`77198c2`) |
 | D15 | Ingesta NHC duplicada en dos procesos | 🟠 Doble tráfico a NOAA | — | **Resuelta** (`64e9445`) |
 
+**Abiertas: 3** (D2, D3, D16). **Cerradas: 12.** D9 es una precaución, no deuda.
+
+**Cobertura**: unitaria **197/197**, integración **37/37**. Cero fallos, cero skip.
+
 **Abiertas: 4** (D1 aplazada, D2, D3, D16). **Cerradas: 11.** D9 es una precaución, no deuda.
 
 **Abiertas: 4** (D1 aplazada, D2, D3, D8). **Cerradas: 10.** D9 es una precaución, no deuda.
 
+### ~~D1 — Specs de backend con tests comentados~~ **Resuelta** (`2bcc948`)
+
+> **Resuelta.** Ninguno de los dos archivos fallaba por código equivocado: estaban neutered por
+> un `/*` mal cerrado y una línea de constructor comentada.
+>
+> - `storms.service.spec.ts`: el `/*` de `service = new StormsService(repository)` se tragaba el
+>   archivo entero hasta el `*/` final. Vitest decía "No test found" y **6 tests eran
+>   inalcanzables**.
+> - `dashboard.service.spec.ts`: al comentar el constructor hubo que comentar cada línea que
+>   tocaba `service`, lo que dejó **14 tests que declaraban `result` y no lo usaban**, un `it()`
+>   anidado dentro de otro, un `it.skip` y ocho bloques `/* */` alrededor de las aserciones.
+>
+> Los dos servicios habían crecido una y dos dependencias de constructor que los specs nunca
+> supieron, y eso lo cazó el type-checker en cuanto se quitaron los comentarios: `StormsService`
+> necesita `CacheService`; `DashboardService`, `AdvisoriesService` y `CacheService`. Los stubs de
+> caché dejan pasar la llamada, así que los tests ejercitan el cálculo real.
+>
+> **Cinco tests solo tenían forma de test**: declaraban `result`, no lo usaban y pasaban. Los
+> delató el aviso de `no-unused-vars` del linter, no yo. Sus aserciones están de vuelta y los
+> números que comprueban (totales, ACE, umbral de huracán) vuelven a contar.
+>
+> **Sobre la meta de 209**: son 197, y la diferencia no son tests sin restaurar. El 209 se registró
+> antes del refactor de DTOs, y parte de esos tests ya no describen el contrato actual. No inventé
+> 12 tests para llegar a una cifra.
 ### D1 — Specs de backend con tests comentados (⏸ aplazado por decisión)
 
 > **Decisión del usuario (2026-09-26): aplazar.** No es deuda que se vaya a resolver sola ni
@@ -805,18 +833,14 @@ El usuario se quejó dos veces de comprobaciones lentas.
 
 ### Si retomar
 
-1. **D1** — las 3 suites unitarias comentadas. Con la integración ya en verde (37 tests), es la
-   cobertura que falta. Sigue aplazada por decisión tuya, y es lo que bloquea tocar storms y
-   dashboard con seguridad.
-2. **D16** — `/auth/tokens` sin consumidor. Decisión de producto: gestionarlo en Settings,
+1. **D16** — `/auth/tokens` sin consumidor. Decisión de producto: gestionarlo en Settings,
    cubrirlo con tests, o retirarlo del backend.
+2. **Fase 4.1–4.3** — unificar carpetas duplicadas. Ahora con red de seguridad: las 197 unitarias
+   y las 37 de integración están en verde.
 3. **Fase 3** — auditorías a11y y Web Vitals. No es código, es un informe. Requiere tu permiso.
-4. **Fase 4.1–4.3** — unificar carpetas duplicadas (`history`/`storm-history`/`weather/storms`
-   en backend; `helpers/` vs `domain/` y la pregunta de `pages/` en frontend). Mantenimiento.
 
 
-**Nota de cobertura**: integración (37 tests, verde) y unitaria (182: 179 verdes, 3 fallos de
-D1, 1 skip) son suites distintas. Que la primera esté en verde no reactiva D1, que es solo
-sobre las 3 suites unitarias comentadas.
+**Nota de cobertura**: unitaria **197/197** e integración **37/37**, ambas en verde y sin skips.
+`npm test` y `npm run test:integration` son comandos distintos y hay que pasar los dos.
 distintas. Que la primera esté en verde no reactiva D1, que es solo sobre las 3 suites
 unitarias comentadas.
