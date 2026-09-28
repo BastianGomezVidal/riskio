@@ -87,18 +87,6 @@ export const resetPasswordResultSchema = z.object({
   message: z.string(),
 });
 
-export const healthSchema = z.object({ status: z.string() });
-
-export const apiTokenSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  prefix: z.string(),
-});
-
-export const apiTokenListSchema = z.array(apiTokenSchema);
-
-/** Shape returned by GET /auth/tokens, derived so it cannot drift. */
-export type TokensResponse = z.infer<typeof apiTokenListSchema>;
 
 /* ------------------------------------------------------------------ */
 /* Storms                                                              */
@@ -222,7 +210,6 @@ export type SchemaMatchesDomain = [
   Assert<
     Exact<z.infer<typeof resetPasswordResultSchema>, ResetPasswordResult>
   >,
-  Assert<Exact<z.infer<typeof healthSchema>, { status: string }>>,
   Assert<Exact<z.infer<typeof stormAggregateSchema>, StormAggregate>>,
   Assert<Exact<z.infer<typeof stormsListSchema>, StormListItem[]>>,
   Assert<Exact<z.infer<typeof stormDetailSchema>, StormDetail>>,

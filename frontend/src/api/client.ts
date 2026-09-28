@@ -3,17 +3,14 @@ import type { StormsQuery } from "@/domain/storm";
 import type { ResetPasswordRequest } from "@/domain/auth";
 import { getAccessToken } from "@/auth/session";
 import {
-  apiTokenListSchema,
   dashboardSummarySchema,
   forgotPasswordResultSchema,
   resetPasswordResultSchema,
-  healthSchema,
   sessionSchema,
   stormAdvisoryDetailSchema,
   stormDetailSchema,
   stormsListSchema,
   userSchema,
-  type TokensResponse,
 } from "./schemas";
 
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
@@ -159,8 +156,6 @@ export function oauthAuthorizeUrl(provider: "google" | "outlook"): string {
 }
 
 export const api = {
-  health: () => request("/health", healthSchema),
-
   // ── Storms ────────────────────────────────────────────────────────
 
   storms: (query: StormsQuery) => {
@@ -216,8 +211,6 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  tokens: () => request("/auth/tokens", apiTokenListSchema),
-
   // ── Dashboard ─────────────────────────────────────────────────────
 
   dashboardSummary: () => request("/dashboard/summary", dashboardSummarySchema),
@@ -248,4 +241,3 @@ export const api = {
   deleteMe: () => requestEmpty("/users/me", { method: "DELETE" }),
 };
 
-export type { TokensResponse };
