@@ -12,8 +12,8 @@ import {
   parseConeKml,
   parseWatchWarningsKml,
 } from '../parser/kml-parser.js';
-import { StormsService } from '../../weather/storms/storms.service.js';
-import { AdvisoriesService } from '../../weather/advisories/advisories.service.js';
+import { StormWriter } from './writers/storm-writer.js';
+import { AdvisoryWriter } from './writers/advisory-writer.js';
 import { CACHE_SERVICE } from '../../cache/cache.tokens.js';
 import type { CacheService } from '../../cache/cache.service.js';
 
@@ -60,8 +60,8 @@ export class IngestionService {
 
   constructor(
     private readonly nhc: NhcProvider,
-    private readonly storms: StormsService,
-    private readonly advisories: AdvisoriesService,
+    private readonly stormWriter: StormWriter,
+    private readonly advisoryWriter: AdvisoryWriter,
     @Inject(CACHE_SERVICE)
     private readonly cache: CacheService,
   ) {}
@@ -147,7 +147,7 @@ export class IngestionService {
      * for storms unknown to the DB and emit a cascade of noise.
      */
     try {
-      await this.storms.reconcileFromFeed(
+      await this.stormWriter.reconcileFromFeed(
         basin,
         summaries.map((s) => ({
           atcfId: s.atcfId,
@@ -182,7 +182,7 @@ export class IngestionService {
       try {
         // The storm was already inserted/updated by reconcileFromFeed.
         // Here we only load it to hand it to the advisories.
-        const storm = await this.storms.findOneRaw(summary.atcfId);
+        const storm = await this.stormWriter.findOneRaw(summary.atcfId);
 
         report.stormsUpserted++;
 
@@ -235,7 +235,7 @@ export class IngestionService {
         const rawText = tcmItem.description ?? null;
 
         const { advisory, inserted } =
-          await this.advisories.upsertFromIngestion({
+          await this.advisoryWriter.upsert({
             storm,
             advisoryNumber,
             issuedAt,
@@ -269,7 +269,7 @@ export class IngestionService {
         if (rawText) {
           const points = parseForecastPoints(rawText, issuedAt);
 
-          const n = await this.advisories.replaceForecastPoints(
+          const n = await this.advisoryWriter.replaceForecastPoints(
             advisory,
             points,
           );
@@ -302,7 +302,7 @@ export class IngestionService {
             ? (parseConeKml(parseKmz(coneKmz))?.polygon ?? null)
             : null;
 
-          await this.advisories.setTrackCone(advisory.id, track, cone);
+          await this.advisoryWriter.setTrackCone(advisory.id, track, cone);
 
           if (track || cone) {
             report.geometriesUpdated++;
@@ -327,7 +327,7 @@ export class IngestionService {
 
           const segments = wwKmz ? parseWatchWarningsKml(parseKmz(wwKmz)) : [];
 
-          const n = await this.advisories.replaceWarnings(
+          const n = await this.advisoryWriter.replaceWarnings(
             advisory,
             segments.map((segment) => ({
               warningType: segment.type,

@@ -1,4 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
+import type { ForecastPointDto } from '../../../common/contracts/forecast-point.dto.js';
 
 /**
  * Parser for NOAA NHC feeds.
@@ -49,15 +50,6 @@ export interface ParsedFeed {
 }
 
 /** A single forecast track point, as produced by {@link parseForecastPoints}. */
-export interface ForecastPointDto {
-  validAt: Date;
-  latitude: number;
-  longitude: number;
-  windSpeedKt: number | null;
-  pressureMb: number | null;
-  category: number | null;
-}
-
 /**
  * Title patterns that mean "no active storm" in a feed.
  * First matches wallet/area feeds, second matches basin summaries.

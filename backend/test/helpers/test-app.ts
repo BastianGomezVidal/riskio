@@ -20,8 +20,8 @@ import { AddSessionTrackingColumns1893500000000 } from '../../src/database/migra
 import { TEST_DATABASE_URL } from '../setup-integration.js';
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
-import { StormsService } from '../../src/domain/weather/storms/storms.service.js';
-import { AdvisoriesService } from '../../src/domain/weather/advisories/advisories.service.js';
+import { StormWriter } from '../../src/domain/feeds/ingestion/writers/storm-writer.js';
+import { AdvisoryWriter } from '../../src/domain/feeds/ingestion/writers/advisory-writer.js';
 
 export interface ProviderOverride<T> {
   provide: unknown;
@@ -168,24 +168,26 @@ export async function seedStorm(
   storm: StormSeed,
   advisories: Array<{ advisory: AdvisorySeed; points: PointSeed[] }>,
 ) {
-  const stormsService = app.get(StormsService);
-  const advisoriesService = app.get(AdvisoriesService);
+  // The writers, not the reader services: seeding writes, and after the
+  // extraction these live in their own process.
+  const stormWriter = app.get(StormWriter);
+  const advisoryWriter = app.get(AdvisoryWriter);
 
-  const savedStorm = await stormsService.upsertFromIngestion(storm);
+  const savedStorm = await stormWriter.upsert(storm);
 
   for (const { advisory, points } of advisories) {
     const { advisory: savedAdvisory } =
-      await advisoriesService.upsertFromIngestion({
+      await advisoryWriter.upsert({
         storm: savedStorm,
         advisoryNumber: advisory.advisoryNumber,
         issuedAt: advisory.issuedAt,
         rawText: advisory.rawText,
       });
 
-    await advisoriesService.replaceForecastPoints(savedAdvisory, points);
+    await advisoryWriter.replaceForecastPoints(savedAdvisory, points);
 
     if (advisory.track !== undefined || advisory.cone !== undefined) {
-      await advisoriesService.setTrackCone(
+      await advisoryWriter.setTrackCone(
         savedAdvisory.id,
         (advisory.track as never) ?? null,
         (advisory.cone as never) ?? null,
@@ -193,7 +195,7 @@ export async function seedStorm(
     }
 
     if (advisory.warnings && advisory.warnings.length > 0) {
-      await advisoriesService.replaceWarnings(
+      await advisoryWriter.replaceWarnings(
         savedAdvisory,
         advisory.warnings as never[],
       );

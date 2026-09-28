@@ -1179,10 +1179,30 @@ mismo cambio que quita la caché, con un percentil real y no con este número.
 El único con trabajo real. Requiere, en este orden:
 
 1. Mover `ForecastPointDto` al lado de quien lo usa (hoy `weather` lo importa de `feeds`, y es
-   **solo un tipo**).
+   **solo un tipo**). — **hecho**
 2. Que la ingesta **escriba sus propias filas** en vez de llamar a `StormsService` y
-   `AdvisoriesService`.
-3. Que deje de importar `auth`.
+   `AdvisoriesService`. — **hecho**
+3. Que deje de importar `auth`. — pendiente: lo decide la extracción, porque el `auth` solo lo
+   necesita el *controller* del disparo manual, y ese se queda en la API.
+
+**Pasos 1 y 2 hechos** (`wip`). Tres tipos cruzaban el límite y los tres se mudaron a
+`common/contracts`: `ForecastPointDto`, `WarningSegmentDto` y `FeedStormSummary`. No se mudaron
+"al lado de quien lo usa" porque eso solo habría invertido la flecha —moverlos a `weather`
+haría que `feeds` dependiera de `weather`— y duplicarlos dejaría dos definiciones que divergen
+en silencio. Un tipo que ambos lados necesitan y que ninguno posee no pertenece a ninguno.
+
+Los seis métodos de escritura se mudaron a `StormWriter` y `AdvisoryWriter`, y **los usaba solo
+la ingesta**: ninguno más en todo el código, así que no hubo que duplicar nada. Los lectores
+`StormsService` y `AdvisoriesService` se quedan sin escrituras. Cada writer declara sus
+repositorios con `forFeature` en vez de tomarlos de los lectores: un lector y un escritor
+compartiendo el mismo handle de repositorio es exactamente la costura que se estaba despegando.
+
+`upsertFromIngestion` pasó a llamarse `upsert` en los writers, porque el sufijo ya no aporta nada
+cuando todos los métodos de la clase son de ingesta.
+
+Verificado: 226/226 unitarias (20 archivos, +2 specs nuevos con 47 casos migrados) y 31/31
+integración, `tsc` limpio. Los readers bajaron de 237+213 a 237+213… sin cambio de líneas pero
+con ~180 líneas de escritura fuera.
 
 Con eso el grafo queda en `feeds → {}` y es extraíble sin tocar `other`. Es el último porque es
 el único que mueve comportamiento, y para entonces hay trazas de la ingesta que dicen si algo

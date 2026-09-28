@@ -12,7 +12,7 @@ import {
   listAdvisoryIds,
 } from '../../../../test/helpers/test-app.js';
 import { NhcProvider } from '../providers/nhc/nhc.provider.js';
-import { StormsService } from '../../weather/storms/storms.service.js';
+import { StormWriter } from './writers/storm-writer.js';
 import { Advisory } from '../../weather/advisories/entities/advisory.entity.js';
 import { ForecastPoint } from '../../weather/advisories/entities/forecast-point.entity.js';
 import { AuthService } from '../../auth/auth.service.js';
@@ -57,7 +57,7 @@ async function createAdminApiKey(targetApp: INestApplication): Promise<string> {
 describe('Ingestion endpoints (integration)', () => {
   let app: INestApplication;
   let token: string;
-  let stormsService: StormsService;
+  let stormWriter: StormWriter;
   let adminKey: string;
 
   const nhcMock = {
@@ -70,7 +70,7 @@ describe('Ingestion endpoints (integration)', () => {
 
   beforeAll(async () => {
     app = await createTestApp([{ provide: NhcProvider, useValue: nhcMock }]);
-    stormsService = app.get(StormsService);
+    stormWriter = app.get(StormWriter);
     adminKey = await createAdminApiKey(app);
 
     token = await registerAndLogin(app);
@@ -86,7 +86,7 @@ describe('Ingestion endpoints (integration)', () => {
     await pointsRepo.createQueryBuilder().delete().execute();
     await advRepo.createQueryBuilder().delete().execute();
 
-    await stormsService.upsertFromIngestion({
+    await stormWriter.upsert({
       atcfId: 'EP142026',
       name: null,
       basin: 'EP',

@@ -8,12 +8,6 @@ import { StormDto, AdvisoryRefDto } from './dto/storm.dto.js';
 import { CACHE_SERVICE } from '../../cache/cache.tokens.js';
 import type { CacheService } from '../../cache/cache.service.js';
 
-interface FeedStormSummary {
-  atcfId: string;
-  name: string | null;
-  basin: string;
-}
-
 @Injectable()
 export class StormsService {
   constructor(
@@ -235,58 +229,9 @@ export class StormsService {
     }));
   }
 
-  async findOneRaw(atcfId: string): Promise<Storm> {
-    const storm = await this.stormsRepository.findOne({
-      where: { atcfId },
-    });
-    if (!storm) {
-      throw new NotFoundException(`Storm ${atcfId} not found`);
-    }
-    return storm;
-  }
 
-  async reconcileFromFeed(
-    basin: string,
-    summaries: FeedStormSummary[],
-  ): Promise<void> {
-    const now = new Date();
 
-    await this.stormsRepository.manager.transaction(async (manager) => {
-      await manager.update(Storm, { basin }, { isActive: false });
 
-      for (const s of summaries) {
-        await manager.upsert(
-          Storm,
-          {
-            atcfId: s.atcfId,
-            name: s.name,
-            basin: s.basin,
-            isActive: true,
-            lastSeenInFeedAt: now,
-          },
-          { conflictPaths: ['atcfId'] },
-        );
-      }
-    });
-  }
 
-  async upsertFromIngestion(input: {
-    atcfId: string;
-    name: string | null;
-    basin: string;
-  }): Promise<Storm> {
-    await this.stormsRepository.upsert(
-      {
-        atcfId: input.atcfId,
-        name: input.name,
-        basin: input.basin,
-        isActive: true,
-        lastSeenInFeedAt: new Date(),
-      },
-      { conflictPaths: ['atcfId'] },
-    );
-    return this.stormsRepository.findOneOrFail({
-      where: { atcfId: input.atcfId },
-    });
-  }
+
 }
