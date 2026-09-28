@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
+import { Logger } from 'nestjs-pino';
 
 /**
  * Start the HTTP server.
@@ -14,7 +15,10 @@ import { AppModule } from './app.module.js';
  *  - serve the Swagger UI at /docs and the machine-readable spec at /docs-json.
  */
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+
+  // Flush the buffered logs through pino instead of Nest's console Logger.
+  app.useLogger(app.get(Logger));
 
   app.useGlobalPipes(
     new ValidationPipe({

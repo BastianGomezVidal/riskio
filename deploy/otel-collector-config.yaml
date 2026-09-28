@@ -1,0 +1,88 @@
+# OpenTelemetry Collector — the single OTLP endpoint for the whole stack.
+#
+# The app, the worker and the browser all talk OTLP to here and nowhere else.
+# Changing where telemetry lands is a change to this file, not to the app:
+# sending the same traces to CloudWatch or X-Ray later means adding an
+# exporter, not editing application code.
+#
+# Used instead of the image's default config so the receivers we depend on are
+# explicit and reviewable.
+
+receivers:
+  # Application and worker traces and metrics.
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  # Infrastructure: the host itself. CPU, memory, disk, network and filesystem
+  # for this machine, which is what tells you whether a slow request was the
+  # application or the box.
+  hostmetrics:
+    # The default is 60s, which on a dev machine is long enough to look like
+    # the receiver is broken. 20s keeps the host visible while working.
+    collection_interval: 20s
+    scrapers:
+      cpu: {}
+      memory: {}
+      disk: {}
+      filesystem: {}
+      network: {}
+      load: {}
+
+processors:
+  # Bound the collector's own memory before the batch queue does.
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+
+exporters:
+  # Traces go to Jaeger, which accepts OTLP directly.
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+    # Jaeger may not be up yet when the collector starts, so queue and retry
+    # rather than drop the first traces.
+    sending_queue:
+      enabled: true
+      num_consumers: 10
+      queue_size: 1000
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+
+  # Prometheus is pull-based and cannot receive a push, so the collector
+  # exposes the metrics and Prometheus scrapes this endpoint.
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: true
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  telemetry:
+    logs:
+      level: warn
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/jaeger]
+    metrics:
+      receivers: [otlp, hostmetrics]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]

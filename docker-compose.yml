@@ -34,6 +34,14 @@ x-backend-env: &backend-env
   SMTP_USER: ${SMTP_USER:-}
   SMTP_PASS: ${SMTP_PASS:-}
   MAIL_FROM: ${MAIL_FROM:-riskio@example.com}
+  # Telemetry. Both processes speak OTLP to the collector and nothing else, so
+  # pointing traces at CloudWatch or X-Ray later is a change to the collector's
+  # config and not to the app. service.name is fixed here so the service
+  # extractions in Fase 6 do not relabel data that already exists.
+  OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-riskio-api}
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_TRACE_SAMPLE_RATIO: ${OTEL_TRACE_SAMPLE_RATIO:-1}
+  DEPLOYMENT_ENVIRONMENT: ${DEPLOYMENT_ENVIRONMENT:-local}
 
 services:
   db:
@@ -151,6 +159,10 @@ services:
     environment:
       <<: [*storage-env, *backend-env]
       IS_WORKER: "true"
+      # A distinct service name, or the worker's traces and the API's are
+      # indistinguishable in Jaeger. The worker is the one that talks to NOAA,
+      # which makes it the more interesting of the two.
+      OTEL_SERVICE_NAME: ${OTEL_WORKER_SERVICE_NAME:-riskio-worker}
     networks:
       # core only: the worker has no HTTP listener, so nothing outside needs
       # to reach it.
@@ -179,6 +191,71 @@ services:
       backend-api:
         condition: service_healthy
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.139.0
+    restart: unless-stopped
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./deploy/otel-collector-config.yaml:/etc/otel/config.yaml:ro,z
+      # Per-container metrics via the podman socket are deliberately absent.
+      # They were tried and do not work here: SELinux denies a container access
+      # to /run/user/1000/podman/podman.sock even as root, and one broken
+      # receiver takes the whole collector down with it, taking traces and host
+      # metrics with it. Per-service resource usage is still available from the
+      # app side: the Node runtime metrics that ship with auto-instrumentations
+      # report process CPU and heap per service.
+    networks:
+      - core
+    ports:
+      # OTLP over HTTP on loopback, so the browser can send traces too
+      # (Fase 6.2). Nothing is exposed off the host.
+      - "127.0.0.1:${OTEL_PORT:-4318}:4318"
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.68.0
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "127.0.0.1:${JAEGER_PORT:-16686}:16686"
+    networks:
+      - core
+
+  prometheus:
+    image: prom/prometheus:v3.6.0
+    restart: unless-stopped
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro,z
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - core
+
+  loki:
+    image: grafana/loki:3.5.5
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yml"]
+    volumes:
+      - ./deploy/loki.yml:/etc/loki/loki.yml:ro,z
+      - loki_data:/loki
+    networks:
+      - core
+
+  grafana:
+    image: grafana/grafana:12.3.1
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro,z
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
+    networks:
+      - core
+
 networks:
   # Data tier. Only the API and the worker sit here alongside it.
   core:
@@ -189,3 +266,5 @@ volumes:
   pgdata:
   storage_data:
   redis_data:
+  loki_data:
+  grafana_data:

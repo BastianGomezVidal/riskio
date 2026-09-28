@@ -11,6 +11,7 @@ import { UsersModule } from './domain/users/users.module.js';
 import { HealthModule } from './health/health.module.js';
 import { DashboardModule } from './domain/dashboard/dashboard.module.js';
 import { AppCacheModule } from './domain/cache/cache.module.js';
+import { ObservabilityModule } from './config/observability.module.js';
 
 /**
  * Root application module.
@@ -46,6 +47,7 @@ import { AppCacheModule } from './domain/cache/cache.module.js';
     HealthModule,
     DashboardModule,
     AppCacheModule,
+    ObservabilityModule,
   ],
 })
 export class AppModule {}
