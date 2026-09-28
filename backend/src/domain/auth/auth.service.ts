@@ -15,6 +15,7 @@ import { Repository, IsNull } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from './entities/user.entity.js';
 import { ApiToken } from './entities/api-token.entity.js';
+import { ApiTokenDto } from './dto/api-token.dto.js';
 import { PasswordResetToken } from './entities/password-reset-token.entity.js';
 import { generateApiToken, hashToken } from './auth.utils.js';
 import { AuthResponseDto } from './dto/credentials.dto.js';
@@ -322,12 +323,27 @@ export class AuthService {
     };
   }
 
-  /** List a user's active API tokens (metadata only). */
-  async listApiTokens(userId: string): Promise<ApiToken[]> {
-    return this.tokensRepository.find({
+  /**
+   * List a user's active API tokens.
+   *
+   * Maps the rows to a DTO on purpose. Returning the entities shipped
+   * `tokenHash` to the browser, which the "metadata only" comment above
+   * promised it did not; see ApiTokenDto for why the digest is not harmless
+   * just because it is one-way.
+   */
+  async listApiTokens(userId: string): Promise<ApiTokenDto[]> {
+    const tokens = await this.tokensRepository.find({
       where: { user: { id: userId }, revokedAt: IsNull() },
       order: { createdAt: 'DESC' },
     });
+
+    return tokens.map((token) => ({
+      id: token.id,
+      name: token.name,
+      prefix: token.prefix,
+      createdAt: token.createdAt,
+      lastUsedAt: token.lastUsedAt,
+    }));
   }
 
   /**

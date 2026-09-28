@@ -42,6 +42,7 @@ import {
   CreatedApiTokenDto,
 } from './dto/create-api-token.dto.js';
 import { ApiToken } from './entities/api-token.entity.js';
+import { ApiTokenDto } from './dto/api-token.dto.js';
 import { CurrentUser } from './decorators/current-user.decorator.js';
 import { Public } from './decorators/public.decorator.js';
 import type { AuthPrincipal } from './auth.roles.js';
@@ -195,9 +196,9 @@ export class AuthController {
   @Get('tokens')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List the current account API tokens' })
-  @ApiOkResponse({ description: 'Active tokens (metadata only)' })
+  @ApiOkResponse({ description: 'Active tokens (metadata only)', type: [ApiTokenDto] })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT' })
-  listTokens(@CurrentUser() user: AuthPrincipal): Promise<ApiToken[]> {
+  listTokens(@CurrentUser() user: AuthPrincipal): Promise<ApiTokenDto[]> {
     return this.auth.listApiTokens(user.id);
   }
 
