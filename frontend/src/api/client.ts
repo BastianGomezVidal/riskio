@@ -9,6 +9,8 @@ const tracePropagator = new W3CTraceContextPropagator();
 import type { Span } from "@opentelemetry/api";
 import { getAccessToken } from "@/auth/session";
 import {
+  apiTokensListSchema,
+  createdApiTokenSchema,
   dashboardSummarySchema,
   forgotPasswordResultSchema,
   resetPasswordResultSchema,
@@ -290,5 +292,23 @@ export const api = {
   },
 
   deleteMe: () => requestEmpty("/users/me", { method: "DELETE" }),
+
+  /** Active machine tokens for the signed-in account. Metadata only. */
+  apiTokens: () => request("/auth/tokens", apiTokensListSchema),
+
+  /**
+   * The plaintext lives in this one response and nowhere else, so the caller
+   * has to surface it immediately: the server kept the digest and there is no
+   * endpoint that can reproduce the secret.
+   */
+  createApiToken: (name: string) =>
+    request("/auth/tokens", createdApiTokenSchema, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
+  /** 204. A token that is not yours answers 404, deliberately. */
+  revokeApiToken: (id: string) =>
+    requestEmpty(`/auth/tokens/${id}`, { method: "DELETE" }),
 };
 

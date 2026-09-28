@@ -20,6 +20,12 @@ export const queryKeys = {
     all: ["storms"] as const,
     list: (query: StormsQuery) => ["storms", "list", query] as const,
   },
+  apiTokens: {
+    all: ["auth", "tokens"] as const,
+    // Scoped by account: the list is per-user, so a second account signing in
+    // on the same tab must not read the first one's tokens out of the cache.
+    list: (userId: string | null) => ["auth", "tokens", "list", userId] as const,
+  },
   stormAdvisory: {
     all: ["storms", "advisory"] as const,
     detail: (atcfId: string, advisoryNumber: string) =>
@@ -51,6 +57,21 @@ export function stormsListQuery(query: StormsQuery) {
     queryKey: queryKeys.storms.list(query),
     queryFn: () => api.storms(query),
     staleTime: 2 * 60_000,
+  });
+}
+
+/**
+ * The account's machine tokens.
+ *
+ * Short staleTime because revoking a credential is the one thing here a user
+ * wants to see take effect immediately, and a stale list showing a token that
+ * was just revoked is the kind of wrong that erodes trust in the screen.
+ */
+export function apiTokensQuery(userId: string | null) {
+  return queryOptions({
+    queryKey: queryKeys.apiTokens.list(userId),
+    queryFn: () => api.apiTokens(),
+    staleTime: 15_000,
   });
 }
 

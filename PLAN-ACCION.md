@@ -133,7 +133,7 @@ detalle.
 |---|---|---|---|---|
 | D4 | Observaciones sueltas | — | — | 2 de 3 resueltos |
 | D9 | `manualChunks` compila verde y mata la app | — No hay bug activo | — | Precaución, no deuda |
-| D16 | `/auth/tokens` sin consumidor: ni UI ni spec | 🟠 Feature sin terminar | — | Abierta, decisión de producto |
+| D16 | `/auth/tokens` sin consumidor: ni UI ni spec | ✅ Resuelta (`2209dd3`, UI en `Settings`) | — | **Resuelta** |
 | D2 | Carpetas duplicadas en backend | 🟡 Mantenimiento doble | 4.1 | **Resuelta** (`336ea0e`) |
 | D3 | Carpetas duplicadas en frontend | 🟡 Una de las dos queda vieja | 4.2 | **Resuelta** (`d4b5fce`) |
 | D1 | Specs de backend comentados | 🔴 Sin red de seguridad | 4.4 | **Resuelta** (`2bcc948`) |
@@ -148,7 +148,7 @@ detalle.
 | D14 | Capa de mensajería sin uso | 🟡 ~350 líneas muertas | — | **Resuelta** (`77198c2`) |
 | D15 | Ingesta NHC duplicada en dos procesos | 🟠 Doble tráfico a NOAA | — | **Resuelta** (`64e9445`) |
 
-**Abierta: 1** (D16, decisión de producto). **Cerradas: 14.** D9 es una precaución, no deuda.
+**Abiertas: 0. Cerradas: 15.** D9 es una precaución, no deuda.
 
 **Cobertura**: unitaria **191/191**, integración **31/31**. Cero fallos, cero skip.
 
@@ -1694,3 +1694,44 @@ los seis servicios. Ya no lee, no escribe y no cachea: **solo reenvía**.
 no usa la clave, hay que escribirla en su bloque de `environment`, aunque el valor venga de `.env`
 por interpolación. La interpolación `${JWT_SECRET}` **no** filtra: la resuelve Compose y la
 inyecta, que es justo lo que queremos cuando corresponde y no cuando no.
+
+
+### D16 — ~~`/auth/tokens` sin consumidor: ni UI ni spec~~ **Resuelta**
+
+**No era una feature de admin.** Eso lo escribí mal al resumir el registro, y la pregunta salió
+mal por culpa mía. Los endpoints existentes son de **API tokens del propio usuario**
+(`GET/POST/DELETE /auth/tokens`, credenciales de máquina), y no hay nada de sesiones revocables
+por admin: el modelo es una sesión activa por usuario (`currentSessionId`), sin tabla de sesiones
+ni `jti`. Construir la UI de admin habría significado inventar el modelo de sesiones.
+
+Elegí la opción del usuario final sobre su propia cuenta, y antes de escribir una línea
+apareció lo que el spec ausente estaba escondiendo.
+
+**`GET /auth/tokens` enviaba `tokenHash` al navegador.** El método decía *"metadata only"* y
+devolvía la entidad, y una entidad `ApiToken` lleva `tokenHash`: el SHA-256 con el que se
+verifica un token. No es reversible —el secreto son 32 bytes aleatorios—, así que no es una
+credencial filtrada. Es un **verificador equivalente a contraseña** en la respuesta que lista las
+credenciales. Filtrar el prefijo da una etiqueta; filtrar el digest da la capacidad de comprobar
+candidatos offline. Cualquier XSS, log o proxy capturado después pasa a ser un oráculo. Corregido
+con `ApiTokenDto`, que es también lo que Swagger anuncia ahora.
+
+**Los 14 tests nuevos fijan la forma de la respuesta y el alcance por usuario.** Anotar lo que
+pasó escribiéndolos: asumí que `revokeApiToken` leía la fila y comprobaba el dueño en JavaScript, y
+cuatro tests fallaron porque **el código es mejor que mi suposición** — mete el usuario en el
+`WHERE` del `UPDATE`, así que no hay ventana entre lectura y escritura, y `affected` responde
+"¿era tuyo y seguía vivo?" en la misma ida y vuelta. Los tests ahora afirman eso.
+
+**El bug que encontró la verificación en vivo**: `CreatedApiTokenDto` no trae `lastUsedAt`, porque
+un token recién creado nunca se ha usado. Yo había tipado `CreatedApiToken extends ApiToken`, lo
+que metía un campo nullable en una respuesta que no lo tiene, y el schema estricto habría lanzado
+`ApiContractError` **justo en la llamada donde el usuario está mirando su secreto nuevo**. Se
+typó aparte. Un `Assert<Exact<>>` no lo detecta: las dos caras frontend concordaban, la que
+mentía era el DTO de Nest.
+
+**Verificado contra la API en marcha**: crear → listar (sin `tokenHash`) → revocar 204 → listar, y
+las claves de ambas respuestas casan exactamente con los schemas. 264/264 unitarias, 31/31
+integración, `tsc` limpio, build del frontend en verde.
+
+**Lo que sigue sin red de seguridad**: el frontend no tiene vitest, ni RTL, ni un solo test. Esta
+UI entra sin cobertura, y el backend tampoco cubre estos endpoints en la suite de integración.
+Es la carencia más grande que queda, y es de infraestructura de test, no de producto.

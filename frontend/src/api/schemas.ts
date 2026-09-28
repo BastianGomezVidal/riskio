@@ -14,6 +14,7 @@ import type {
   StormListItem,
 } from "@/domain/storm";
 import type { User } from "@/domain/users";
+import type { ApiToken, CreatedApiToken } from "@/domain/apiTokens";
 
 /**
  * Runtime contracts for every API response.
@@ -87,6 +88,45 @@ export const resetPasswordResultSchema = z.object({
   message: z.string(),
 });
 
+
+/* ------------------------------------------------------------------ */
+/* API tokens                                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Strict on purpose.
+ *
+ * Zod strips unknown keys by default, so a `tokenHash` appearing in a future
+ * response is dropped at the boundary rather than parked in the cache where it
+ * could be logged or serialised. The server used to send that digest, and the
+ * regression is cheap to reintroduce and easy to miss without this.
+ */
+export const apiTokenSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    prefix: z.string(),
+    createdAt: isoDate,
+    lastUsedAt: nullableIsoDate,
+  })
+  .strict();
+
+export const apiTokensListSchema = z.array(apiTokenSchema);
+
+/**
+ * Built from scratch rather than from `apiTokenSchema.extend(...)`: the create
+ * response has no `lastUsedAt`, and extending would have demanded a field the
+ * server does not send — turning every token creation into a contract error.
+ */
+export const createdApiTokenSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    prefix: z.string(),
+    createdAt: isoDate,
+    token: z.string().min(1),
+  })
+  .strict();
 
 /* ------------------------------------------------------------------ */
 /* Storms                                                              */
@@ -203,6 +243,8 @@ type Assert<T extends true> = T;
 
 export type SchemaMatchesDomain = [
   Assert<Exact<z.infer<typeof userSchema>, User>>,
+  Assert<Exact<z.infer<typeof apiTokenSchema>, ApiToken>>,
+  Assert<Exact<z.infer<typeof createdApiTokenSchema>, CreatedApiToken>>,
   Assert<Exact<z.infer<typeof sessionSchema>, Session>>,
   Assert<
     Exact<z.infer<typeof forgotPasswordResultSchema>, ForgotPasswordResult>
