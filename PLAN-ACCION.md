@@ -1067,7 +1067,17 @@ aguanta si alguien cambia las otras dos sin saber qué había en juego.
 
 **Matiz al navegar**: los logs se guardan siempre, pero el tail sampling descarta ~80 % de las
 trazas de éxito. Saltar de una línea a su traza fallará en la mayoría de los éxitos y
-funcionará siempre en los errores.
+funcionará siempre en los errores. Es el patrón que recomienda OpenTelemetry: correlación y
+muestreo son cosas separadas, `trace_id` es el vínculo, y no se pretende que Loki y Jaeger
+tengan la misma cobertura.
+
+**El umbral de latencia depende de `cache`, y 6.4 lo invalida.** La política de `slow` (250 ms)
+no mide peticiones lentas, mide **fallos de caché**: `/dashboard/summary` tarda ~470 ms en
+frío y 2-4 ms con acierto, porque `dashboard.service.ts` la envuelve en `getOrSet` con 30 s de
+TTL. Hoy eso es justo lo útil — una traza con caché no enseña la consulta y no dice nada del
+trabajo real. Al cortar la caché en 6.4, todas las peticiones harán la consulta de verdad, todas
+pasarán 250 ms, y esa ruta dejará de muestrearse en silencio. Hay que revisar el umbral en el
+mismo cambio que quita la caché, con un percentil real y no con este número.
 
 ### 6.6 — `feeds` como servicio propio
 

@@ -68,6 +68,12 @@ processors:
       - key: http.response.header.set-cookie
         action: delete
 
+  # Only safe because every span of a trace lands on this one instance. Tail
+  # sampling is a per-trace decision made from the complete set of spans, so a
+  # second collector, or any load balancer in front of several, would show
+  # partial traces: half the spans sampled as "success" and half arriving after
+  # the decision. If this ever scales out, route by trace_id first, so all
+  # spans of a trace reach the same instance.
   # Sampling decided when the operation finishes, not when it starts.
   #
   # A head-based sampler has to choose at the first span and cannot know how the
@@ -86,6 +92,26 @@ processors:
         type: status_code
         status_code:
           status_codes: [ERROR]
+      # Slow traces, in full. A request that took its time is the one you will
+      # be asked about afterwards, and by the "normal" policy below it would be
+      # thrown away 80% of the time like any other success — which is how a
+      # performance problem becomes invisible exactly when someone reports it.
+      #
+      # 250 ms is a dev-scale threshold, but read what it actually measures: a
+      # cache miss, not a slow request. /dashboard/summary is ~470 ms cold and
+      # 2-4 ms on a hit, because dashboard.service.ts wraps it in getOrSet with
+      # a 30 s TTL. So today this keeps the cold calls and the concurrent
+      # bursts and samples the cached ones, which is the useful half: a cached
+      # trace shows no query and tells you nothing about the work.
+      #
+      # It stops meaning anything in 6.4. Once the cache is cut, every dashboard
+      # request does the real query, every one clears 250 ms, and this route
+      # silently stops being sampled at all. Revisit the threshold in the same
+      # change that removes the cache, with a real percentile rather than this.
+      - name: slow
+        type: latency
+        latency:
+          threshold_ms: 250
       # Everything else at a share. Set to 100 in development when you want to
       # see every navigation.
       - name: successes
