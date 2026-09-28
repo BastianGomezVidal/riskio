@@ -136,9 +136,10 @@ detalle.
 | ~~D11~~ | Specs de integración caídos | — | — | **Resuelta** (`0955a80`, `2dd0b3e`) |
 | D12 | `generateTemporaryPassword` sin uso tras el flujo de token | 🟡 Código muerto, aún testeado | — | Abierta, decisión tuya |
 | D13 | Un `204` precede al `200` en GETs del dashboard | 🟠 Sin explicar | — | Anotada, sin investigar |
+| D14 | Capa de mensajería entera sin uso tras cerrar D5 | 🟡 ~7 archivos muertos | — | Abierta, decisión tuya |
 | **D1** | Specs de backend comentados (3 suites, ~34 tests) | 🔴 Sin red de seguridad | 4.4 | **Aplazada** por decisión |
 | D7 | `VITE_API_URL` era un build arg muerto | 🟠 Solo funcionaba en local | — | **Resuelta** (`1ddefa5`) |
-| **D5** | `InMemoryBroker` no cruza procesos: avatares huérfanos | 🟠 Silencioso, crece sin límite | 4.5 *(propuesto)* | Abierta, sin paso |
+| ~~D5~~ | `InMemoryBroker` no cruza procesos: avatares huérfanos | — | — | **Resuelta** (`557b6f1`) |
 | **D2** | Carpetas duplicadas en backend | 🟡 Mantenimiento doble | 4.1 | Abierta |
 | **D3** | Carpetas duplicadas en frontend | 🟡 Una de las dos queda vieja | 4.2 | Parcialmente cerrada en 2.4 |
 | **D8** | `api.health()` / `api.tokens()` sin uso | 🟡 Contrato que nada valida | 4.6 *(propuesto)* | Abierta, sin paso |
@@ -206,7 +207,7 @@ accidente, y por eso el síntoma es "No test found in suite" en vez de un fallo 
   600 kB con el motivo escrito en `vite.config.ts` (antd y `@rc-component` no se pueden
   separar sin romper la app al cargar).
 
-### D5 — `InMemoryBroker` no cruza procesos: los avatares huérfanos nunca se limpian
+### ~~D5 — `InMemoryBroker` no cruza procesos~~ **Resuelta** (`557b6f1`)
 
 > **Sin paso asignado.** Registrado con la recomendación (llamar a `STORAGE_SERVICE`
 > directamente desde `UsersService`) pero nunca convertido en fase. → **Paso 4.5** (propuesto,
@@ -230,6 +231,17 @@ silencioso.
 `redis.broker.ts` no arregla nada, solo cambia el modo de fallo. Con `redis` aceptado por el
 esquema de validación y sin implementarlo, se pierde el evento igual. Además, Redis para un
 único evento de baja latencia y baja frecuencia es sobreingeniería.
+
+**Cómo se cerró**: `UsersService` llama a `STORAGE_SERVICE` directamente y el consumer
+`OrphanCleanupConsumer` se eliminó, porque se suscribía a un topic que nadie publica y su log
+"Subscribed" hacía creer que la limpieza funcionaba. El avatar se borra **después** del commit
+de la transacción, no dentro: dentro, un rollback borraría el archivo de una cuenta que sigue
+existiendo. Verificado contra el stack: avatar subido, cuenta borrada, y el objeto pasó de 4
+a 3 en el bucket mientras el usuario pasó a 0 filas. Seis tests lo fijan.
+
+> **Lo que dejó esto abierto (D14)**: la capa de mensajería completa —interfaz, token, módulo
+> y tres adapters (memory, SQS, Kafka)— ya no la consume nadie. Borrarla entera es una decisión
+> mayor que la que tomé aquí; la dejé en pie porque el arreglo de D5 no la requería.
 
 **Opciones**:
 
@@ -642,7 +654,7 @@ deuda → arreglo exista. **Ninguno está aprobado.**
 
 | Paso | Cierra | Qué implica | Nota |
 |---|---|---|---|
-| 4.5 | D5 | Que `UsersService` llame a `STORAGE_SERVICE` directamente y deje de publicar `orphan-cleanup`, o un adapter de broker real | Toca backend con D1 aplazada |
+| ~~4.5~~ | ~~D5~~ | **Cerrada**: `UsersService` → `STORAGE_SERVICE` directo, consumer eliminado | Ya no queda nada |
 | 4.6 | D8 | Borrar `api.health()` y `api.tokens()` con sus schemas | Solo borrado, sin riesgo |
 | ~~4.7~~ | ~~D6~~ | **Cerrada**: link de un solo uso + `MAIL_TRANSPORT=smtp` con nodemailer | Ya no queda nada por decidir aquí |
 
@@ -724,12 +736,12 @@ El usuario se quejó dos veces de comprobaciones lentas.
 
 1. **D1** — las 3 suites unitarias (D1). Con la integración ya verde, es la cobertura que
    falta. Sigue aplazada por decisión tuya; es lo que bloquea tocar storms/dashboard.
-2. **D5** — `InMemoryBroker` no cruza procesos: los avatares huérfanos se acumulan en silencio.
-   La receta ya está escrita (paso 4.5).
+2. **D13** — el `204` antes de cada `GET` del dashboard. Anómalo y sin explicar.
 3. **Fase 3** — auditorías a11y y Web Vitals. No es código, es un informe. Requiere tu permiso.
 4. **Fase 4.1–4.3** — unificar carpetas duplicadas. Mantenimiento, no urgencia.
 
-Resueltos y cerrados: D6, D7, D10, D11. D12 es una decisión de diez minutos.
+Resueltos y cerrados: D5, D6, D7, D10, D11. D12, D13 y D14 son decisiones o investigaciones
+pequeñas.
 
 **Nota de cobertura**: la integración (37 tests, verde) y la unitaria (175) son suites
 distintas. Que la primera esté en verde no reactiva D1, que es solo sobre las 3 suites
