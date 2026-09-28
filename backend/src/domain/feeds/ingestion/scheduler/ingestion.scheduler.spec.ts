@@ -56,7 +56,14 @@ describe('IngestionScheduler', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
+  let originalIsWorker: string | undefined;
+
   beforeEach(() => {
+    // The handler only runs in the worker process; without this every
+    // assertion below would pass vacuously against a skipped run.
+    originalIsWorker = process.env.IS_WORKER;
+    process.env.IS_WORKER = 'true';
+
     logSpy = vi
       .spyOn(Logger.prototype, 'log')
       .mockImplementation(() => undefined);
@@ -72,6 +79,8 @@ describe('IngestionScheduler', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    if (originalIsWorker === undefined) delete process.env.IS_WORKER;
+    else process.env.IS_WORKER = originalIsWorker;
   });
 
   it('delegates to ingestAllBasins exactly once', async () => {
@@ -292,5 +301,49 @@ describe('IngestionScheduler', () => {
       'scheduled-ingest failed: connection reset',
       'STACK_TRACE',
     );
+  });
+
+  /*
+   * The scheduler must only poll in the worker.
+   *
+   * main.ts and main.worker.ts bootstrap the same AppModule, so the cron
+   * exists in both processes. Without the guard every basin was polled twice
+   * per interval, doubling the requests to NHC and the writes, and defeating
+   * the reason the worker exists: keeping polling alive across an API restart.
+   */
+  describe('process role', () => {
+    const original = process.env.IS_WORKER;
+
+    afterEach(() => {
+      if (original === undefined) delete process.env.IS_WORKER;
+      else process.env.IS_WORKER = original;
+    });
+
+    it('polls when it is the worker', async () => {
+      process.env.IS_WORKER = 'true';
+      const { scheduler, ingestAllBasins } = makeScheduler([]);
+
+      await scheduler.pollAllBasins();
+
+      expect(ingestAllBasins).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not poll in the HTTP API', async () => {
+      delete process.env.IS_WORKER;
+      const { scheduler, ingestAllBasins } = makeScheduler([]);
+
+      await scheduler.pollAllBasins();
+
+      expect(ingestAllBasins).not.toHaveBeenCalled();
+    });
+
+    it('does not poll when IS_WORKER is anything else', async () => {
+      process.env.IS_WORKER = 'false';
+      const { scheduler, ingestAllBasins } = makeScheduler([]);
+
+      await scheduler.pollAllBasins();
+
+      expect(ingestAllBasins).not.toHaveBeenCalled();
+    });
   });
 });

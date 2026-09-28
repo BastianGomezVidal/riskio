@@ -8,6 +8,13 @@ import { IngestionService } from '../ingestion.service.js';
  * A failed storm is not retried immediately. The next scheduled execution
  * will fetch the RSS feed again and retry any storm that failed during the
  * previous run.
+ *
+ * Runs only in the worker. Both `main.ts` and `main.worker.ts` bootstrap the
+ * same `AppModule`, so without this guard the HTTP API also held the cron and
+ * every basin was polled twice per interval: twice the requests to NHC and
+ * twice the writes. The writes are idempotent, so nothing was corrupted, but
+ * it also defeated the reason the worker exists at all — keeping the polling
+ * alive across an API restart.
  */
 @Injectable()
 export class IngestionScheduler {
@@ -27,6 +34,11 @@ export class IngestionScheduler {
    */
   @Cron('0 */10 * * * *')
   async pollAllBasins(): Promise<void> {
+    if (process.env.IS_WORKER !== 'true') {
+      this.logger.log('not the worker, skipping scheduled ingest');
+      return;
+    }
+
     const started = Date.now();
 
     this.logger.log('scheduled-ingest start');
