@@ -768,7 +768,7 @@ El usuario se quejó dos veces de comprobaciones lentas.
 3. **Fase 3** — auditorías a11y y Web Vitals. No es código, es un informe. Requiere tu permiso.
 4. **Fase 4.1–4.3** — unificar carpetas duplicadas. Mantenimiento, no urgencia.
 
-Resueltos y cerrados: D5, D6, D7, D10, D11, D14. D12 es una decisión de diez minutos y D13 una
+Resueltos y cerrados: D5, D6, D7, D10, D11, D14, D15. D12 es una decisión de diez minutos y D13 una
 investigación concreta.
 
 **Nota de cobertura**: la integración (37 tests, verde) y la unitaria (175) son suites
