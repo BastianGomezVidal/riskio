@@ -131,6 +131,22 @@ processors:
         probabilistic:
           sampling_percentage: 20
 
+    # A trace that matches no policy is dropped, not passed through at 20%. This
+    # is the part that surprises people writing a test: POSTing a hand-built
+    # span to :4318/v1/traces returns 200 and the span is then discarded, because
+    # a single fast successful span satisfies neither `errors` nor `slow`. The
+    # 200 only means the receiver took the ExportTraceServiceRequest; the
+    # decision happens here, afterwards, and nothing tells you which way it went.
+    #
+    # So a synthetic trace meant to prove something has to be built to be kept:
+    # either status.code 2, or a span longer than 250 ms. Both is cheapest to
+    # reason about. And check the result with
+    # GET :16686/api/v3/traces/{traceID} rather than trusting the POST status.
+    #
+    # Note the metrics pipeline below has no tail_sampling at all, so web vitals
+    # are never sampled away while traces are. A metric count dropping is a bug;
+    # a trace count dropping is this.
+
   # Bound the collector's own memory before the batch queue does.
   memory_limiter:
     check_interval: 1s

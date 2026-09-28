@@ -32,6 +32,16 @@
 #
 #   ttl.spans matches the 15d Prometheus retention in deploy/prometheus.yml, so
 #   traces and metrics are not silently kept for different lengths of time.
+#
+#   Badger is not shared across processes here, and that is deliberate. Badger
+#   cannot be opened by a collector and a query in separate processes, and this
+#   is why the Jaeger docs steer split deployments to jaeger-remote-storage
+#   instead. Nothing of that applies: the OTLP receiver, jaeger_storage and
+#   jaeger_query are three extensions of one `service:`, so one process owns the
+#   database. `ps` in the container shows a single `jaeger-linux`, and a trace
+#   read back after a restart is the practical proof that both ends are on the
+#   same database. If this ever splits into separate deployments, this file has
+#   to become jaeger-remote-storage, not a shared volume.
 service:
   extensions: [jaeger_storage, jaeger_query, healthcheckv2]
   telemetry:
