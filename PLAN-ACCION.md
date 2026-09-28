@@ -1044,6 +1044,34 @@ se rompió.
 - **No parte `auth`/`users` en servicios de red**, ni `dashboard` en solitario. Ver Fase 5.
 - **No migra a base de datos por servicio.** Queda como evolution posterior.
 
+### 6.1 y 6.2 — Ejecutadas (2026-09-27)
+
+**6.1** (`f3dfcc5`): collector como hub, `hostmetrics` para la infra, Node runtime metrics por
+servicio, y trazas de API y worker con `service.name` propio. Verificado: 17 spans en una traza
+que cubre HTTP, middleware y queries de Postgres; 19 métricas del host y 223 de la app en
+Prometheus con `service.name` como label; el `trace_id` de una línea de log resuelve a su traza.
+
+**Métricas por contenedor: no funciona aquí.** SELinux impide que un contenedor acceda al socket
+de podman **incluso como root**, y un receiver roto tumba el collector entero. Se dejó fuera y
+queda anotado en el compose. El uso de recursos por servicio sigue disponible desde el lado de la
+app, con las métricas de runtime de Node.
+
+**6.2** (`ba312c0`): trazas del navegador con correlación de punta a punta. Una sola traza lleva
+`riskio-web` y `riskio-api`: el span del navegador, el GET y las queries de Postgres debajo.
+
+Dos bugs que **solo aparecieron al mirar las trazas**, no los dashboards:
+
+- Al deshabilitar la instrumentación de `fetch` (para no contar cada llamada dos veces) se
+  eliminó también el código que inyecta `traceparent`. Toda traza del navegador era una traza
+  propia y la correlación no existía, en silencio. Ahora el contexto se inyecta en
+  `buildHeaders`.
+- El endpoint OTLP del collector necesita CORS para el navegador, y fallaba el preflight: el
+  navegador enviaba y Jaeger no mostraba nada. Es la relajación consciente de la regla de `edge`,
+  con orígenes explícitos y no reflejados.
+
+**Loki queda para 6.5**: está arriba y sirviendo sus propias métricas, pero `/ready` sigue en 503
+mientras el ingester se asienta. No se le ha enviado ningún log todavía.
+
 ### Beneficio que ya existe sin nada de esto
 
 Los `Logger` de Nest emiten `[Nest] 30 - 09/27/2026, 5:20:15 p.m. LOG [MailerService] ...`:
@@ -1062,7 +1090,7 @@ indexa por tiempo de forma fiable. El JSON con UTC de 6.1.5 lo arregla aunque Lo
 | 2 | ✅ Frontend con Error Boundaries, TanStack Query, Zod, colocation, splitting | Medio (refactor de data layer) |
 | 3 | ⬜ **Sin empezar.** Informe de a11y + Web Vitals. Requiere tu permiso | Bajo (auditoría) |
 | 5 | ⬜ **Sin empezar.** A1–A2 operación admin; B1–B3 costuras de despliegue | A1–A2 bajo · B3 medio |
-| 6 | ⬜ **Sin empezar.** 6.1 telemetría app+infra · 6.2 front · 6.3 storage · 6.4 cache · 6.5 logs→Loki · 6.6 feeds | bajo hasta 6.5 · **6.6 medio** |
+| 6 | 🚧 **6.1 y 6.2 hechas.** 6.3 storage · 6.4 cache · 6.5 logs→Loki · 6.6 feeds | bajo hasta 6.5 · **6.6 medio** |
 | 4 | ✅ **Cerrada.** 4.1–4.3: las premisas eran falsas; 4.4 = D1 reactivada | Bajo |
 
 **Fase 6 tiene orden obligatorio**: 6.1 antes que cualquier corte. Separar `storage`, `cache` o
