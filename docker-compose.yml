@@ -511,6 +511,11 @@ services:
         # collector's loopback port. Empty disables browser tracing entirely:
         # the SDK is compiled in either way, it just does not register.
         VITE_OTEL_EXPORTER_OTLP_ENDPOINT: ${VITE_OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318}
+        # Compile-time, read by src/auth/session-context.tsx at build. Empty means
+        # "use the defaults in that file", which is what these are set to; they
+        # are spelled out so a deployment can override them without editing code.
+        VITE_IDLE_TIMEOUT_MS: ${VITE_IDLE_TIMEOUT_MS:-}
+        VITE_IDLE_WARNING_MS: ${VITE_IDLE_WARNING_MS:-}
     runtime: runc
     restart: unless-stopped
     ports:

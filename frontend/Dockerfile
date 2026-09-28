@@ -8,11 +8,15 @@ ENV VITE_API_URL=$VITE_API_URL
 ARG VITE_OTEL_EXPORTER_OTLP_ENDPOINT
 ENV VITE_OTEL_EXPORTER_OTLP_ENDPOINT=$VITE_OTEL_EXPORTER_OTLP_ENDPOINT
 
-# compose passes this as a build arg. Vite only sees env vars that are declared
-# (ARG) and exported into the build stage (ENV); without both it silently falls
-# back to the localhost default in src/api/client.ts.
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
+# Inactivity timeout and the warning that fires before it. These are read at
+# build time by src/auth/session-context.tsx, so they are compile-time values
+# and not runtime environment: changing them needs a rebuild, which is why they
+# live here rather than in the nginx stage. Without this pair a container
+# cannot change them and the built-in defaults apply to every deployment.
+ARG VITE_IDLE_TIMEOUT_MS
+ENV VITE_IDLE_TIMEOUT_MS=$VITE_IDLE_TIMEOUT_MS
+ARG VITE_IDLE_WARNING_MS
+ENV VITE_IDLE_WARNING_MS=$VITE_IDLE_WARNING_MS
 
 COPY package*.json ./
 RUN npm ci
