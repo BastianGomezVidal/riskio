@@ -135,7 +135,7 @@ detalle.
 | D6 | `forgot-password` resetea la contraseña y no la entrega | — | 4.7 | **Resuelta** (`cf4f2e5`, `e646477`, `608ce38`) |
 | ~~D11~~ | Specs de integración caídos | — | — | **Resuelta** (`0955a80`, `2dd0b3e`) |
 | D15 | Ingesta NHC duplicada: API y worker corroboraban a la vez | 🟠 Doble tráfico a NOAA | — | **Resuelta** (`64e9445`) |
-| D12 | `generateTemporaryPassword` sin uso tras el flujo de token | 🟡 Código muerto, aún testeado | — | Abierta, decisión tuya |
+| ~~D12~~ | `generateTemporaryPassword` sin uso | — | — | **Resuelta** (`b74b0ad`) |
 | D13 | Un `204` precede al `200` en GETs del dashboard | 🟠 Sin explicar | — | Anotada, sin investigar |
 | ~~D14~~ | Capa de mensajería sin uso | — | — | **Resuelta** (`77198c2`) |
 | **D1** | Specs de backend comentados (3 suites, ~34 tests) | 🔴 Sin red de seguridad | 4.4 | **Aplazada** por decisión |
@@ -413,7 +413,7 @@ contra otra versión de la API.
 **Por qué importa**: la cobertura de integración es efectivamente cero. Con D1 además
 aplazado, `findOne` de storms y `getSummary` de dashboard se quedan sin red de seguridad.
 
-### D12 — `generateTemporaryPassword` quedó sin uso
+### ~~D12 — `generateTemporaryPassword` quedó sin uso~~ **Resuelta** (`b74b0ad`)
 
 **Causa**: el flujo de token no genera contraseñas temporales. La función sigue en
 `auth.utils.ts` y solo la consume su propio spec.
@@ -716,8 +716,8 @@ comportamiento verificado contra el stack en ejecución.
 5. **Fase 3** — auditorías de a11y y Web Vitals, con informe de prioridades.
 
 **Lo único 🔴 que quedaba, D6, está resuelto.** Ya no hay ninguna entrada abierta con
-impacto directo sobre un usuario: D1 está aplazada por decisión, y D5, D11 y D12 son
-silenciosos o de mantenimiento.
+impacto directo sobre un usuario: D1 está aplazada por decisión, y lo que queda es
+mantenimiento.
 
 Cada paso se ejecuta y se revisa antes de pasar al siguiente. Nada se commitea sin
 revisar el diff.
@@ -768,8 +768,7 @@ El usuario se quejó dos veces de comprobaciones lentas.
 3. **Fase 3** — auditorías a11y y Web Vitals. No es código, es un informe. Requiere tu permiso.
 4. **Fase 4.1–4.3** — unificar carpetas duplicadas. Mantenimiento, no urgencia.
 
-Resueltos y cerrados: D5, D6, D7, D10, D11, D14, D15. D12 es una decisión de diez minutos y D13 una
-investigación concreta.
+Resueltos y cerrados: D5, D6, D7, D10, D11, D12, D14, D15. Solo queda D13, una investigación concreta.
 
 **Nota de cobertura**: la integración (37 tests, verde) y la unitaria (175) son suites
 distintas. Que la primera esté en verde no reactiva D1, que es solo sobre las 3 suites
