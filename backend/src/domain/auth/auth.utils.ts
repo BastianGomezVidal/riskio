@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomInt } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 /** Prefix applied to plaintext API tokens so they are recognizable. */
 export const API_TOKEN_PREFIX = 'riskio_';
@@ -72,26 +72,4 @@ export function hashToken(value: string): string {
     : value;
 
   return createHash('sha256').update(raw).digest('hex');
-}
-
-/** Alphanumerics without ambiguous characters (0/O, 1/l/I). */
-const TEMP_PASSWORD_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-
-/**
- * Generate a random, copy-friendly temporary password.
- *
- * Used by the forgot-password flow so a user can sign in again after losing
- * their password; the plaintext is returned once and the hashed form is
- * stored.
- *
- * @param length number of characters to generate, default 12.
- * @returns the temporary password.
- */
-export function generateTemporaryPassword(length = 12): string {
-  let password = '';
-  for (let i = 0; i < length; i += 1) {
-    const index = randomInt(TEMP_PASSWORD_ALPHABET.length);
-    password += TEMP_PASSWORD_ALPHABET[index];
-  }
-  return password;
 }
