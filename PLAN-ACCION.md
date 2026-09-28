@@ -135,6 +135,7 @@ detalle.
 | D6 | `forgot-password` resetea la contraseña y no la entrega | — | 4.7 | **Resuelta** (`cf4f2e5`, `e646477`, `608ce38`) |
 | ~~D11~~ | Specs de integración caídos | — | — | **Resuelta** (`0955a80`, `2dd0b3e`) |
 | D12 | `generateTemporaryPassword` sin uso tras el flujo de token | 🟡 Código muerto, aún testeado | — | Abierta, decisión tuya |
+| D13 | Un `204` precede al `200` en GETs del dashboard | 🟠 Sin explicar | — | Anotada, sin investigar |
 | **D1** | Specs de backend comentados (3 suites, ~34 tests) | 🔴 Sin red de seguridad | 4.4 | **Aplazada** por decisión |
 | D7 | `VITE_API_URL` era un build arg muerto | 🟠 Solo funcionaba en local | — | **Resuelta** (`1ddefa5`) |
 | **D5** | `InMemoryBroker` no cruza procesos: avatares huérfanos | 🟠 Silencioso, crece sin límite | 4.5 *(propuesto)* | Abierta, sin paso |
@@ -402,6 +403,31 @@ aplazado, `findOne` de storms y `getSummary` de dashboard se quedan sin red de s
 **Por qué no la borré**: borrarla exige borrar también sus tests, y con D1 aplazado reducir el
 conteo de tests verdes (objetivo: 209/209) hace la meta más difícil de seguir. Es una decisión
 tuya: borrarla, o dejarla como utilidad disponible.
+
+### D13 — Un `204` precede al `200` en los GET del dashboard
+
+**Observado** el 2026-09-27 al trazar la navegación con el panel de red de Chrome, no por
+lectura de código. Cada petición de datos del dashboard aparece **dos veces**:
+
+```
+204 /users/me
+200 /users/me
+204 /dashboard/summary
+200 /dashboard/summary
+```
+
+**Por qué está anotada y no resuelta**: un `204 No Content` en un `GET` con cuerpo esperado es
+anómalo, y hay varias causas posibles con consecuencias muy distintas:
+
+- Si es un **preflight CORS** mal contabilizado por el panel de red, es inocuo.
+- Si es TanStack Query **deduplicando o reintentando**, el primer 204 podría estar enmascarando
+  un fallo real que luego "se arregla" solo.
+- Si el servidor responde 204 a propósito en alguna ruta, hay una discrepancia entre el
+  contrato y lo que el cliente espera.
+
+**Cómo investigarlo**: repetir la traza distinguiendo el método (OPTIONS vs GET) y mirando la
+pestaña Network a mano, en vez de por script. Después, comprobar en el backend si alguna ruta
+devuelve 204 por diseño.
 
 ### D9 — Precaución, no deuda: `manualChunks` compila verde y mata la app al cargar
 
