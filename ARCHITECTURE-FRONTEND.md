@@ -271,3 +271,58 @@ Las mejoras son **evolutivas**, no un refactor masivo. Los **3 puntos de mayor r
 2. **Error Boundaries + `use()`/Suspense** → menos boilerplate, mejor UX de carga/error.
 3. **Zod en la frontera API** → contrato runtime vs TypeScript.
 
+## 10. Saltos HTTP de una sesión autenticada (medido)
+
+Números reales, no estimados. Se miden con `.audit/session-capture.mjs`, que
+inicia sesión de verdad y navega como lo haría una persona (clic en los enlaces
+del menú, no `page.goto`).
+
+```bash
+AUDIT_EMAIL=... AUDIT_PASSWORD=... node .audit/session-capture.mjs
+```
+
+### Resultado
+
+| Fase | HTTP | preflight | API | OTLP | assets |
+|---|---|---|---|---|---|
+| `arranque` (portada `/`) | 33 | 0 | 0 | 0 | 33 |
+| `login` (enviar credenciales) | 15 | 4 | 2 | 2 | 7 |
+| `dashboard` (navegar) | **0** | 0 | 0 | 0 | 0 |
+| `storms` (navegar) | 6 | 1 | 1 | 1 | 3 |
+| **total** | **54** | **5** | **3** | **3** | **43** |
+
+Las tres únicas llamadas a la API de negocio de toda la sesión son:
+
+1. `POST /auth/login`
+2. `GET /dashboard/summary`
+3. `GET /storms?tab=active&sort=newest`
+
+### Tres cosas que el número esconde
+
+**La portada no toca la API.** Cero XHR/fetch en `/`: es una pantalla de login y
+todo son estáticos. Cualquier suposición de que "la home carga storms" es falsa.
+
+**Navegar a `/dashboard` cuesta 0 peticiones.** React Query ya tiene
+`/users/me` y `/dashboard/summary` de antes del login, así que montar el
+componente no genera tráfico. Es la caché funcionando, y conviene decirlo
+explícitamente porque el mismo recorrido medido con `page.goto` entre fases da
+**6 llamadas en vez de 3**: una recarga completa tira la caché y vuelven a
+pedirse `/users/me` y `/dashboard/summary`. El método de medición cambia el
+número por un factor de dos.
+
+**Cada llamada a la API cuesta 2 peticiones HTTP.** La app se sirve desde
+`localhost:80` y llama a `http://localhost:3000`, luego es cross-origin y cada
+llamada lleva un `OPTIONS` previo (204) además de la llamada real (200). Son
+3 preflight por las 3 llamadas de negocio, más 2 por los `POST` al collector.
+
+Eso son 6 saltos de red para 3 datos, y es el mayor coste evitable de la sesión.
+`frontend/nginx.conf` no tiene `location /api/`: sirve solo estáticos. Con un
+proxy a la API en el mismo origen, los 3 preflight desaparecen y las llamadas
+pasan de `200` con doble round-trip a uno solo.
+
+> Nota: `nginx`.proxy es solo una mejora de topología **local**. En producción
+> el criterio es otro: si API y front viven en dominios distintos, los preflight
+> son inevitables por diseño y lo que procede es consolidar en CORS con
+> credenciales, no perseguir el cero.
+
+

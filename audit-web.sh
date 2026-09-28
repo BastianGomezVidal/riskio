@@ -117,6 +117,23 @@ step "Publicando el resultado como metricas"
 # decidir, y las metricas son una copia extra.
 node .audit/report-metrics.mjs "${COLLECTOR:-http://localhost:4318}" || true
 
+# --------------------------------------------------------------------------
+# Saltos HTTP de una sesion autenticada (opcional)
+# --------------------------------------------------------------------------
+# Solo si hay credenciales en el entorno. Sin ellas el paso se salta entero y
+# no falla la auditoria: auditar la portada no necesita una sesion, y obligar a
+# tener una cuenta para correr Lighthouse seria una barrera para nada.
+#
+# Mide las llamadas que hace una persona real, navigating con los enlaces del
+# menu. Con page.goto entre fases el numero se duplica porque cada recarga tira
+# la cache de React Query; los detalles estan en ARCHITECTURE-FRONTEND.md.
+if [[ -n "${AUDIT_EMAIL:-}" && -n "${AUDIT_PASSWORD:-}" ]]; then
+  step "Saltos HTTP con sesion autenticada"
+  node .audit/session-capture.mjs "$TARGET" || warn "la captura de sesion fallo"
+else
+  info "sin AUDIT_EMAIL/AUDIT_PASSWORD: se omite la captura de sesion autenticada"
+fi
+
 step "resumen"
 [[ $rc -eq 0 ]] && ok "todo dentro de umbrales" || warn "hay umbrales rotos o herramientas que fallaron"
 info "informes: $OUT/{lighthouse.json,axe.json}"
