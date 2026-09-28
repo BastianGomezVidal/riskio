@@ -135,17 +135,20 @@ detalle.
 | D2 | Carpetas duplicadas en backend | 🟡 Mantenimiento doble | 4.1 | Abierta |
 | D3 | Carpetas duplicadas en frontend | 🟡 Una de las dos queda vieja | 4.2 | Parcialmente cerrada en 2.4 |
 | D4 | Observaciones sueltas | — | — | 2 de 3 resueltos |
-| D8 | `api.health()` / `api.tokens()` sin uso | 🟡 Contrato que nada valida | 4.6 *(propuesto)* | **Abierta, sin paso** |
 | D9 | `manualChunks` compila verde y mata la app | — No hay bug activo | — | Precaución, no deuda |
+| D16 | `/auth/tokens` sin consumidor: ni UI ni spec | 🟠 Feature sin terminar | — | Abierta, decisión de producto |
 | D5 | `InMemoryBroker` no cruza procesos | 🟠 Avatares huérfanos | 4.5 | **Resuelta** (`557b6f1`) |
 | D6 | `forgot-password` no entregaba la contraseña | 🔴 Usuario sin acceso a la cuenta | 4.7 | **Resuelta** (`cf4f2e5`, `e646477`, `608ce38`) |
 | D7 | `VITE_API_URL` era un build arg muerto | 🟠 Solo funcionaba en local | — | **Resuelta** (`1ddefa5`) |
+| D8 | `api.health()` / `api.tokens()` sin uso | 🟡 Contrato que nada validaba | 4.6 | **Resuelta** (`2a6739e`) |
 | D10 | Migración aplicada que nunca existió en el repo | 🔴 Despliegue no reproducible | — | **Resuelta** (`0955a80`) |
 | D11 | Specs de integración caídos | 🟠 Cobertura inexistente | — | **Resuelta** (`0955a80`, `2dd0b3e`) |
 | D12 | `generateTemporaryPassword` sin uso | 🟡 Código muerto | — | **Resuelta** (`b74b0ad`) |
 | D13 | `204` antes de los GET del dashboard | — No era un bug | — | **Resuelta** |
 | D14 | Capa de mensajería sin uso | 🟡 ~350 líneas muertas | — | **Resuelta** (`77198c2`) |
 | D15 | Ingesta NHC duplicada en dos procesos | 🟠 Doble tráfico a NOAA | — | **Resuelta** (`64e9445`) |
+
+**Abiertas: 4** (D1 aplazada, D2, D3, D16). **Cerradas: 11.** D9 es una precaución, no deuda.
 
 **Abiertas: 4** (D1 aplazada, D2, D3, D8). **Cerradas: 10.** D9 es una precaución, no deuda.
 
@@ -340,7 +343,7 @@ build ni en CI.
 **Arreglo**: declarar `ARG VITE_API_URL` en la etapa de build y escribirlo en el stage, o
 sacar la URL del runtime (config inyectada en `index.html`) en vez de compilarla.
 
-### D8 — `api.health()` y `api.tokens()` son código muerto
+### ~~D8 — `api.health()` y `api.tokens()` son código muerto~~ **Resuelta** (`2a6739e`)
 
 > **Sin paso asignado.** Es un borrado de ~40 líneas, sin dependents. → **Paso 4.6** (propuesto)
 
@@ -348,8 +351,12 @@ sacar la URL del runtime (config inyectada en `index.html`) en vez de compilarla
 `apiTokenListSchema`, pero no hay ningún consumidor: `rg 'api\.(tokens|health)\(' src` no
 devuelve nada. Son restos de un health check que se retiró.
 
-**Arreglo**: borrarlos (cliente y schema), o bien documentar para qué se conservan. Hoy
-mantienen ~40 líneas de contrato que nada valida.
+**Resuelta** (`2a6739e`): fuera los dos métodos del cliente, `healthSchema`,
+`apiTokenListSchema`, el `apiTokenSchema` del que se derivaba y el alias `TokensResponse`. Una
+aserción de schema menos, de 10 a 9.
+
+Lo que **no** se borró es el backend: `GET /health` lo usa el healthcheck del compose, y
+`/auth/tokens` es una feature de máquina. Eso es D16, no D8.
 
 ### D10 — ~~Una migración aplicada en la BD nunca existió en el repo~~ **Resuelta** (`0955a80`)
 
@@ -424,6 +431,23 @@ aplazado, `findOne` de storms y `getSummary` de dashboard se quedan sin red de s
 conteo de tests verdes (objetivo: 209/209) hace la meta más difícil de seguir. Es una decisión
 tuya: borrarla, o dejarla como utilidad disponible.
 
+### D16 — `/auth/tokens` existe en el API y no lo consume nadie
+
+**Síntoma**: el backend expone `POST /auth/tokens`, `GET /auth/tokens` y `DELETE /auth/tokens/:id`
+(`backend/src/domain/auth/auth.controller.ts`), con su `ApiToken` entity, su hash SHA-256 y su
+servicio completo. No hay ningún consumidor: el frontend no tenía UI para ellos, y ningún spec los
+menciona.
+
+**Por qué NO lo borré al limpiar D8**: sin UI ni tests, la tentación es borrarlo como código
+muerto. Pero un token de API es una feature *de máquina*: existe para clientes que no son el
+navegador, y borrarla es una decisión de producto, no limpieza. Lo que sí era código muerto era
+el lado del cliente, y eso sí se fue en `2a6739e`.
+
+**Qué haría falta para cerrarla**: o una pantalla de gestión en Settings (crear, listar, revocar),
+o tests de integración del recurso, o admitir que la feature no se quiere y retirarla del
+backend. Las tres son decisiones tuyas.
+
+### ~~D13 — Un `204` precede al `200` en los GET del dashboard~~ **Resuelta**: no era un bug
 ### ~~D13 — Un `204` precede al `200` en los GET del dashboard~~ **Resuelta**: no era un bug
 
 **Observado** el 2026-09-27 al trazar la navegación con el panel de red de Chrome, no por
@@ -784,7 +808,8 @@ El usuario se quejó dos veces de comprobaciones lentas.
 1. **D1** — las 3 suites unitarias comentadas. Con la integración ya en verde (37 tests), es la
    cobertura que falta. Sigue aplazada por decisión tuya, y es lo que bloquea tocar storms y
    dashboard con seguridad.
-2. **D8** — `api.health()` y `api.tokens()` no los llama nadie. Borrado de bajo riesgo.
+2. **D16** — `/auth/tokens` sin consumidor. Decisión de producto: gestionarlo en Settings,
+   cubrirlo con tests, o retirarlo del backend.
 3. **Fase 3** — auditorías a11y y Web Vitals. No es código, es un informe. Requiere tu permiso.
 4. **Fase 4.1–4.3** — unificar carpetas duplicadas (`history`/`storm-history`/`weather/storms`
    en backend; `helpers/` vs `domain/` y la pregunta de `pages/` en frontend). Mantenimiento.
