@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BASIN_NAMES, BasinName } from '../../../shared/basin/basin.js';
 import { NhcProvider } from '../providers/nhc/nhc.provider.js';
 import {
@@ -14,7 +14,8 @@ import {
 } from '../parser/kml-parser.js';
 import { StormsService } from '../../weather/storms/storms.service.js';
 import { AdvisoriesService } from '../../weather/advisories/advisories.service.js';
-import { CacheService } from '../../cache/cache.service.js';
+import { CACHE_SERVICE } from '../../cache/cache.tokens.js';
+import type { CacheService } from '../../cache/cache.service.js';
 
 /**
  * Counters describing the outcome of one ingestion run for a basin.
@@ -61,6 +62,7 @@ export class IngestionService {
     private readonly nhc: NhcProvider,
     private readonly storms: StormsService,
     private readonly advisories: AdvisoriesService,
+    @Inject(CACHE_SERVICE)
     private readonly cache: CacheService,
   ) {}
 

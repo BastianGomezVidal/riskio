@@ -1,11 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Storm } from './entities/storm.entity.js';
 import { StormListQueryDto } from './dto/storm-list-query.dto.js';
 import { StormSort, StormTab } from './utils/storm-enums.js';
 import { StormDto, AdvisoryRefDto } from './dto/storm.dto.js';
-import { CacheService } from '../../cache/cache.service.js';
+import { CACHE_SERVICE } from '../../cache/cache.tokens.js';
+import type { CacheService } from '../../cache/cache.service.js';
 
 interface FeedStormSummary {
   atcfId: string;
@@ -19,6 +20,7 @@ export class StormsService {
     @InjectRepository(Storm)
     private readonly stormsRepository: Repository<Storm>,
 
+    @Inject(CACHE_SERVICE)
     private readonly cache: CacheService,
   ) {}
 

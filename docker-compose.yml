@@ -23,14 +23,31 @@ x-storage-env: &storage-env
 # purpose: the API used to merge in the S3 keys, and the whole point of the
 # storage service is that it does not any more. Merging them back in would be
 # a one-line mistake that undoes the extraction without failing anything.
+# What the API knows about caching: only the address of the service. Kept apart
+# from x-backend-env for the same reason as the storage one — a merge key is the
+# easiest place in this file to accidentally hand out a connection string.
+x-cache-client-env: &cache-client-env
+  CACHE_SERVICE_URL: http://backend-cache:3005
+  # Short, because every call sits in the request path. A cache hit measured
+  # 8-12 ms over the wire, so a second of budget is generous; and a miss pays
+  # the timeout twice, get and set, which is what turned a 0.5 s uncached
+  # response into 4 s before the client learned to short-circuit.
+  CACHE_SERVICE_TIMEOUT_MS: ${CACHE_SERVICE_TIMEOUT_MS:-1000}
+  # How long to keep skipping the cache after a failure. Without it, failing
+  # open is theoretical: the requests still work, they are just slower than if
+  # the cache had never existed.
+  CACHE_SERVICE_COOLDOWN_MS: ${CACHE_SERVICE_COOLDOWN_MS:-10000}
+
 x-storage-client-env: &storage-client-env
   STORAGE_API_URL: http://backend-storage:3004
   STORAGE_API_TIMEOUT_MS: ${STORAGE_API_TIMEOUT_MS:-5000}
 
 x-backend-env: &backend-env
   DATABASE_URL: ${DATABASE_URL}
-  CACHE_DRIVER: ${CACHE_DRIVER:-redis}
-  REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+  # REDIS_URL is not here any more. The cache service holds the only Redis
+  # connection in the stack, and the API reaches it over HTTP; leaving it in
+  # this anchor would hand every backend process a cache connection again and
+  # undo the extraction without a single thing failing.
   # Outbound email, used only for the password reset link. `log` keeps the link
   # in the backend log instead of sending it, which is fine locally and unsafe
   # anywhere else. Set MAIL_TRANSPORT=smtp plus the SMTP_* values to send for
@@ -129,7 +146,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      <<: [*storage-client-env, *backend-env]
+      <<: [*storage-client-env, *cache-client-env, *backend-env]
       PORT: 3000
     ports:
       - "${BACKEND_API_PORT:-3000}:3000"
@@ -155,6 +172,38 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  # Own service, and the only holder of a Redis connection. Nothing waits for it
+  # to be healthy: the API degrades to uncached reads instead of refusing to
+  # start, which is the whole point of extracting it.
+  backend-cache:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    runtime: runc
+    command: ["npm", "run", "start:cache"]
+    restart: unless-stopped
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      CACHE_SERVICE_PORT: 3005
+      OTEL_SERVICE_NAME: ${OTEL_CACHE_SERVICE_NAME:-riskio-cache}
+    networks:
+      - core
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3005/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # Own service, own credentials, own blast radius. The API talks to it over
   # HTTP and no longer holds the S3 keys; the bucket policy and the shape of a
@@ -203,7 +252,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      <<: [*storage-client-env, *backend-env]
+      <<: [*storage-client-env, *cache-client-env, *backend-env]
       IS_WORKER: "true"
       # A distinct service name, or the worker's traces and the API's are
       # indistinguishable in Jaeger. The worker is the one that talks to NOAA,

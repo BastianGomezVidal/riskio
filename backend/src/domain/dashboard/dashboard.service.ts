@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -10,7 +10,8 @@ import { StormSummaryDto } from '../weather/storms/dto/storm-summary.dto.js';
 import { Storm } from '../weather/storms/entities/storm.entity.js';
 import { AdvisoriesService } from '../weather/advisories/advisories.service.js';
 import { riskFromCategory } from '../weather/storms/utils/storm-risk.js';
-import { CacheService } from '../cache/cache.service.js';
+import { CACHE_SERVICE } from '../cache/cache.tokens.js';
+import type { CacheService } from '../cache/cache.service.js';
 
 @Injectable()
 export class DashboardService {
@@ -20,6 +21,7 @@ export class DashboardService {
 
     private readonly advisoriesService: AdvisoriesService,
 
+    @Inject(CACHE_SERVICE)
     private readonly cache: CacheService,
   ) {}
 

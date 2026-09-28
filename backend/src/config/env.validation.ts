@@ -148,3 +148,22 @@ export const storageEnvValidationSchema = Joi.object({
   /** Per-request timeout, so a wedged storage service cannot hang a request. */
   STORAGE_API_TIMEOUT_MS: Joi.number().default(5_000),
 });
+
+/**
+ * Environment contract for the cache service.
+ *
+ * Its own schema for the same reason the storage service has one: this process
+ * has no database and signs no tokens, so requiring DATABASE_URL and JWT_SECRET
+ * here would mean shipping both to a service that cannot use them.
+ *
+ * REDIS_URL appears here and nowhere else in the stack. The API used to carry
+ * it, and the whole point of the extraction is that the only holder of a cache
+ * connection is the process that needs one.
+ */
+export const cacheEnvValidationSchema = Joi.object({
+  REDIS_URL: Joi.string()
+    .uri({ scheme: ['redis', 'rediss'] })
+    .default('redis://redis:6379'),
+  /** Default TTL for entries that do not state one. */
+  CACHE_DEFAULT_TTL_MS: Joi.number().default(60_000),
+});

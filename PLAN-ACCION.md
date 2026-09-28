@@ -1063,11 +1063,69 @@ transparente para la telemetría porque la auto-instrumentación de `fetch` inye
 API y la extracción se deshace **sin que nada falle ni avise**. La separación real está en el
 compose, con dos anchors distintos a propósito.
 
-### 6.4 — Cortar `cache` (hoja, 93 líneas)
+### 6.4 — Cortar `cache` (93 líneas) — **hecho**
 
-Segundo, también hoja. **Ojo**: hoy `AppCacheModule` es `@Global()` y se registra en
-`AppModule`; hay que conservar ese comportamiento al moverlo o los servicios que lo injectan
-dejan de resolverlo.
+Segundo, también hoja. `AppCacheModule` sigue siendo `@Global()` y sigue registrado en
+`AppModule`, como avisa el plan: quitar el decorador parecería funcionar hasta que el primer
+módulo que no lo importara dejara de resolver. Los tres consumidores (dashboard, storms,
+ingestion) siguen llamando a `getOrSet` e `invalidate` sin cambios de comportamiento.
+
+**El contrato se parte en dos** porque hay dos lados con necesidades distintas. `CacheStore` es
+el contrato de cable: `get`/`set`/`del`/`invalidate`, sin read-through. El contrato anterior
+tenía `getOrSet(key, ttl, fn)`, y un loader es **código**: solo puede ejecutarse en el proceso
+de quien llama. Una caché detrás de un salto de red es dueña del almacenamiento, no de la
+política. `CacheService` es lo que ve el resto de la aplicación: las cuatro operaciones más
+`getOrSet`, que sigue siendo local.
+
+Separarlas es lo que mantiene testeable a los llamantes: dependen de una interfaz, así que un
+test puede pasar un objeto plano, cosa imposible con una clase con campos privados. Ese error
+lo cometí primero y lo corregí.
+
+**Todo falla abierto, y eso es la decisión de diseño de la extracción.** Antes, un fallo de
+Redis hacía que `get` rechazara, `getOrSet` no llegara a su loader, y la petición fallara por
+datos que estaban en la base de datos todo el rato. Ahora cada llamada captura, avisa **una vez**
+y devuelve "no hay nada cacheado".
+
+**Y falla abierto de verdad, no solo en el papel.** Medido con el servicio parado: la primera
+petición pagaba el timeout y las siguientes también, 4 s cada una, porque un acierto son dos
+llamadas secuenciales (get y set) y cada una esperaba su timeout. Es decir, la degradación era
+**8× más lenta que la ruta sin caché**, que es justo lo contrario de lo que se quería. Se
+añadió un enfriamiento: tras un fallo se saltan las llamadas durante 10 s y el llamante va
+directo a su loader. Medido después: 1,57 s la primera y ~0,5 s las siguientes, que es el coste
+real de la consulta sin caché.
+
+**Redis también quedó aislado**: solo `backend-cache` tiene `REDIS_URL`, comprobado sobre los
+contenedores en marcha.
+
+#### Un bug de fondo que salió por el camino
+
+La invalidación por patrón **nunca funcionó**. No al extraerla: ya estaba roto, y en silencio.
+
+`CacheService.invalidate` llamaba a `store.iterator(pattern)` sobre el adaptador de
+cache-manager, que **acepta el patrón y no devuelve nada**. Cero claves, cero borrados, ningún
+error, ningún log. `ingestion.service.ts` llama a `invalidate('dashboard:*')` e
+`invalidate('storms:*')` después de cada ejecución, y no estaba limpiando nada: las claves
+vencidas se quedaban hasta su TTL.
+
+Las dos formas "naturales" de escribir este método fallan, en direcciones opuestas y las dos en
+silencio:
+
+| Cómo | Resultado |
+|---|---|
+| `store.iterator(patrón)` (el código viejo) | No borra nada y parece funcionar |
+| `kv.iterator(patrón)` en la instancia | **Borra todas las claves** de la caché |
+
+La segunda la escribí yo al principio, creyendo que el parámetro filtraba. Lo detecté porque
+`invalidate('storms:*')` devolvió `deleted: 4` cuando solo 2 claves cumplían el patrón. El
+filtro de `Keyv.iterator` es decorativo.
+
+Por eso el glob se casa **aquí**, a mano, y el fake del spec está modelado para comportarse como
+el Keyv real — que es ignorar el patrón. Un fake que filtrara habría dado el test en verde
+mientras la invalidación real vaciaba la caché entera en cada ejecución de ingesta.
+
+Dos errores más de la misma familia, ambos por escribir una interfaz a memoria en vez de leer
+el objeto real: `del` no existe en Keyv (es `delete`) y el iterador no está donde se busca.
+Compilan sin quejarse y fallan en runtime. El spec los cubre con un fake que no tiene `del`.
 
 ### 6.5 — Logs → Loki
 
