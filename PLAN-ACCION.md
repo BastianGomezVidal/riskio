@@ -131,12 +131,12 @@ detalle.
 
 | # | Qué es | Impacto | Dónde se arregla | Estado |
 |---|---|---|---|---|
-| D2 | Carpetas duplicadas en backend | 🟡 Mantenimiento doble | 4.1 | Abierta |
-| D3 | Carpetas duplicadas en frontend | 🟡 Una de las dos queda vieja | 4.2 | Parcialmente cerrada en 2.4 |
 | D4 | Observaciones sueltas | — | — | 2 de 3 resueltos |
 | D9 | `manualChunks` compila verde y mata la app | — No hay bug activo | — | Precaución, no deuda |
 | D16 | `/auth/tokens` sin consumidor: ni UI ni spec | 🟠 Feature sin terminar | — | Abierta, decisión de producto |
-| D1 | Specs de backend comentados (3 suites) | 🔴 Sin red de seguridad | 4.4 | **Resuelta** (`2bcc948`) |
+| D2 | Carpetas duplicadas en backend | 🟡 Mantenimiento doble | 4.1 | **Resuelta** (`336ea0e`) |
+| D3 | Carpetas duplicadas en frontend | 🟡 Una de las dos queda vieja | 4.2 | **Resuelta** (`d4b5fce`) |
+| D1 | Specs de backend comentados | 🔴 Sin red de seguridad | 4.4 | **Resuelta** (`2bcc948`) |
 | D5 | `InMemoryBroker` no cruza procesos | 🟠 Avatares huérfanos | 4.5 | **Resuelta** (`557b6f1`) |
 | D6 | `forgot-password` no entregaba la contraseña | 🔴 Usuario sin acceso a la cuenta | 4.7 | **Resuelta** (`cf4f2e5`, `e646477`, `608ce38`) |
 | D7 | `VITE_API_URL` era un build arg muerto | 🟠 Solo funcionaba en local | — | **Resuelta** (`1ddefa5`) |
@@ -147,6 +147,10 @@ detalle.
 | D13 | `204` antes de los GET del dashboard | — No era un bug | — | **Resuelta** |
 | D14 | Capa de mensajería sin uso | 🟡 ~350 líneas muertas | — | **Resuelta** (`77198c2`) |
 | D15 | Ingesta NHC duplicada en dos procesos | 🟠 Doble tráfico a NOAA | — | **Resuelta** (`64e9445`) |
+
+**Abierta: 1** (D16, decisión de producto). **Cerradas: 14.** D9 es una precaución, no deuda.
+
+**Cobertura**: unitaria **191/191**, integración **31/31**. Cero fallos, cero skip.
 
 **Abiertas: 3** (D2, D3, D16). **Cerradas: 12.** D9 es una precaución, no deuda.
 
@@ -216,6 +220,41 @@ es legítimo como deuda declarada; un bloque `/* */` que se traga el archivo ent
 accidente, y por eso el síntoma es "No test found in suite" en vez de un fallo claro.
 
 → Ver **Paso 4.4**
+
+### ~~D2 — Carpetas duplicadas en backend~~ **Resuelta** (`336ea0e`)
+
+> **La premisa era falsa.** `domain/history/` se renombró a `domain/storm-history/` en Fase 0
+> (`e56e0fa`) y ya no existe, y **ningún símbolo está definido dos veces** entre `storm-history` y
+> `weather/storms/`.
+>
+> Lo que sí estaba duplicado era la **capacidad**: el frontend tiene pestañas Active/Past en
+> `/storms` y las lee por `GET /storms?tab=active|past`, mientras `GET /storm-history` devolvía una
+> lista paginada de esas mismas tormentas inactivas. Dos endpoints para una feature, y `9116fb2`
+> movió el cliente al otro al plegar el historial dentro de `/storms`. El segundo no lo consumía
+> nadie: 490 líneas con sus dos specs.
+>
+> Verificado, no asumido: tras el cambio `/storm-history` da 404 y `/storms?tab=past` sigue
+> devolviendo las 2 tormentas inactivas. Unit 197 → 191 e integración 37 → 31, predicho y exacto.
+
+### ~~D3 — Carpetas duplicadas en frontend~~ **Resuelta** (`d4b5fce`)
+
+> **La premisa también era falsa:** no hay duplicación. Ningún símbolo se define dos veces entre
+> `helpers/` y `domain/`; `basinLabel` **importa** `BASIN` de `domain/storm` en vez de copiarlo.
+> Eran capas, y el nombre `helpers/`sugería lo contrario.
+>
+> Con tu criterio de "una responsabilidad, un lugar" cada helper se movió junto a su dominio:
+> `helpers/storms/*` → `domain/storm/` (el `.tsx` renombrado a `presentation.tsx`, porque es lógica
+> de presentación), `helpers/geo/*` → `domain/geo/`, `helpers/format-time/datetime.ts` →
+> `domain/datetime/format.ts`.
+>
+> **Una función no encajaba**: `toWhen(isActive, storm)` recibe un `StormAggregate`, así que se fue a
+> `domain/storm` con el resto en vez de quedarse en un módulo de fechas genérico que tendría que
+> importar el dominio de tormentas solo para compilar.
+>
+> Sin suite en el front, la verificación es el build y el navegador: las 6 rutas renderizan con
+> longitudes **idénticas** a antes del movimiento (825/707/476/451/825/102), que es la única señal
+> con sentido para un refactor que es todo formato de fechas y tormentas.
+
 
 ### D2 — Código duplicado en backend
 
@@ -835,12 +874,14 @@ El usuario se quejó dos veces de comprobaciones lentas.
 
 1. **D16** — `/auth/tokens` sin consumidor. Decisión de producto: gestionarlo en Settings,
    cubrirlo con tests, o retirarlo del backend.
-2. **Fase 4.1–4.3** — unificar carpetas duplicadas. Ahora con red de seguridad: las 197 unitarias
-   y las 37 de integración están en verde.
-3. **Fase 3** — auditorías a11y y Web Vitals. No es código, es un informe. Requiere tu permiso.
+2. **Fase 3** — auditorías a11y y Web Vitals. No es código, es un informe. Requiere tu permiso.
 
 
-**Nota de cobertura**: unitaria **197/197** e integración **37/37**, ambas en verde y sin skips.
+**Nota de cobertura**: unitaria **191/191** e integración **31/31**, ambas en verde y sin skips.
 `npm test` y `npm run test:integration` son comandos distintos y hay que pasar los dos.
+
+Las 4.1–4.3 quedan cerradas: las premisas de D2 y D3 resultaron falsas (no había carpetas
+duplicadas), y lo que había eran dos endpoints para la misma feature y un directorio mal
+nombrado. Nada más que unificar.
 distintas. Que la primera esté en verde no reactiva D1, que es solo sobre las 3 suites
 unitarias comentadas.
