@@ -897,6 +897,86 @@ requiere decisión.
 
 ---
 
+## Fase 6 — Telemetría: collector como hub único
+
+> Creada el 2026-09-27. La app **no habla con ningún backend de telemetría**: habla OTLP con
+> un collector, y el collector reparte. Es lo que permite añadir mañana CloudWatch, X-Ray o
+> CloudWatch Logs **sin tocar una línea de la app**, solo reconfigurando el collector.
+>
+> Y el collector no solo recoge la app: también la **infraestructura** (métricas del host y de
+> los contenedores).
+
+### Arquitectura
+
+```
+                       ┌──────────────────────────┐
+   backend-api   ──┐   │                          │
+   backend-worker ─┼──▶│    otel-collector        │
+   host / pods   ──┘   │    (recibos)             │
+                       │                          │
+                       └───┬────────┬────────┬────┘
+              traces ───────┘        │        └────── metrics
+                           ▼         ▼                ▼
+                        Jaeger   Loki (fase 2)   Prometheus ──▶ Grafana
+                                                                        ▲
+                                                        datasource: Prometheus, Loki, Jaeger
+```
+
+Una sola URL de configurable: `OTEL_EXPORTER_OTLP_ENDPOINT`. Cambiar de destino = cambiar una
+variable de entorno o un `exporters:` del collector.
+
+### 6.1 — Traces y métricas (+ telemetría de infraestructura)
+
+| # | Paso | Riesgo |
+|---|---|---|
+| **6.1.1** | Dependencias OTel en el backend: `sdk-node`, `auto-instrumentations-node`, exportadores OTLP, `sdk-metrics`, y `nestjs-pino` para logs JSON | Bajo |
+| **6.1.2** | `src/instrumentation.ts` que se carga **antes** que la app, vía `node --import`. Si se carga después, no instrumenta nada y no hay error que lo indique | Bajo |
+| **6.1.3** | `Dockerfile` y `package.json`: `start:prod` y `start:worker` con `--import ./dist/instrumentation.js`. **El worker también**: es quien golpea NOAA, y ahí está la traza interesante | Bajo |
+| **6.1.4** | Atributos de recurso: `service.name` distinto para api y worker, `service.version`, `deployment.environment`. Sin `service.name` las trazas de los dos procesos se mezclan | Bajo |
+| **6.1.5** | Servicio `otel-collector` en `docker-compose.yml`, red `core` (nunca `edge`), con config en `deploy/otel-collector-config.yaml` | Bajo |
+| **6.1.6** | Receivers: `otlp` (app) **y `host_metrics`** (infra: CPU, memoria, disco, red del host) | Bajo |
+| **6.1.7** | Exporters: `otlp` → Jaeger, y `prometheus` exponiendo `/metrics` para que Prometheus lo scrapee (Prometheus es pull-based, no acepta push) | Bajo |
+| **6.1.8** | Servicios `jaeger`, `prometheus` y `grafana`, con datasources precargados | Bajo |
+
+**Sampling**: empezar con un ratio bajo (1–10 %). La ingesta cada 10 minutos no genera volumen, pero
+el auto-instrumentation de HTTP y Postgres sí puede hacerlo. Ajustar cuando haya datos reales.
+
+**Cardinalidad**: los labels de métrica no llevan `userId`, `atcfId` ni `email`. Es la causa
+número uno de Prometheus comiéndose la memoria. Esos datos van en **trazas** y **logs**, que no
+tienen ese límite.
+
+### 6.2 — Logs estructurados → Loki
+
+Los logs de la app pasan a JSON con `nestjs-pino`: `timestamp`, `level`, `service`, `context`,
+`msg` y **correlación con la traza** (`trace_id`, `span_id`). Eso responde a lo pedido de un
+formato estándar con estampa de tiempo, y además permite saltar de un log a su traza.
+
+Pendiente de decidir en su momento (el collector admite las dos, así que no bloquea 6.1):
+
+| Opción | Cómo | A favor / en contra |
+|---|---|---|
+| **OTLP nativo** | La app envía logs por OTLP al collector, y de ahí al endpoint `/otlp` de Loki (nativo desde Loki 3.0) | Sin agente. Correlación limpia. La pieza pino→OTLP es la menos estandarizada |
+| **Shipper** | El collector lee los logs de los contenedores con `filelog` | Traditional, pero en podman rootless necesita acceso al store, que es lo que más problemas da |
+
+Se añade `loki` con retención definida y el datasource en Grafana.
+
+### Lo que esta fase NO hace
+
+- **No instrumentar el frontend.** Una SPA en este proyecto aportaría poco frente a medir el
+  backend, que es donde están NOAA, Postgres y el storage. RUM se puede añadir después desde el
+  mismo collector, que es justo de lo que se trata.
+- **No sustituir los `Logger` uno a uno.** `nestjs-pino` los sustituye en bloque vía
+  `app.useLogger()`, y las llamadas existentes siguen funcionando.
+
+### Beneficio que ya existe, sin este trabajo
+
+Los `Logger` de Nest emiten líneas de texto con formato de fecha **local y sin zona**:
+`[Nest] 30 - 09/27/2026, 5:20:15 p.m. LOG [MailerService] ...`. Eso no se puede indexar por
+tiempo de forma fiable, y no distingue servicio. Formato JSON con UTC lo arregla aunque Loki
+llegue en 6.2.
+
+---
+
 ## Resumen de entregables por fase
 
 | Fase | Entregable | Riesgo |
@@ -906,6 +986,7 @@ requiere decisión.
 | 2 | ✅ Frontend con Error Boundaries, TanStack Query, Zod, colocation, splitting | Medio (refactor de data layer) |
 | 3 | ⬜ **Sin empezar.** Informe de a11y + Web Vitals. Requiere tu permiso | Bajo (auditoría) |
 | 5 | ⬜ **Sin empezar.** A1–A2 operación admin; B1–B3 costuras de despliegue | A1–A2 bajo · B3 medio |
+| 6 | ⬜ **Sin empezar.** 6.1 traces+métricas+infra; 6.2 logs → Loki. Collector como hub | 6.1 bajo · 6.2 medio |
 | 4 | ✅ **Cerrada.** 4.1–4.3: las premisas eran falsas; 4.4 = D1 reactivada | Bajo |
 
 Fases 0, 1 y 2 ejecutadas (2026-09-26). La 2 dejó el bundle de entrada en 25 kB y el
