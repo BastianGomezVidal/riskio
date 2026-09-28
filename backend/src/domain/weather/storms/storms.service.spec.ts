@@ -3,6 +3,7 @@ import { NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { StormsService } from './storms.service.js';
 import { Storm } from './entities/storm.entity.js';
+import { CacheService } from '../../cache/cache.service.js';
 
 /**
  * Creates a minimal valid Storm entity for storms service tests.
@@ -31,6 +32,7 @@ describe('StormsService', () => {
   let managerUpsert: ReturnType<typeof vi.fn>;
   let createQueryBuilder: ReturnType<typeof vi.fn>;
   let getRawOne: ReturnType<typeof vi.fn>;
+  let getOrSet: ReturnType<typeof vi.fn>;
   let service: StormsService;
 
   beforeEach(() => {
@@ -43,6 +45,11 @@ describe('StormsService', () => {
     managerUpsert = vi.fn();
     getRawOne = vi.fn();
     createQueryBuilder = vi.fn();
+    // StormsService caches findMany behind CacheService; the stub below always
+    // calls through, so these tests exercise the real computation.
+    getOrSet = vi.fn(
+      async (_key: string, _ttlMs: number, fn: () => Promise<unknown>) => fn(),
+    );
 
     const manager = {
       update: managerUpdate,
@@ -75,7 +82,9 @@ describe('StormsService', () => {
       },
     } as unknown as Repository<Storm>;
 
-    /*service = new StormsService(repository);
+    service = new StormsService(repository, {
+      getOrSet,
+    } as unknown as CacheService);
   });
 
   describe('findOne', () => {
@@ -233,7 +242,5 @@ describe('StormsService', () => {
         where: { atcfId: 'EP142026' },
       });
     });
-  });
-});*/
   });
 });
