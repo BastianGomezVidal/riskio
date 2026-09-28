@@ -33,6 +33,10 @@ receivers:
             - "http://localhost"
             - "http://localhost:5173"
             - "http://localhost:8080"
+            # vite preview. Same app, different origin, so without this the
+            # browser rejects the export and a test against a locally built
+            # bundle looks like broken telemetry.
+            - "http://localhost:4173"
             - "http://riskio.test"
             - "https://riskio.test"
           allowed_headers: ["Content-Type", "traceparent", "tracestate"]

@@ -10,7 +10,7 @@ import { QueryProvider } from "./data/QueryProvider";
 import "./index.css";
 import { ErrorBoundary } from "./global_components/ErrorBoundary/ErrorBoundary";
 import { AppFallback } from "./global_components/AppFallback/AppFallback";
-import "./observability/telemetry";
+import { initTracing } from "./observability/telemetry";
 import { reportWebVitals } from "./observability/web-vitals";
 
 /**
@@ -49,6 +49,22 @@ if (root) {
     </StrictMode>,
   );
 
-  // After the first render, so LCP has a value to report.
+  // After the first render, so LCP has a value to report and the tracing SDK
+  // lands off the critical path.
   queueMicrotask(() => reportWebVitals());
+
+  // And then only once the browser is idle, which is a different and later
+  // moment. Loading the SDK right after the first render looked harmless and
+  // was not: ~85 kB of zone.js and the tracing SDK arrived while React was
+  // still mounting, competing for the same throttled bandwidth that the render
+  // needed, and LCP went up. requestIdleCallback is precisely "not while the
+  // page needs you". Neither branch is awaited: a session that never reports is
+  // a missing metric, not a broken page.
+  const loadTelemetry = () => void initTracing();
+  if ("requestIdleCallback" in window) {
+    (window as Window & { requestIdleCallback: (cb: () => void, o?: { timeout: number }) => number })
+      .requestIdleCallback(loadTelemetry, { timeout: 2000 });
+  } else {
+    setTimeout(loadTelemetry, 1000);
+  }
 }
