@@ -1185,6 +1185,53 @@ El único con trabajo real. Requiere, en este orden:
 3. Que deje de importar `auth`. — pendiente: lo decide la extracción, porque el `auth` solo lo
    necesita el *controller* del disparo manual, y ese se queda en la API.
 
+#### Herramienta de ingesta de desarrollo (`npm run dev:fixtures`)
+
+El plan daba por hecho que un disparo manual servía para probar. **No sirve**, y por eso está
+built antes de la extracción y no después: si el feed no ha cambiado, la ingesta reporta
+`advisoriesInserted: 0`, no invalida nada porque no se ha escrito nada, y la ejecución *parece*
+haber funcionado sin haber ejercitado nada del camino de escritura.
+
+La herramienta renderiza los fixtures con el **número de advisory variable**, porque un advisory
+es único por `(tormenta, advisoryNumber)` y un número nuevo es una fila realmente nueva. Se
+pueden encadenar las ejecuciones sin tocar la base entre medias.
+
+Dos decisiones, y las dos salieron de leer el código en vez de suponer:
+
+- **Solo se plantilla lo que la ingesta lee.** El número sale del **título del item TCM**
+  (`extractAdvisoryNumber` = `/Number\s+(\d+)/i`) y nada más. Los catorce "Number 2" que hay
+  entre enlaces y cabeceras WMO son decoración: templatearlos todos habría sido más minucioso y
+  más frágil, sin cambiar una sola fila escrita.
+- **Los tiempos de la trayectoria se quedan como están.** Moverlos exigiría manejar cinco formatos
+  de fecha distintos por sustitución de texto, que es la clase de sustitución que funciona a
+  medias sin avisar. El advisory queda fechado "ahora" con una trayectoria de su día original,
+  que se lee raro y no daña nada: nada valida la coherencia entre ambos.
+
+Dos fallos que aparecieron al probarla de verdad, no al escribirla:
+
+- El contador vivía en un fichero y arrancaba en 3. Los advisories 4 y 5 **ya existían** de
+  datos reales, así que la segunda y tercera ejecución reportaban cero inserciones. El caso es
+  peor que un fallo: no es que_insertara de más, es que se saltaba en silencio. Ahora **consulta
+  la base** y arranca por encima del máximo existente, con `pg`, que ya era dependencia.
+- `.dev-fixtures` se horneó **dentro de la imagen** porque `.dockerignore` no lo excluía, y el
+  contador se congelaba en el valor del último build. Excluido, y con volumen para que sobreviva
+  a los reinicios.
+
+Y los casos edge que casi se caen: base vacía (normal en la primera ejecución, no un problema),
+base inaccesible (avisa, porque un contador ciego puede chocar), y **`state.json` a medias**, que
+hacía `JSON.parse` y tumbaba el script entero. 12 tests en `scripts/dev-fixtures.spec.ts`.
+
+`deploy/compose.dev-ingest.yml` es un override aparte a propósito. `NHC_BASE_URL` es una variable
+de entorno cualquiera: un despliegue que la apuntara a unos fixtures seguiría reportando ingestas
+exitosas sin leer nada de NOAA. Que llegar a los fixtures exija nombrar ese fichero, y que
+`docker-compose.yml` no los mencione, es lo que lo cierra.
+
+Verificado: tres rondas seguidas, `advisoriesInserted: 1` en las tres.
+
+**El worker no se retira todavía.** `IS_WORKER` solo lo usa el scheduler, así que quitar el worker
+antes de que `feeds-service` traiga el cron dejaría la ingesta sin nadie que la dispare. Se
+retira en el mismo commit que mueve el scheduler.
+
 **Pasos 1 y 2 hechos** (`wip`). Tres tipos cruzaban el límite y los tres se mudaron a
 `common/contracts`: `ForecastPointDto`, `WarningSegmentDto` y `FeedStormSummary`. No se mudaron
 "al lado de quien lo usa" porque eso solo habría invertido la flecha —moverlos a `weather`

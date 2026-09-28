@@ -9,7 +9,11 @@ export default defineConfig({
   test: {
     globals: true,
     root: './',
-    include: ['src/**/*.spec.ts'],
+    // scripts/ is included on purpose: dev-fixtures.spec.ts covers the advisory
+    // counter, and the failure mode it guards against is a silent skip that
+    // looks like a healthy ingestion run. A helper that only breaks in the
+    // developer's hands is a helper that will.
+    include: ['src/**/*.spec.ts', 'scripts/**/*.spec.ts'],
     exclude: ['**/*.integration-spec.ts'],
   },
 });

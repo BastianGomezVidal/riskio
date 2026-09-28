@@ -38,3 +38,8 @@ backend/.env
 backend/.eslintrc.js
 # Personal notes
 contexto.txt
+
+# Rendered by backend/scripts/dev-fixtures.mjs. Its state.json carries the
+# advisory counter, and a committed one would make the next advisory number
+# depend on who cloned the repo last.
+backend/.dev-fixtures/

@@ -1,0 +1,61 @@
+# Development-only override for the feeds.
+#
+# `podman-compose -f docker-compose.yml -f deploy/compose.dev-ingest.yml ...`
+#
+# It exists so that pointing the ingestion at a local fixture server is the
+# easy path, and so that nothing in `docker-compose.yml` has to be edited to do
+# it. That matters more than it looks: `NHC_BASE_URL` is an ordinary environment
+# variable, and a deployment that had it pointed at a fixture server would keep
+# reporting successful ingestion runs while reading nothing from NOAA. The safe
+# arrangement is that reaching the fixtures requires asking for this file by
+# name, and the production file never mentions them.
+x-dev-ingest: &dev-ingest
+  # The rendered fixtures, served by scripts/dev-fixtures.mjs. Override the
+  # command to render a specific advisory number:
+  #   command: ["node", "scripts/dev-fixtures.mjs", "--advisory", "7"]
+  command: ["node", "scripts/dev-fixtures.mjs", "--port", "8099"]
+  working_dir: /usr/src/app
+
+services:
+  # Serves the rendered NHC fixtures to the API. Uses the backend image because
+  # it already has node and the script needs nothing else, so this adds no new
+  # image to pull and no new dependency to install.
+  fixtures:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    runtime: runc
+    restart: unless-stopped
+    <<: *dev-ingest
+    env_file: .env
+    environment:
+      # Not a service with a listener the app needs; it is a plain static
+      # server for the ingestion provider to fetch.
+      OTEL_SERVICE_NAME: riskio-fixtures
+      # Read-only use: the script looks up the highest advisory number already
+      # stored for the storm so the rendered one cannot collide. Without it the
+      # counter is blind to the database and will hand back numbers that are
+      # already taken, which the ingestion then skips without complaint.
+      DATABASE_URL: ${DATABASE_URL}
+    volumes:
+      # The advisory counter has to outlive the container. Without this, a
+      # restart hands back the same advisory the ingestion already inserted, so
+      # the second run reports zero inserts and looks like a working system
+      # while exercising nothing.
+      - fixtures_state:/usr/src/app/.dev-fixtures
+    networks:
+      - core
+    ports:
+      # Loopback only, and only so a developer can read the rendered XML in a
+      # browser. The API reaches it over the `core` network by service name.
+      - "127.0.0.1:${FIXTURES_PORT:-8099}:8099"
+
+  backend-api:
+    environment:
+      # Overrides the value from .env and docker-compose.yml. The fixtures are
+      # reachable by service name on `core`, which avoids depending on
+      # host.containers.internal.
+      NHC_BASE_URL: http://fixtures:8099
+
+volumes:
+  fixtures_state:

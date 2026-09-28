@@ -4,3 +4,7 @@ coverage
 .git
 .gitignore
 *.log
+# Rendered NHC fixtures and their advisory counter. Baking them in is how the
+# counter ended up frozen in the image, so every run of the fixture server
+# started from whatever the last build happened to capture.
+.dev-fixtures
