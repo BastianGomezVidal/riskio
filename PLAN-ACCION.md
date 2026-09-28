@@ -955,8 +955,25 @@ no como requisito previo.
 **Advertencia**: montar ese socket en un contenedor le da control del host, equivalente a root.
 Aceptable en dev; en un entorno compartido, no.
 
-**Sampling**: ratio bajo (1–10 %). La ingesta cada 10 minutos no genera volumen, pero la
-auto-instrumentación de HTTP y Postgres sí. Se ajusta con datos reales, no antes.
+**Sampling**: se hace **tail sampling**, no head. El SDK envía el 100 % y decide el collector
+cuando ya sabe si la petición acabó en error: así los errores se conservan **siempre** y el
+corte se aplica solo a los éxitos.
+
+Medido con 50 trazas sintéticas (`service.name: synthetic-sampling`): **10/10 de error (100 %)
+y 7/40 de éxito (17 %)** con `sampling_percentage: 20`.
+
+Dos detalles que costaron una vuelta de tuerca:
+
+- Los valores válidos del `status_code` policy son `OK`, `ERROR` y `UNSET`. Poner
+  `STATUS_CODE_UNSET` (que es como lo llama el SDK) **tumba el collector entero** al arrancar:
+  un processor mal configurado es un pipeline que no arranca, no una política que se ignora.
+- El head sampling del SDK se queda en 1 a propósito. Si se baja ahí, el error ya se perdió
+  antes de que el collector llegue a opinar.
+
+**Errores**: un `TraceErrorInterceptor` global marca el span de Nest como `ERROR` y registra la
+excepción. Sin él, un 500 de TypeORM sale con status `UNSET` y el muestreo lo tira. Aporta además
+`http.route` y `http.request.method`, que es lo que hace que un error sea **buscable** en
+Jaeger sin abrir cada traza.
 
 **Cardinalidad**: los labels de métrica **no** llevan `userId`, `atcfId` ni `email`. Es la causa
 número uno de que Prometheus se coma la memoria; eso va en **trazas** y **logs**, que no tienen

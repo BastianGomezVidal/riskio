@@ -64,6 +64,11 @@ const sdk = new NodeSDK({
       exportIntervalMillis: 15_000,
     }),
   ],
+  // Head sampling only decides what the SDK is willing to send. The collector
+  // then decides again, with tail_sampling, once it knows whether the request
+  // ended in an error. Keeping this at 1 means nothing is lost before the
+  // collector can make the better-informed decision; the collector is the one
+  // that drops.
   sampler: new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(sampleRatio) }),
   instrumentations: [
     getNodeAutoInstrumentations({

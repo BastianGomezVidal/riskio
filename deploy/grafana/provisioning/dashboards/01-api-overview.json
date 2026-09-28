@@ -1,0 +1,106 @@
+{
+  "uid": "riskio-api",
+  "title": "Riskio · API",
+  "tags": ["riskio"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Peticiones por segundo, por ruta",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count[5m]))",
+          "legendFormat": "{{http_route}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Latencia p95 por ruta",
+      "description": "El objetivo de la Fase 3 es INP < 200 ms; aquí se ve la latencia de servidor.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95 {{http_route}}"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p50 {{http_route}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Errores 4xx/5xx por ruta",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum by (http_route, http_response_status_code) (rate(http_server_request_duration_seconds_count{http_response_status_code=~\"4..|5..\"}[5m]))",
+          "legendFormat": "{{http_response_status_code}} {{http_route}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Latencia de queries a Postgres",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, db_operation_name) (rate(db_client_operation_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95 {{db_operation_name}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Event loopdelay p99 y utilización",
+      "description": "La saturación del event loop se manifiesta aquí antes que en la latencia de negocio.",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 8 },
+      "targets": [
+        {
+          "expr": "nodejs_eventloop_delay_p99_seconds",
+          "legendFormat": "delay p99"
+        },
+        {
+          "expr": "nodejs_eventloop_utilization_ratio",
+          "legendFormat": "utilización"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Servicios con telemetría",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 15 },
+      "targets": [
+        { "expr": "count(count by (service_name) (http_server_request_duration_seconds_count))" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Rendimiento medio de Postgres",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 15 },
+      "targets": [
+        {
+          "expr": "sum(rate(db_client_operation_duration_seconds_count[5m])) or vector(0)"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Rutas más lentas (p95, ventana)",
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 15 },
+      "targets": [
+        {
+          "expr": "topk(10, histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket[15m]))))",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    }
+  ]
+}

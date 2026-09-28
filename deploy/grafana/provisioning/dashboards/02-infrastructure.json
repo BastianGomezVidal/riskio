@@ -1,0 +1,134 @@
+{
+  "uid": "riskio-infra",
+  "title": "Riskio \u00b7 Infraestructura",
+  "tags": [
+    "riskio",
+    "infra"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "CPU por estado",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "avg by (state) (rate(system_cpu_time_seconds_total{state=~\"idle|user|system|iowait|steal\"}[5m]))",
+          "legendFormat": "{{state}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Memoria en uso",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "system_memory_usage_bytes{state=\"used\"}",
+          "legendFormat": "usada"
+        },
+        {
+          "expr": "system_memory_usage_bytes{state=\"available\"}",
+          "legendFormat": "disponible"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Load average",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "system_cpu_load_average_1m",
+          "legendFormat": "1m"
+        },
+        {
+          "expr": "system_cpu_load_average_5m",
+          "legendFormat": "5m"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Disco: lecturas y escrituras por segundo",
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (device) (rate(system_disk_io_bytes_total{direction=\"read\"}[5m]))",
+          "legendFormat": "lectura {{device}}"
+        },
+        {
+          "expr": "sum by (device) (rate(system_disk_io_bytes_total{direction=\"write\"}[5m]))",
+          "legendFormat": "escritura {{device}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Red por interfaz",
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (device) (rate(system_network_io_bytes_total{direction=\"receive\"}[5m]))",
+          "legendFormat": "recibido {{device}}"
+        },
+        {
+          "expr": "sum by (device) (rate(system_network_io_bytes_total{direction=\"transmit\"}[5m]))",
+          "legendFormat": "enviado {{device}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Memoria del proceso por servicio",
+      "description": "Uso de heap y RSS por servicio. Viene del lado de la app: las m\u00e9tricas por contenedor no est\u00e1n disponibles porque SELinux impide al collector leer el socket de podman.",
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "v8js_memory_heap_used_bytes",
+          "legendFormat": "heap {{service_name}}"
+        },
+        {
+          "expr": "process_resident_memory_bytes",
+          "legendFormat": "rss {{service_name}}"
+        }
+      ]
+    }
+  ]
+}

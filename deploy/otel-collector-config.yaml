@@ -46,6 +46,31 @@ receivers:
       load: {}
 
 processors:
+  # Sampling decided when the operation finishes, not when it starts.
+  #
+  # A head-based sampler has to choose at the first span and cannot know how the
+  # request ends, so a fixed ratio either throws away the errors or keeps every
+  # failed request. Tail sampling waits for the whole trace, keeps all of it when
+  # any span is an error, and keeps a share of the rest.
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 50000
+    expected_new_traces_per_sec: 20
+    policies:
+      # Anything that failed, in full. The app's own TraceErrorInterceptor is
+      # what sets ERROR on the server span, so a 500 shows up here even though
+      # the HTTP span still reports the status code in its own attribute.
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      # Everything else at a share. Set to 100 in development when you want to
+      # see every navigation.
+      - name: successes
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 20
+
   # Bound the collector's own memory before the batch queue does.
   memory_limiter:
     check_interval: 1s
@@ -93,7 +118,7 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
+      processors: [memory_limiter, tail_sampling, batch]
       exporters: [otlp/jaeger]
     metrics:
       receivers: [otlp, hostmetrics]

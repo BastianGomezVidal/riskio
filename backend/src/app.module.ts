@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -12,6 +13,7 @@ import { HealthModule } from './health/health.module.js';
 import { DashboardModule } from './domain/dashboard/dashboard.module.js';
 import { AppCacheModule } from './domain/cache/cache.module.js';
 import { ObservabilityModule } from './config/observability.module.js';
+import { TraceErrorInterceptor } from './common/interceptors/trace-error.interceptor.js';
 
 /**
  * Root application module.
@@ -48,6 +50,11 @@ import { ObservabilityModule } from './config/observability.module.js';
     DashboardModule,
     AppCacheModule,
     ObservabilityModule,
+  ],
+  providers: [
+    // Global so every route's span is marked on failure, which is what the
+    // tail sampling policy keys off to keep every error trace.
+    { provide: APP_INTERCEPTOR, useClass: TraceErrorInterceptor },
   ],
 })
 export class AppModule {}
