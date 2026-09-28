@@ -555,8 +555,21 @@ services:
   prometheus:
     image: prom/prometheus:v3.6.0
     restart: unless-stopped
+    # Prometheus is a database, not a cache. It already writes a real TSDB to
+    # /prometheus, but without a volume that directory lives in the container
+    # layer, so `podman-compose down` or any --force-recreate takes every metric
+    # with it. Which is how the web-vitals series kept disappearing: the data
+    # was never missing, the database was being thrown away.
+    #
+    # Retention is Prometheus's default of 15d, written down so it is a decision
+    # rather than an inherited surprise.
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
     volumes:
       - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro,z
+      - prometheus_data:/prometheus
     ports:
       - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
     networks:
@@ -599,3 +612,4 @@ volumes:
   redis_data:
   loki_data:
   grafana_data:
+  prometheus_data:
