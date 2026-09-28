@@ -1,4 +1,5 @@
-import { StormsTab } from "@/domain/storm";
+import type { StormAggregate, StormsTab } from "@/domain/storm";
+import { formatUTC } from "@/domain/datetime";
 
 /**
  * Display name for a storm: the given name, or `Invest <ATCF id>` when
@@ -23,4 +24,8 @@ export function stormTab(storm: { isActive: boolean }): StormsTab {
  */
 export function stormStatusLabel(isActive: boolean): "Active" | "Past" {
   return isActive ? "Active" : "Past";
+}
+
+export function toWhen(isActive: boolean, storm: StormAggregate): string {
+  return isActive ? "now" : formatUTC(storm.lastSeenAt);
 }

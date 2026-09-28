@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { RightOutlined } from "@ant-design/icons";
 import type { StormAggregate } from "@/domain/storm";
-import { stormDisplayName, stormTab } from "@/helpers/storms/storm";
+import { stormDisplayName, stormTab } from "@/domain/storm";
 
 interface Props {
   storm: StormAggregate;

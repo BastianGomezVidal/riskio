@@ -9,7 +9,6 @@
  * timestamp from the API is rendered.
  */
 
-import { StormAggregate } from "@/domain/storm";
 
 type DateInput = string | Date;
 
@@ -95,8 +94,4 @@ export function formatDuration(fromIso: string, toIso: string): string {
   const months = days / 30.44;
   const rounded = Math.round(months);
   return `${rounded} ${rounded === 1 ? "month" : "months"}`;
-}
-
-export function toWhen(isActive: boolean, storm: StormAggregate): string {
-  return isActive ? "now" : formatUTC(storm.lastSeenAt);
 }

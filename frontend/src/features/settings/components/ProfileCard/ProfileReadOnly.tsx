@@ -1,5 +1,5 @@
 import { Tag } from "antd";
-import { formatUTC } from "@/helpers/format-time/datetime";
+import { formatUTC } from "@/domain/datetime";
 import type { User } from "@/domain/users";
 
 interface Props {

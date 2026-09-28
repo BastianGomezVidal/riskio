@@ -1,5 +1,5 @@
 import type { ForecastPoint } from "@/domain/storm";
-import { maxWinds, movement, stormType } from "@/helpers/storms";
+import { maxWinds, movement, stormType } from "@/domain/storm";
 
 interface Props {
   points: ForecastPoint[];

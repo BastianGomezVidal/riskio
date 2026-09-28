@@ -5,7 +5,7 @@ import {
   ErrorEmpty,
   OfflineEmpty,
 } from "@/global_components/StatusEmpty/StatusEmpty";
-import { formatUTC } from "@/helpers/format-time/datetime";
+import { formatUTC } from "@/domain/datetime";
 import type { DashboardStorm } from "@/domain/storm";
 import { StatGrid } from "../StatGrid/StatGrid";
 import { DashboardEmpty } from "../DashboadEmpty/DashBoardEmpty";

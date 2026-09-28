@@ -8,13 +8,8 @@ import {
 } from "@ant-design/icons";
 import type { ReactNode } from "react";
 import type { StormAggregate, StormRiskLevel } from "@/domain/storm";
-import {
-  formatUTC,
-  formatDuration,
-  formatRelative,
-  toWhen,
-} from "@/helpers/format-time/datetime";
-import { stormDisplayName } from "@/helpers/storms";
+import { formatUTC, formatDuration, formatRelative } from "@/domain/datetime";
+import { stormDisplayName, toWhen } from "@/domain/storm";
 
 function Root({
   storm,
