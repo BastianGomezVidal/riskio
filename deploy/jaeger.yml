@@ -1,0 +1,66 @@
+# Jaeger v2. Replaces the v1 all-in-one, which reached end-of-life in December
+# 2025 and printed a deprecation banner on every start.
+#
+# The reason for moving rather than for keeping v1: v1's badger storage cannot
+# be made to persist. There is no BADGER_* variable in `all-in-one env`, no
+# flag, and no entry in print-config, because the options are registered by the
+# storage factory at runtime. Left alone it wrote to a temp directory
+# ("Dir":"/tmp/badger2014150244") and lost every trace on restart. v2 configures
+# storage in YAML, where the directory and ephemeral=false are both stated.
+#
+# OTLP is served on the standard 4317/4318, so the collector's otlp/jaeger
+# exporter keeps working unchanged, and the query UI stays on 16686 so the
+# Grafana datasource and the browser keep their URLs.
+service:
+  extensions: [jaeger_storage, jaeger_query, healthcheckv2]
+  telemetry:
+    logs:
+      level: info
+    http:
+      endpoint: 0.0.0.0:16686
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [jaeger_storage_exporter]
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  jaeger_storage_exporter:
+    trace_storage: some_storage
+
+extensions:
+  jaeger_storage:
+    backends:
+      some_storage:
+        # UNVERIFIED. Traces are stored and queryable, but nothing is written
+        # here: /jaeger/sqlite stays empty, /tmp stays empty, and no storage
+        # path is ever logged.
+        #
+        # What was tried, all of it starting cleanly and all of it writing
+        # nothing: badger with directory and ephemeral:false, badger renamed to
+        # the name the log reports, and this sqlite path. The v2 logs always say
+        # "Initializing storage 'some_storage'" regardless of what this file
+        # says, which suggests the extension is not reading backends at all.
+        #
+        # Worth knowing before trusting a clean startup here: v2 does not
+        # validate its config. A file with a made-up top-level key still starts
+        # and logs "Everything is ready", so absence of errors is not evidence
+        # that any of this was applied.
+        sqlite:
+          path: /jaeger/sqlite/traces.db
+  jaeger_query:
+    storage:
+      backends: [some_storage]
+  healthcheckv2:
+    use_v2: true

@@ -543,10 +543,15 @@ services:
       - "127.0.0.1:${OTEL_PORT:-4318}:4318"
 
   jaeger:
-    image: jaegertracing/all-in-one:1.68.0
+    # v2, not the v1 all-in-one: v1 went end-of-life in December 2025. It also
+    # could not be made to keep traces at all — badger's directory is not
+    # configurable there, so it wrote to a temp dir and lost everything on
+    # restart. v2 configures storage in YAML. See deploy/jaeger.yml.
+    image: docker.io/jaegertracing/jaeger:2.21.0
     restart: unless-stopped
-    environment:
-      COLLECTOR_OTLP_ENABLED: "true"
+    volumes:
+      - ./deploy/jaeger.yml:/etc/jaeger/config.yml:ro,z
+      - jaeger_data:/jaeger/sqlite
     ports:
       - "127.0.0.1:${JAEGER_PORT:-16686}:16686"
     networks:
@@ -613,3 +618,4 @@ volumes:
   loki_data:
   grafana_data:
   prometheus_data:
+  jaeger_data:
