@@ -279,9 +279,12 @@ services:
     runtime: runc
     command: ["npm", "run", "start:weather"]
     restart: unless-stopped
-    env_file: .env
+    # No env_file: this reads storms and advisories and signs nothing. Loading
+    # .env handed it the signing secret and both OAuth client secrets, which it
+    # had no use for and no business holding.
     environment:
       <<: *cache-client-env
+      DATABASE_URL: ${DATABASE_URL}
       WEATHER_SERVICE_PORT: 3007
       OTEL_SERVICE_NAME: ${OTEL_WEATHER_SERVICE_NAME:-riskio-weather}
     networks:
@@ -316,9 +319,14 @@ services:
     runtime: runc
     command: ["npm", "run", "start:feeds"]
     restart: unless-stopped
-    env_file: .env
+    # No env_file, and the NHC_* values are spelled out rather than inherited:
+    # this service polls NOAA and writes storms, and nothing about it needs the
+    # signing secret or the OAuth credentials that .env was handing it.
     environment:
-      <<: [*cache-client-env, *backend-env]
+      <<: *cache-client-env
+      DATABASE_URL: ${DATABASE_URL}
+      NHC_BASE_URL: ${NHC_BASE_URL:-https://www.nhc.noaa.gov}
+      NHC_TIMEOUT_MS: ${NHC_TIMEOUT_MS:-10000}
       FEEDS_SERVICE_PORT: 3006
       OTEL_SERVICE_NAME: ${OTEL_FEEDS_SERVICE_NAME:-riskio-feeds}
     networks:
@@ -391,7 +399,8 @@ services:
     runtime: runc
     command: ["npm", "run", "start:storage"]
     restart: unless-stopped
-    env_file: .env
+    # No env_file: the S3 block is the whole configuration, and the secrets in
+    # .env were being delivered to a process that only ever speaks to a bucket.
     environment:
       <<: *storage-env
       STORAGE_API_PORT: 3004

@@ -1625,6 +1625,27 @@ Que `auth` caído tumbe todo lo autenticado **es lo correcto**, no un defecto: s
 autenticar, no hay nada que servir. Lo que faltaba era que `/health` siguiera vivo — y lo hace,
 porque es público. 250/250 unitarias, 31/31 integración, `tsc` limpio.
 
-**Pendiente**: `weather`, `feeds` y `storage` siguen con `env_file: .env` y heredan los 3
-secretos que no usan. El aislamiento por credenciales está hecho para `auth`; para los otros tres
-es cuestión de quitarles `env_file` como se hizo con la API.
+### Paso 3 — secretos, uno por contenedor: **hecho**
+
+`env_file: .env` no admite excepciones, así que mientras estuvo puesto, quitar una clave del
+código no cambiaba nada: el proceso la seguía teniendo en el entorno. Es la trampa más fácil de
+meter en este proyecto, porque el síntoma no es ningún error, es un `printenv` que muestra de más.
+
+Cada servicio recibe ahora exactamente lo que usa:
+
+| Contenedor | Configuración | Secretos |
+|---|---|---|
+| `riskio-api` | `DATABASE_URL` (migraciones) + URLs de los seis servicios | **0** |
+| `riskio-auth` | `JWT_SECRET`, OAuth, SMTP, `ADMIN_EMAILS` | **5** |
+| `riskio-feeds` | `DATABASE_URL`, `NHC_*`, `CACHE_SERVICE_*` | **0** |
+| `riskio-weather` | `DATABASE_URL`, `CACHE_SERVICE_*` | **0** |
+| `riskio-cache` | `REDIS_URL` | **0** |
+| `riskio-storage` | `STORAGE_*` | **0** |
+
+Comprobado sobre los contenedores en marcha, no sobre el fichero.
+
+**La regla que sale de esto**, y que conviene no olvidar al añadir un servicio nuevo: un
+`env_file` compartido es un `env_file` que reparte secretos a quien no los necesita. Si el servicio
+no usa la clave, hay que escribirla en su bloque de `environment`, aunque el valor venga de `.env`
+por interpolación. La interpolación `${JWT_SECRET}` **no** filtra: la resuelve Compose y la
+inyecta, que es justo lo que queremos cuando corresponde y no cuando no.
