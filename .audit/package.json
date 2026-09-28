@@ -1,0 +1,10 @@
+{
+  "name": "riskio-web-audit",
+  "private": true,
+  "type": "module",
+  "description": "Dependencias de auditoria web. Fuera del frontend a proposito: nada de esto debe acabar en el bundle.",
+  "dependencies": {
+    "@axe-core/puppeteer": "^4.10.1",
+    "puppeteer-core": "^23.11.1"
+  }
+}

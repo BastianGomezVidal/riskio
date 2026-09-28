@@ -46,3 +46,7 @@ backend/.dev-fixtures/
 
 # Salidas de dev.sh
 .dev-logs/
+
+# Deps e informes de audit-web.sh
+.audit/node_modules/
+.audit/out/
