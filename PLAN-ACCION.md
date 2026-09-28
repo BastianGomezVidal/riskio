@@ -845,30 +845,28 @@ cache      → (nadie)
 (`ForecastPointDto`), que desaparece al compilar, y un import dentro de un
 `integration-spec.ts`. En producción **no existe**. Eso abre la costura de la ingesta.
 
-#### Se pueden separar
+#### Las costuras (ahora en la Fase 6)
 
-| Paso | Qué | Por qué es seguro | Coste |
-|---|---|---|---|
-| **B1** | `storage` como servicio propio | 190 líneas, **no importa a nadie**. Habla S3 y ya. Hoja limpia del grafo | Mecánico |
-| **B2** | `cache` como servicio propio | 93 líneas, `@Global`, sin dependencias | Mecánico |
-| **B3** | `feeds` sin dependencias de salida | Perfil distinto (golpea NOAA cada 10 min) y ya corre en proceso propio desde D15 | El único con trabajo real |
+El detalle, el orden y el razonamiento están en la **Fase 6**, que telemetría y corte van juntos a
+propósito. En resumen:
 
-**B3 en concreto** requiere: mover `ForecastPointDto` al lado de quien lo usa; que la ingesta
-escriba sus propias filas en vez de llamar a `StormsService`/`AdvisoriesService`; y que deje de
-importar `auth`. Con eso `feeds → {}` y es extraíble sin tocar la app.
+| Se puede separar | Por qué |
+|---|---|
+| `storage` (190 líneas) | Hoja del grafo: **no importa a nadie**. Habla S3 y ya |
+| `cache` (93 líneas) | Hoja del grafo, sin dependencias. Ojo: hoy es `@Global` |
+| `feeds` (1.896 líneas) | Perfil distinto y ya corre en proceso propio desde D15. Requiere quitarle sus dependencias de salida |
 
 #### NO se separan
 
 - **`auth` + `users` como servicio de identidad (estilo Kerberos).** Hay ciclo real
-  `auth ↔ users`, y cada request de cada servicio_validaría el JWT contra ese servicio: una
-  llamada de red, o validación local con clave compartida — que para entonces ya no es un
-  servicio de auth, es un emisor de tokens. Con 7.323 líneas de backend no se justifica.
+  `auth ↔ users`, y cada request validaría el JWT contra ese servicio: una llamada de red por
+  request, o clave compartida — que para entonces ya no es un servicio de auth, es un emisor de
+  tokens. Con 7.323 líneas de backend no se justifica.
 - **`dashboard` en solitario.** Solo lee `weather` y `cache`; sin ingesta no tiene nada propio.
 
-**Por qué no partir más ahora**: microservicios sobre base de datos compartida no son
-microservicios, son un monolito distribuido — despliegue distribuido **más** acoplamiento por
-tablas, y una transacción distribuida que hoy no hace falta. Con un equipo pequeño, el coste de
-operación supera el beneficio.
+**Por qué no partir más**: microservicios sobre base de datos compartida no son microservicios,
+son un monolito distribuido — despliegue distribuido **más** acoplamiento por tablas, y una
+transacción distribuida que hoy no hace falta.
 
 ### Los pasos, en orden de ejecución
 
@@ -897,83 +895,123 @@ requiere decisión.
 
 ---
 
-## Fase 6 — Telemetría: collector como hub único
+## Fase 6 — Telemetría primero, y luego el corte de servicios
 
-> Creada el 2026-09-27. La app **no habla con ningún backend de telemetría**: habla OTLP con
-> un collector, y el collector reparte. Es lo que permite añadir mañana CloudWatch, X-Ray o
-> CloudWatch Logs **sin tocar una línea de la app**, solo reconfigurando el collector.
->
-> Y el collector no solo recoge la app: también la **infraestructura** (métricas del host y de
-> los contenedores).
+> **Por qué este orden y no el contrario**: partir un monolito sin poder observarlo es hacerlo a
+> ciegas. Si `storage` pasa a ser un servicio y algo se degrada, sin trazas ni métricas no hay
+> manera de saber si fue el corte o la Extract-the-code. Así que primero se mide, y **cada corte
+> se verifica con la telemetría que acaba de existir**.
 
-### Arquitectura
+### Arquitectura objetivo
+
+Cuatro servicios, con el collector midiendo todos:
 
 ```
-                       ┌──────────────────────────┐
-   backend-api   ──┐   │                          │
-   backend-worker ─┼──▶│    otel-collector        │
-   host / pods   ──┘   │    (recibos)             │
-                       │                          │
-                       └───┬────────┬────────┬────┘
-              traces ───────┘        │        └────── metrics
-                           ▼         ▼                ▼
-                        Jaeger   Loki (fase 2)   Prometheus ──▶ Grafana
-                                                                        ▲
-                                                        datasource: Prometheus, Loki, Jaeger
+  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+  │   storage    │  │    cache     │  │    feeds     │  │    other     │
+  │  avatares    │  │  redis/ttl   │  │  ingesta NOAA│  │  auth,users, │
+  │  (S3)        │  │              │  │              │  │  dashboard,  │
+  │              │  │              │  │              │  │  weather     │
+  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
+         └────────────────┴─────────────────┴──────────────────┘
+                                    │  todos hablan OTLP
+                                    ▼
+                          ┌────────────────────┐
+                          │  otel-collector    │
+                          └─────────┬──────────┘
+              traces ───────────────┼────────────── métricas
+                    ▼               │              ▼
+                 Jaeger      Loki (6.4)      Prometheus ──▶ Grafana
 ```
 
-Una sola URL de configurable: `OTEL_EXPORTER_OTLP_ENDPOINT`. Cambiar de destino = cambiar una
-variable de entorno o un `exporters:` del collector.
+**El matiz que decide el coste**: "separar en servicios" admite dos lecturas, y no son lo mismo.
 
-### 6.1 — Traces y métricas (+ telemetría de infraestructura)
+| | Qué es | Coste | Reversible |
+|---|---|---|---|
+| **Deployables separados** | 4 procesos/contenedores, **base de datos compartida**, cada uno dueño de sus tablas | Bajo. Es lo que se propone aquí | Sí, son 4 `CMD` y 4 `depends_on` |
+| **Servicios de red con DB propia** | Cada uno con su esquema, y **`feeds` hablando con `other` por API o eventos** | Alto. Requiere rediseñar `feeds → weather` y transactional fuera | No |
+
+Se va por la primera. La telemetría da lo mismo en los dos casos — un `service.name` por servicio
+— así que **nada se pierde por empezar aquí**, y la parte cara queda como evolución posterior,
+no como requisito previo.
+
+### 6.1 — Telemetría: la base de todo lo demás
 
 | # | Paso | Riesgo |
 |---|---|---|
-| **6.1.1** | Dependencias OTel en el backend: `sdk-node`, `auto-instrumentations-node`, exportadores OTLP, `sdk-metrics`, y `nestjs-pino` para logs JSON | Bajo |
-| **6.1.2** | `src/instrumentation.ts` que se carga **antes** que la app, vía `node --import`. Si se carga después, no instrumenta nada y no hay error que lo indique | Bajo |
-| **6.1.3** | `Dockerfile` y `package.json`: `start:prod` y `start:worker` con `--import ./dist/instrumentation.js`. **El worker también**: es quien golpea NOAA, y ahí está la traza interesante | Bajo |
-| **6.1.4** | Atributos de recurso: `service.name` distinto para api y worker, `service.version`, `deployment.environment`. Sin `service.name` las trazas de los dos procesos se mezclan | Bajo |
-| **6.1.5** | Servicio `otel-collector` en `docker-compose.yml`, red `core` (nunca `edge`), con config en `deploy/otel-collector-config.yaml` | Bajo |
-| **6.1.6** | Receivers: `otlp` (app) **y `host_metrics`** (infra: CPU, memoria, disco, red del host) | Bajo |
-| **6.1.7** | Exporters: `otlp` → Jaeger, y `prometheus` exponiendo `/metrics` para que Prometheus lo scrapee (Prometheus es pull-based, no acepta push) | Bajo |
-| **6.1.8** | Servicios `jaeger`, `prometheus` y `grafana`, con datasources precargados | Bajo |
+| **6.1.1** | Deps OTel en el backend: `sdk-node`, `auto-instrumentations-node`, exportadores OTLP, `sdk-metrics`, y `nestjs-pino` | Bajo |
+| **6.1.2** | `src/instrumentation.ts` cargado con `node --import` **antes** de la app. Si se carga después no instrumenta nada, **y no hay error que lo indique** | Bajo |
+| **6.1.3** | `start:prod` **y** `start:worker`. El worker es quien golpea NOAA: ahí está la traza interesante | Bajo |
+| **6.1.4** | `service.name` por proceso. **Preparado ya para los 4 servicios futuros**, no se cambia después | Bajo |
+| **6.1.5** | Logs JSON con `nestjs-pino` vía `app.useLogger()`: `timestamp` en UTC, `level`, `service`, `context`, `msg`, `trace_id`, `span_id`. Sube aquí y no a 6.4, porque **al cortar servicios es la forma de saber quién hizo qué** | Bajo |
+| **6.1.6** | `otel-collector` en `docker-compose.yml`, red `core` (**nunca `edge`**) | Bajo |
+| **6.1.7** | Receivers: **`otlp`** (app) + **`host_metrics`** (infra: CPU, memoria, disco, red del host) + **`docker_stats`** (infra: por contenedor) | Medio |
+| **6.1.8** | Exporters: `otlp` → Jaeger, y `prometheus` exponiendo `/metrics` (Prometheus es pull-based, no acepta push) | Bajo |
+| **6.1.9** | `jaeger`, `prometheus`, `grafana` con datasources precargados | Bajo |
 
-**Sampling**: empezar con un ratio bajo (1–10 %). La ingesta cada 10 minutos no genera volumen, pero
-el auto-instrumentation de HTTP y Postgres sí puede hacerlo. Ajustar cuando haya datos reales.
+**Sobre `docker_stats`**: el socket de podman está activo y es Docker-compatible
+(`/run/user/1000/podman/podman.sock`, API 5.8.7), así que el receiver puede leer CPU y memoria
+**por contenedor** — que es lo que permite comprobar que un corte no movió el perfil de recursos.
+**Advertencia**: montar ese socket en un contenedor le da control del host, equivalente a root.
+Aceptable en dev; en un entorno compartido, no.
 
-**Cardinalidad**: los labels de métrica no llevan `userId`, `atcfId` ni `email`. Es la causa
-número uno de Prometheus comiéndose la memoria. Esos datos van en **trazas** y **logs**, que no
-tienen ese límite.
+**Sampling**: ratio bajo (1–10 %). La ingesta cada 10 minutos no genera volumen, pero la
+auto-instrumentación de HTTP y Postgres sí. Se ajusta con datos reales, no antes.
 
-### 6.2 — Logs estructurados → Loki
+**Cardinalidad**: los labels de métrica **no** llevan `userId`, `atcfId` ni `email`. Es la causa
+número uno de que Prometheus se coma la memoria; eso va en **trazas** y **logs**, que no tienen
+ese límite.
 
-Los logs de la app pasan a JSON con `nestjs-pino`: `timestamp`, `level`, `service`, `context`,
-`msg` y **correlación con la traza** (`trace_id`, `span_id`). Eso responde a lo pedido de un
-formato estándar con estampa de tiempo, y además permite saltar de un log a su traza.
+### 6.2 — Cortar `storage` (hoja, 190 líneas)
 
-Pendiente de decidir en su momento (el collector admite las dos, así que no bloquea 6.1):
+Primer corte porque **no importa a nadie**: separarlo no toca un solo import ajeno. Se convierte
+en servicio propio y `users` pasa a hablar con él. Se verifica que el upload y el borrado de
+avatares siguen funcionando, y las métricas por contenedor confirman que no se movió nada.
 
-| Opción | Cómo | A favor / en contra |
-|---|---|---|
-| **OTLP nativo** | La app envía logs por OTLP al collector, y de ahí al endpoint `/otlp` de Loki (nativo desde Loki 3.0) | Sin agente. Correlación limpia. La pieza pino→OTLP es la menos estandarizada |
-| **Shipper** | El collector lee los logs de los contenedores con `filelog` | Traditional, pero en podman rootless necesita acceso al store, que es lo que más problemas da |
+### 6.3 — Cortar `cache` (hoja, 93 líneas)
 
-Se añade `loki` con retención definida y el datasource en Grafana.
+Segundo, también hoja. **Ojo**: hoy `AppCacheModule` es `@Global()` y se registra en
+`AppModule`; hay que conservar ese comportamiento al moverlo o los servicios que lo injectan
+dejan de resolverlo.
+
+### 6.4 — Logs → Loki
+
+`loki` con retención definida y datasource en Grafana. El collector admite las dos formas de
+llevar los logs, así que este paso no bloquea a los anteriores:
+
+| Opción | A favor / en contra |
+|---|---|
+| **OTLP nativo** (app → collector → `/otlp` de Loki) | Sin agente y correlación limpia. El puente pino→OTLP es la pieza menos estandarizada |
+| **`filelog` en el collector** | Traditional, pero necesita acceso al store de podman |
+
+### 6.5 — `feeds` como servicio propio
+
+El único con trabajo real. Requiere, en este orden:
+
+1. Mover `ForecastPointDto` al lado de quien lo usa (hoy `weather` lo importa de `feeds`, y es
+   **solo un tipo**).
+2. Que la ingesta **escriba sus propias filas** en vez de llamar a `StormsService` y
+   `AdvisoriesService`.
+3. Que deje de importar `auth`.
+
+Con eso el grafo queda en `feeds → {}` y es extraíble sin tocar `other`. Es el último porque es
+el único que mueve comportamiento, y para entonces hay trazas de la ingesta que dicen si algo
+se rompió.
 
 ### Lo que esta fase NO hace
 
-- **No instrumentar el frontend.** Una SPA en este proyecto aportaría poco frente a medir el
-  backend, que es donde están NOAA, Postgres y el storage. RUM se puede añadir después desde el
-  mismo collector, que es justo de lo que se trata.
-- **No sustituir los `Logger` uno a uno.** `nestjs-pino` los sustituye en bloque vía
-  `app.useLogger()`, y las llamadas existentes siguen funcionando.
+- **No parte `auth`/`users` en servicios de red**, ni `dashboard` en solitario. Ver Fase 5.
+- **No instrumenta el frontend.** Una SPA aportaría poco frente a medir NOAA, Postgres y el
+  storage. RUM se añade después **desde el mismo collector**, que es justo lo que compra esta
+  arquitectura.
+- **No migra a base de datos por servicio.** Queda como evolution posterior.
 
-### Beneficio que ya existe, sin este trabajo
+### Beneficio que ya existe sin nada de esto
 
-Los `Logger` de Nest emiten líneas de texto con formato de fecha **local y sin zona**:
-`[Nest] 30 - 09/27/2026, 5:20:15 p.m. LOG [MailerService] ...`. Eso no se puede indexar por
-tiempo de forma fiable, y no distingue servicio. Formato JSON con UTC lo arregla aunque Loki
-llegue en 6.2.
+Los `Logger` de Nest emiten `[Nest] 30 - 09/27/2026, 5:20:15 p.m. LOG [MailerService] ...`:
+**fecha local sin zona**, un único campo de texto, y no dice qué servicio la emitió. Eso no se
+indexa por tiempo de forma fiable. El JSON con UTC de 6.1.5 lo arregla aunque Loki llegue en
+6.4.
 
 ---
 
@@ -986,8 +1024,12 @@ llegue en 6.2.
 | 2 | ✅ Frontend con Error Boundaries, TanStack Query, Zod, colocation, splitting | Medio (refactor de data layer) |
 | 3 | ⬜ **Sin empezar.** Informe de a11y + Web Vitals. Requiere tu permiso | Bajo (auditoría) |
 | 5 | ⬜ **Sin empezar.** A1–A2 operación admin; B1–B3 costuras de despliegue | A1–A2 bajo · B3 medio |
-| 6 | ⬜ **Sin empezar.** 6.1 traces+métricas+infra; 6.2 logs → Loki. Collector como hub | 6.1 bajo · 6.2 medio |
+| 6 | ⬜ **Sin empezar.** 6.1 telemetría (app + infra) · 6.2 storage · 6.3 cache · 6.4 logs→Loki · 6.5 feeds | 6.1 bajo · **6.5 medio** |
 | 4 | ✅ **Cerrada.** 4.1–4.3: las premisas eran falsas; 4.4 = D1 reactivada | Bajo |
+
+**Fase 6 tiene orden obligatorio**: 6.1 antes que cualquier corte. Separar `storage`, `cache` o
+`feeds` sin trazas ni métricas es hacerlo a ciegas, y con `service.name` por servicio la
+telemetría sirve igual antes y después del corte.
 
 Fases 0, 1 y 2 ejecutadas (2026-09-26). La 2 dejó el bundle de entrada en 25 kB y el
 comportamiento verificado contra el stack en ejecución.
