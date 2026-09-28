@@ -12,35 +12,51 @@
 
 type DateInput = string | Date;
 
+/**
+ * Formatters are built once, at module load.
+ *
+ * They used to be constructed inside every call, and the call sites are inside
+ * loops: a storm card formats its timestamp twice, a list of N cards built 2N
+ * `Intl.DateTimeFormat` objects per render. `Intl` construction is one of the
+ * more expensive things you can do in a render, and it all landed in the
+ * keystroke handler of the storm search box — which is the INP we were trying to
+ * protect. A `useMemo` would not have helped; this is not a hook.
+ */
+const UTC_DATE_TIME = new Intl.DateTimeFormat("en", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "UTC",
+});
+
+const UTC_DATE = new Intl.DateTimeFormat("en", {
+  dateStyle: "medium",
+  timeZone: "UTC",
+});
+
+const UTC_TIME = new Intl.DateTimeFormat("en", {
+  timeStyle: "short",
+  timeZone: "UTC",
+});
+
+/**
+ * Same reasoning as the absolute formatters, and the same call sites: every
+ * storm card footer renders a relative timestamp.
+ */
+const RELATIVE = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
 export function formatUTC(value: DateInput): string {
   const date = new Date(value);
-  return (
-    new Intl.DateTimeFormat("en", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: "UTC",
-    }).format(date) + " UTC"
-  );
+  return UTC_DATE_TIME.format(date) + " UTC";
 }
 
 export function formatUTCDate(value: DateInput): string {
   const date = new Date(value);
-  return (
-    new Intl.DateTimeFormat("en", {
-      dateStyle: "medium",
-      timeZone: "UTC",
-    }).format(date) + " UTC"
-  );
+  return UTC_DATE.format(date) + " UTC";
 }
 
 export function formatUTCTime(value: DateInput): string {
   const date = new Date(value);
-  return (
-    new Intl.DateTimeFormat("en", {
-      timeStyle: "short",
-      timeZone: "UTC",
-    }).format(date) + " UTC"
-  );
+  return UTC_TIME.format(date) + " UTC";
 }
 
 /**
@@ -51,15 +67,14 @@ export function formatUTCTime(value: DateInput): string {
  * regardless of where the viewer is — so this one does NOT force UTC.
  */
 export function formatRelative(value: DateInput): string {
-  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
   const diffMs = Date.now() - new Date(value).getTime();
   const minutes = Math.round(diffMs / 60_000);
 
-  if (Math.abs(minutes) < 60) return rtf.format(-minutes, "minute");
+  if (Math.abs(minutes) < 60) return RELATIVE.format(-minutes, "minute");
   const hours = Math.round(minutes / 60);
-  if (Math.abs(hours) < 24) return rtf.format(-hours, "hour");
+  if (Math.abs(hours) < 24) return RELATIVE.format(-hours, "hour");
   const days = Math.round(hours / 24);
-  return rtf.format(-days, "day");
+  return RELATIVE.format(-days, "day");
 }
 
 /**

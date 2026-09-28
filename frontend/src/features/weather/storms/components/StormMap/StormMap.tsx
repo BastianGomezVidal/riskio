@@ -1,3 +1,4 @@
+import "leaflet/dist/leaflet.css";
 import { useMemo } from "react";
 import {
   MapContainer,
@@ -6,6 +7,9 @@ import {
   Polygon,
   CircleMarker,
 } from "react-leaflet";
+// Scoped here rather than imported globally in main.tsx: it was 6.7 kB gzipped
+// of render-blocking CSS on the login page and the dashboard, neither of which
+// ever shows a map.
 import type { LatLngBoundsExpression } from "leaflet";
 import { GraticuleLayer } from "./GraticulateLayer";
 

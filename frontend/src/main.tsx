@@ -2,7 +2,6 @@ import { StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { useQueryClient } from "@tanstack/react-query";
 import "@fontsource-variable/sora/wght.css";
-import "leaflet/dist/leaflet.css";
 import App from "./app/App";
 import { BrowserRouter } from "react-router-dom";
 import { SessionProvider } from "./auth/session-context";

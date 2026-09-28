@@ -23,10 +23,18 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
         cors:
+          # These have to match how the app is actually *served*, not how a dev
+          # server might serve it. This list was localhost/5173/8080 while the
+          # real app is served from riskio.test on port 80, so the browser's
+          # preflight got a 204 with no Access-Control-Allow-Origin and silently
+          # dropped every span and every web vital. There was no error anywhere:
+          # the SDK reported no failures, Loki simply had no riskio-web stream.
           allowed_origins:
             - "http://localhost"
             - "http://localhost:5173"
             - "http://localhost:8080"
+            - "http://riskio.test"
+            - "https://riskio.test"
           allowed_headers: ["Content-Type", "traceparent", "tracestate"]
           max_age: 900
 
