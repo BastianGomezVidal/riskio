@@ -1457,3 +1457,70 @@ El botón *Authorize* **no necesita admin**, necesita cualquier JWT; el rol solo
 Verificado: `admin@admin.com` es admin, otro correo cualquiera es client, `GET /users/me` con
 bearer da 200, y `POST /admin/ingest/run` da **401 con solo el bearer y 200 con bearer +
 `x-api-key`**. Los dos esquemas hacen falta y los dos están registrados.
+
+---
+
+## Radio de impacto: un fallo de un servicio, solo ese servicio
+
+Este es el objetivo que gobierna el resto del trabajo, y conviene escribirlo en voz alta porque
+es el criterio con el que se juzga cada extracción.
+
+**Regla**: si un servicio falla, solo fallan sus endpoints. El resto de la API sigue respondiendo.
+Hoy eso se cumple para `feeds` y `cache`, y **no** para nada de lo demás: 21 endpoints de 7
+grupos distintos conviven en un solo proceso, así que un fallo en `weather` se lleva por delante
+`/dashboard` y también `/auth`.
+
+Verificado, no supuesto: con `backend-feeds` parado, `/health`, `/storms`, `/dashboard/summary` y
+`/users/me` responden 200, y solo `POST /admin/ingest/run` falla — que es exactamente su
+propiedad.
+
+| Grupo | Endpoints | ¿Aislado hoy? |
+|---|---|---|
+| `storage` | avatares (vía `users`) | Sí, servicio propio |
+| `cache` | interno | Sí, y además falla abierto |
+| `feeds` | `POST /admin/ingest/*` | Sí, servicio propio |
+| **`weather`** | `/storms*`, `/advisories/*` | **No** — dentro del proceso de la API |
+| **`auth` + `users`** | `/auth/*`, `/users/*` | **No** — dentro del proceso de la API |
+| **`dashboard`** | `/dashboard/summary` | **No** — y depende de `weather` |
+| `health` | `/health` | No, y está bien: debe morir con la API |
+
+### Objetivo
+
+- **`weather-service`** — `/storms*`, `/advisories/*`. Dueño de la lectura de tormentas,
+  advisories y warnings.
+- **`auth-service`** — `/auth/*` y `/users/*` en un solo servicio, porque `users` depende de
+  `auth` por el login, el registro y el token; separarlos no aportaría nada.
+- **`dashboard-service`** — `/dashboard/summary`, llamando a `weather` por HTTP. Va el último
+  porque es el único que necesita hablar con otro servicio de datos, no solo con Postgres.
+- **`riskio-api` queda como gateway**: enruta y no tiene lógica de negocio ni conexión a la base
+  de datos. La redirección de la API web no cambia: el `compose` publica un puerto y el resto
+  vive en la red `core`.
+
+### La decisión que hay que tomar antes de auth, y no es la obvia
+
+Si `auth` pasa a ser un servicio de red, **la API tiene que seguir verificando el JWT en local**,
+con el secreto compartido. Si verificara llamando a `auth-service`, habría un salto HTTP **en cada
+petición**, para comprobar algo que hoy es parsear un token.
+
+La consecuencia hay que aceptarla con los ojos abiertos: `auth-service` sigue sin ser dueño
+exclusivo de `JWT_SECRET`, porque la API lo necesita para validar. Lo que sí se consigue es lo que
+importa — un fallo de `auth` impide registrarse, entrar y gestionar tokens, **pero no impide leer
+tormentas con un token ya emitido**. Eso es "solo falla ese servicio", y es alcanzable sin poner un
+salto en el camino de cada request.
+
+Lo que `auth-service` sí deja de tener es lo demás: `bcrypt` y los hashes de contraseña quedan
+behind con él, y la API solo lee usuarios cuando hace falta.
+
+### Orden
+
+1. `weather-service`. Es lectura pura de Postgres, no tiene guards, y `dashboard` es su único
+   consumidor: el salto que introduce es acotado yKnown.
+2. `auth-service`, con la verificación local del JWT desde el primer commit. El riesgo real aquí
+   no es técnico, es que toca el camino de cada petición.
+3. `dashboard-service`, cuando `weather` ya sea un servicio y haya a quién llamar.
+4. Convertir la API en gateway, que solo tiene sentido cuando no le quede nada de negocio.
+
+Cada paso se verifica con lo mismo que se ha usado hasta ahora: parar el servicio recién
+extraído y comprobar que el resto de endpoints siguen en 200. Un test que arranque la API entera
+con `feeds`, `cache` y `storage` caídos **no** dice nada, y es el que ha dado falsa confianza
+hasta ahora.
