@@ -132,7 +132,7 @@ export class AuthProxyMiddleware implements NestMiddleware {
     });
   }
 
-  async use(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async use(req: Request, res: Response, _next: NextFunction): Promise<void> {
     // A repeated content-type arrives as an array; take the first, which is the
     // one a body parser would have used.
     const contentType = req.headers['content-type'];

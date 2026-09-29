@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from '../../domain/auth/guards/jwt-auth.guard.js';
-import { RolesGuard } from '../../domain/auth/guards/roles.guard.js';
 import { AuthzGuardsModule } from './authz-guards.module.js';
 import { HttpAuthChecker } from './http-auth-checker.service.js';
 import { AuthProxyMiddleware } from '../../domain/auth/auth-proxy.middleware.js';

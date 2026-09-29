@@ -2,7 +2,6 @@ import { Controller, Get, Inject, Query } from '@nestjs/common';
 import { StormsService } from '../domain/weather/storms/storms.service.js';
 import { AdvisoriesService } from '../domain/weather/advisories/advisories.service.js';
 import { StormTab } from '../domain/weather/storms/utils/storm-enums.js';
-import type { StormListQueryDto } from '../domain/weather/storms/dto/storm-list-query.dto.js';
 import { CACHE_SERVICE } from '../domain/cache/cache.tokens.js';
 import type { CacheService } from '../domain/cache/cache.service.js';
 

@@ -1,11 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
-import type { LineString, Polygon } from 'geojson';
 import { AdvisoriesService } from './advisories.service.js';
 import { Advisory } from './entities/advisory.entity.js';
 import { Warning } from './entities/warning.entity.js';
-import { ForecastPoint } from './entities/forecast-point.entity.js';
 import { Storm } from '../storms/entities/storm.entity.js';
 
 /**
@@ -69,46 +67,10 @@ function makeRepository() {
 /**
  * Creates the warning repository mock used by the service tests.
  */
-function makeWarningsRepository() {
-  const deleteFn = vi.fn();
-  const create = vi.fn();
-  const save = vi.fn();
-
-  const warningsRepo = {
-    delete: deleteFn,
-    create,
-    save,
-  } as unknown as Repository<Warning>;
-
-  return {
-    warningsRepo,
-    deleteFn,
-    create,
-    save,
-  };
-}
 
 /**
  * Creates the forecast point repository mock used by the service tests.
  */
-function makeForecastPointsRepository() {
-  const deleteFn = vi.fn();
-  const create = vi.fn();
-  const save = vi.fn();
-
-  const forecastPointsRepo = {
-    delete: deleteFn,
-    create,
-    save,
-  } as unknown as Repository<ForecastPoint>;
-
-  return {
-    forecastPointsRepo,
-    deleteFn,
-    create,
-    save,
-  };
-}
 
 /**
  * Creates a minimal valid Storm entity for service tests.
@@ -168,93 +130,31 @@ function makeWarning(overrides: Partial<Warning> = {}): Warning {
 /**
  * Creates a valid GeoJSON LineString.
  */
-function makeLineString(
-  coordinates: number[][] = [
-    [-120.5, 16.5],
-    [-121.5, 17.0],
-  ],
-): LineString {
-  return {
-    type: 'LineString',
-    coordinates,
-  };
-}
 
 /**
  * Creates a valid GeoJSON Polygon.
  */
-function makePolygon(): Polygon {
-  return {
-    type: 'Polygon',
-    coordinates: [
-      [
-        [-120.5, 16.5],
-        [-118.5, 15.5],
-        [-118.0, 17.0],
-        [-120.5, 16.5],
-      ],
-    ],
-  };
-}
 
 /**
  * Creates a minimal forecast point payload as the parser would emit.
  */
-function makeForecastPointDto(overrides: Record<string, unknown> = {}) {
-  return {
-    validAt: new Date('2026-09-10T12:00:00Z'),
-    latitude: 16.7,
-    longitude: -118.5,
-    windSpeedKt: 35,
-    pressureMb: null,
-    ...overrides,
-  };
-}
 
 describe('AdvisoriesService', () => {
   let repo: Repository<Advisory>;
   let insert: ReturnType<typeof makeInsertMock>;
   let findOne: ReturnType<typeof vi.fn>;
-  let findOneOrFail: ReturnType<typeof vi.fn>;
-  let update: ReturnType<typeof vi.fn>;
-
-  let warningsRepo: Repository<Warning>;
-  let deleteWarnings: ReturnType<typeof vi.fn>;
-  let createWarnings: ReturnType<typeof vi.fn>;
-  let saveWarnings: ReturnType<typeof vi.fn>;
-
-  let forecastPointsRepo: Repository<ForecastPoint>;
-  let deleteForecastPoints: ReturnType<typeof vi.fn>;
-  let createForecastPoints: ReturnType<typeof vi.fn>;
-  let saveForecastPoints: ReturnType<typeof vi.fn>;
 
   let service: AdvisoriesService;
 
-  beforeEach(() => {
-    const built = makeRepository();
+    beforeEach(() => {
+      const built = makeRepository();
 
-    repo = built.repo;
-    insert = built.insert;
-    findOne = built.findOne;
-    findOneOrFail = built.findOneOrFail;
-    update = built.update;
+      repo = built.repo;
+      insert = built.insert;
+      findOne = built.findOne;
 
-    const warnings = makeWarningsRepository();
-
-    warningsRepo = warnings.warningsRepo;
-    deleteWarnings = warnings.deleteFn;
-    createWarnings = warnings.create;
-    saveWarnings = warnings.save;
-
-    const fps = makeForecastPointsRepository();
-
-    forecastPointsRepo = fps.forecastPointsRepo;
-    deleteForecastPoints = fps.deleteFn;
-    createForecastPoints = fps.create;
-    saveForecastPoints = fps.save;
-
-    service = new AdvisoriesService(repo, warningsRepo, forecastPointsRepo);
-  });
+      service = new AdvisoriesService(repo);
+    });
 
   describe('findOne', () => {
     it('returns a single advisory with forecast points and warnings', async () => {

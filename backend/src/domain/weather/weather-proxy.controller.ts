@@ -1,4 +1,4 @@
-import { All, Controller, Param, Query, Req, Res } from '@nestjs/common';
+import { All, Controller, Param, Req, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';

@@ -1,15 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import type { LineString, Polygon } from 'geojson';
 import { Advisory } from './entities/advisory.entity.js';
-import { Warning } from './entities/warning.entity.js';
 import { Storm } from '../storms/entities/storm.entity.js';
 import { AdvisoryDetailDto } from './dto/advisory-detail.dto.js';
-import { ForecastPoint } from './entities/forecast-point.entity.js';
-import type { ForecastPointDto } from '../../../common/contracts/forecast-point.dto.js';
-import type { WarningSegmentDto } from '../../../common/contracts/warning-segment.dto.js';
-import { categoryFromWindKt } from '../storms/storm-category.js';
 import { StormDto } from '../storms/dto/storm.dto.js';
 import { StormAdvisoryDetailDto } from './dto/storm-advisory-detail.js';
 
@@ -27,15 +21,21 @@ import { StormAdvisoryDetailDto } from './dto/storm-advisory-detail.js';
  */
 @Injectable()
 export class AdvisoriesService {
+  /**
+   * Only the advisory repository is injected.
+   *
+   * `Warning` and `ForecastPoint` used to be injected here as well and were
+   * never read: every read of those two went through
+   * `advisoriesRepository.manager`, which is how the batched latest-per-storm
+   * query reaches `Storm`. Two constructor arguments that exist only to satisfy
+   * the tests, while the tests then had to build repository mocks that the
+   * service never called, is wiring that costs a reader more than it does any
+   * work. The entities are still written, by `advisory-writer.ts` on the feeds
+   * side.
+   */
   constructor(
     @InjectRepository(Advisory)
     private readonly advisoriesRepository: Repository<Advisory>,
-
-    @InjectRepository(Warning)
-    private readonly warningsRepository: Repository<Warning>,
-
-    @InjectRepository(ForecastPoint)
-    private readonly forecastPointsRepository: Repository<ForecastPoint>,
   ) {}
 
   /**

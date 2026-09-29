@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { User } from '../auth/entities/user.entity.js';
 import { UsersService } from './users.service.js';
 import { STORAGE_SERVICE } from '../storage/storage.tokens.js';

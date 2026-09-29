@@ -1,11 +1,9 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { Repository } from 'typeorm';
 import { DashboardService } from './dashboard.service.js';
 import { WeatherClientService } from './weather-client.service.js';
 import { Storm } from '../weather/storms/entities/storm.entity.js';
 import { Advisory } from '../weather/advisories/entities/advisory.entity.js';
 import { ForecastPoint } from '../weather/advisories/entities/forecast-point.entity.js';
-import { AdvisoriesService } from '../weather/advisories/advisories.service.js';
 import { CacheService } from '../cache/cache.service.js';
 
 /**

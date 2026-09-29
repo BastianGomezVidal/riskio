@@ -14,7 +14,6 @@ import { LocalApiKeyVerifier } from '../../src/auth-service/local-api-key-verifi
 import { parseDurationToSeconds } from '../../src/domain/auth/auth.utils.js';
 import { AuthzGuardsModule } from '../../src/common/authz/authz-guards.module.js';
 import { JwtAuthGuard } from '../../src/domain/auth/guards/jwt-auth.guard.js';
-import { RolesGuard } from '../../src/domain/auth/guards/roles.guard.js';
 
 /**
  * The auth domain, in process, for tests.

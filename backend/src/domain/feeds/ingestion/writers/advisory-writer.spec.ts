@@ -119,22 +119,6 @@ function makeAdvisory(overrides: Partial<Advisory> = {}): Advisory {
   };
 }
 
-function makeWarning(overrides: Partial<Warning> = {}): Warning {
-  return {
-    id: 'w-1',
-    warningType: 'Hurricane Watch',
-    geometry: {
-      type: 'LineString',
-      coordinates: [
-        [-80.5, 25.9],
-        [-80.4, 26.1],
-      ],
-    },
-    advisory: makeAdvisory(),
-    ...overrides,
-  };
-}
-
 function makeLineString(
   coordinates: number[][] = [
     [-120.5, 16.5],

@@ -13,7 +13,6 @@ import { LocalAuthChecker } from './local-auth-checker.service.js';
 import { LocalApiKeyVerifier } from './local-api-key-verifier.service.js';
 import { AuthzGuardsModule } from '../common/authz/authz-guards.module.js';
 import { JwtAuthGuard } from '../domain/auth/guards/jwt-auth.guard.js';
-import { RolesGuard } from '../domain/auth/guards/roles.guard.js';
 import { AuthInternalController } from './auth-internal.controller.js';
 import { AuthHealthController } from './auth-health.controller.js';
 import { ObservabilityModule } from '../config/observability.module.js';

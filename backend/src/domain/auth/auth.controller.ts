@@ -42,7 +42,6 @@ import {
   CreateApiTokenDto,
   CreatedApiTokenDto,
 } from './dto/create-api-token.dto.js';
-import { ApiToken } from './entities/api-token.entity.js';
 import { ApiTokenDto } from './dto/api-token.dto.js';
 import { CurrentUser } from './decorators/current-user.decorator.js';
 import { Public } from './decorators/public.decorator.js';
