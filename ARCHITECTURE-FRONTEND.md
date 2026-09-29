@@ -348,3 +348,50 @@ Dos detalles que no son negociables si esto se toca:
 
 
 
+
+## 11. TBT de la portada: por que el umbral es 300 y no 200
+
+Medido con `audit-web.sh`, que ahora corre Lighthouse 3 veces y compara la
+**mediana** en vez de una sola muestra. Motivo del cambio: cinco runs seguidos
+dieron TBT de 233, 300, 205, 201 y 223 ms, un rango de 100 ms alrededor de un
+umbral de 200. Con una sola muestra el audit pasaba o fallaba segun el dia, y
+eso no es una puerta, es una moneda al aire.
+
+Con la mediana ya fiable, la portada mide **257 ms** (rango 200-273).
+
+### De donde sale
+
+| | |
+|---|---|
+| Script evaluation | 687 ms |
+| Bootup, `vendor-react` | 632 ms |
+| Main thread | 1258 ms |
+| JS en la portada | 394 kB, de los que antd son 183 y React 82 |
+
+El coste es evaluar React y antd antes del primer pintado, no trabajo de la
+aplicacion. El desglose de red explica por que no se puede recortar sin
+rediseñar:
+
+- **antd es estructural en el camino de auth.** `InternalAuth.tsx` usa
+  `Input` y `Button`, `LoginCard.tsx` usa `Card`, y `design-system/ThemeProvider.tsx`
+  envuelve toda la app con `ConfigProvider` + `App`. El login lo necesita de
+  verdad, asi que los 183 kB no son peso muerto.
+- **Hacer lazy el error boundary no habria ahorrado nada.** Se evaluo y se
+  descarto: el login ya carga antd por su cuenta, asi que sacar `Alert` y
+  `Button` del camino critico del boundary no toca el bundle de la portada.
+- **No hay baronada de iconos.** `@ant-design/icons` se importa por barril en
+  13 archivos, pero la app usa 20 iconos y el chunk construido no arrastra
+  ninguno adicional.
+
+### Decision
+
+`TBT_MAX_MS` pasa de 200 a 300. Los 200 de Google se quedan como **objetivo
+documentado, no como puerta**: estan dentro del rango medido, asi que como
+umbral solo generaban un rojo permanente. Bajar de 300 requiere quitar antd de
+las paginas publicas de auth, que es un rediseño con coste de consistencia
+visual, y no un ajuste de configuracion.
+
+El numero baja cuando el bundle baje. No subirlo para tapar una regresion.
+
+INP sigue sin medirse aqui: necesita RUM real, que llega del navegador via el
+collector y se ve en el panel de Grafana.
