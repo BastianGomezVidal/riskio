@@ -1,5 +1,5 @@
 import { Link, NavLink } from "react-router-dom";
-import { DashboardOutlined, CloudOutlined } from "@ant-design/icons";
+import { UnorderedListOutlined, CloudOutlined } from "@ant-design/icons";
 import { UserMenu } from "../UserMenu/UserMenu";
 import { semantic } from "@/design-system/tokens/semantic";
 
@@ -10,7 +10,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", Icon: DashboardOutlined },
+  { to: "/dashboard", label: "Dashboard", Icon: UnorderedListOutlined },
   { to: "/storms", label: "Storms", Icon: CloudOutlined },
 ];
 

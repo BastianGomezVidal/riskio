@@ -1,6 +1,6 @@
 import { Link, NavLink } from "react-router-dom";
 import {
-  DashboardOutlined,
+  UnorderedListOutlined,
   CloudOutlined,
   ApiOutlined,
   GithubOutlined,
@@ -14,7 +14,7 @@ interface FooterNavItem {
 }
 
 const FOOTER_NAV_ITEMS: FooterNavItem[] = [
-  { to: "/dashboard", label: "Dashboard", Icon: DashboardOutlined },
+  { to: "/dashboard", label: "Dashboard", Icon: UnorderedListOutlined },
   { to: "/storms", label: "Storms", Icon: CloudOutlined },
 ];
 
