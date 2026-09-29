@@ -17,22 +17,27 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/*
- * The storm photo behind the sign-in card, in CSS rather than as an inline
- * style built from a JS import.
- *
- * It is the largest contentful paint on every public page, and where the URL
- * lives decides when the browser hears about it. As an inline style the URL
- * only exists once React has mounted AuthLayout, which is after the entry
- * bundle has parsed and run — the fetch cannot start until then. In the
- * render-blocking stylesheet the preload scanner finds it while it is still
- * reading the CSS, so the image is already in flight while the JavaScript is
- * still downloading.
- *
- * q62 rather than something higher because a 55% dark gradient sits on top of
- * it: the detail the encoder is being asked to preserve is largely covered. It
- * is 71 kB against the 164 kB of the JPEG it replaces.
- */
+  /*
+   * The storm photo behind the sign-in card, in CSS rather than as an inline
+   * style built from a JS import.
+   *
+   * Why here rather than inline: a background URL in a render-blocking
+   * stylesheet is found by the preload scanner while it is still reading the
+   * CSS, so the fetch is in flight while the JavaScript is still downloading.
+   * Built from a JS import the URL only exists once React has mounted, which is
+   * after the entry bundle has parsed and run.
+   *
+   * It used to be described here as the largest contentful paint on every public
+   * page, which is wrong and was measured to be wrong: the LCP element on / is
+   * the "Sign in to your account to continue." text. A CSS `background-image` is
+   * not an LCP candidate at all — only `<img>`, `<image>`, text and video are.
+   * The decision stands on the preload scanner argument, not on this being the
+   * LCP, and the comment should not imply otherwise.
+   *
+   * q62 rather than something higher because a 55% dark gradient sits on top of
+   * it: the detail the encoder is being asked to preserve is largely covered. It
+   * is 71 kB against the 164 kB of the JPEG it replaces.
+   */
 .auth-background {
   background-image: linear-gradient(
       rgb(2 6 23 / 0.55),
