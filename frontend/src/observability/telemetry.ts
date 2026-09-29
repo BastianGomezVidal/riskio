@@ -221,11 +221,13 @@ export function getMeter(): Promise<Meter> {
     // Plain MeterProvider, not WebMeterProvider: the web-specific one was
     // removed in OTel JS 2.x and the base provider is what serves the browser
     // now.
-    const [{ MeterProvider, PeriodicExportingMetricReader }, { OTLPMetricExporter }] =
-      await Promise.all([
-        import('@opentelemetry/sdk-metrics'),
-        import('@opentelemetry/exporter-metrics-otlp-http'),
-      ]);
+    const [
+      { MeterProvider, PeriodicExportingMetricReader, AggregationTemporality },
+      { OTLPMetricExporter },
+    ] = await Promise.all([
+      import('@opentelemetry/sdk-metrics'),
+      import('@opentelemetry/exporter-metrics-otlp-http'),
+    ]);
 
     meterProvider = new MeterProvider({
       resource: await buildResource(),
@@ -235,7 +237,28 @@ export function getMeter(): Promise<Meter> {
         // ever re-send data already sent, or data recorded after the last flush
         // by code that has not been updated to flush.
         new PeriodicExportingMetricReader({
-          exporter: new OTLPMetricExporter({ url: `${endpoint}/v1/metrics` }),
+          exporter: new OTLPMetricExporter({
+            url: `${endpoint}/v1/metrics`,
+            // DELTA, not the default CUMULATIVE, and this is load-bearing.
+            //
+            // Every page load builds a brand new MeterProvider, so a cumulative
+            // stream arrives from a producer that has no memory of the previous
+            // one. The collector's Prometheus exporter takes that as a new
+            // series and restarts its accumulator, so the histogram is
+            // overwritten on every visit instead of growing.
+            //
+            // Measured, not assumed: with CUMULATIVE, count stayed pinned at 1
+            // across repeated visits while sum tracked whichever session
+            // reported last (560, then 516), and
+            // histogram_quantile(0.75, rate(..._bucket[1h])) was therefore
+            // quantising a single sample. The dashboard showed a p75 that
+            // changed on every reload, which is not a p75.
+            //
+            // A delta carries only what was recorded since the last flush, so
+            // the collector adds it and the series accumulates the way a
+            // long-lived service's would.
+            temporalityPreference: AggregationTemporality.DELTA,
+          }),
           exportIntervalMillis: 30_000,
         }),
       ],

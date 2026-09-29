@@ -68,6 +68,26 @@ export function reportWebVitals(): void {
           description: `${metric.name} reported by real user sessions`,
         });
         histogram.record(metric.value, attributes);
+
+        // The rating as its own counter, alongside the histogram.
+        //
+        // The histogram answers "how slow", and a p75 of 612 ms does not tell a
+        // reader whether that is fine. The rating is the judgement already made:
+        // good, needs-improvement or poor, against Google's thresholds. Counting
+        // it separately gives a share that can be read at a glance, which is how
+        // these numbers usually get reported.
+        //
+        //   100 * sum by (rating) (rate(web_vitals_rating_total{metric="LCP"}[30m]))
+        //   / sum(rate(web_vitals_rating_total{metric="LCP"}[30m]))
+        //
+        // Three label values on top of the ones the histogram already carries, so
+        // the cardinality is the same series with a `rating` dimension rather than
+        // a new family.
+        const ratingCounter = meter.createCounter('web.vitals.rating', {
+          description: 'Core Web Vitals ratings from real user sessions',
+        });
+        ratingCounter.add(1, { ...attributes, rating: metric.rating });
+
         // Send it now. Waiting on the reader's interval loses the measurement
         // whenever the page goes away first, which for a vital is most of the
         // time.

@@ -157,6 +157,15 @@ processors:
     timeout: 5s
     send_batch_size: 512
 
+  # Sums up the deltas that arrive from producers with a short lifetime, keyed by
+  # the metric's own identity, so the prometheus exporter has one accumulating
+  # series instead of a fresh one per producer. See the note on the metrics
+  # pipeline for the measurement that made this necessary.
+  #
+  # Takes no configuration here. It does accept a `cumulative` block with memory
+  # limits, which this build rejects as an invalid key, so the defaults are what
+  # is in use.
+  deltatocumulative:
 exporters:
   # Traces go to Jaeger, which accepts OTLP directly.
   # Loki 3.x speaks OTLP natively, so logs travel the same path as traces and
@@ -210,5 +219,13 @@ service:
       exporters: [otlp/jaeger]
     metrics:
       receivers: [otlp, hostmetrics]
-      processors: [memory_limiter, batch]
+      # deltatocumulative exists because every page load is a new producer with
+      # no memory of the last one, and the prometheus exporter alone does not add
+      # those together. Measured without it: a real browser visit sent LCP with
+      # count=1, sum=568; the exporter showed one series with count=1, sum=568;
+      # and every later visit overwrote it, so sum tracked whichever session
+      # reported last and histogram_quantile(0.75, rate(..._bucket[1h]))
+      # quantised a single sample. The p75 changed on every page load, which is
+      # not a p75. The dashboard was drawing a real number that meant nothing.
+      processors: [memory_limiter, deltatocumulative, batch]
       exporters: [prometheus]

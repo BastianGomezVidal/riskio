@@ -35,7 +35,7 @@ Clasificar los cambios por dominio para hacer commits coherentes (no un commit g
 | **M** | Frontend: `global_components`, `pages`, `hooks` | `global_components/*` (12), `pages/*` (9), `hooks/*` (2) |
 | **N** | Frontend: capa de datos y dominio | `api/client.ts`, `data/promises.ts`, `domain/*` (20), `helpers/*` (8), `app/router/routes.tsx` |
 | **O** | Infra | `docker-compose.yml` |
-| **P** | Docs (este plan + análisis) | `ARCHITECTURE-COMPOSE.md`, `ARCHITECTURE-FRONTEND.md`, `PLAN-ACCION.md` |
+| **P** | Docs (este plan + análisis) | `ARCHITECTURE-COMPOSE.md`, `ARCHITECTURE-FRONTEND.md`, `ARCHITECTURE-OBSERVABILITY.md`, `PLAN-ACCION.md` |
 
 **⚠️ Hallazgo relevante durante el inventario (no bloquea el commit):**
 hay **código duplicado en dos capas** que conviene documentar ahora y resolver después:
