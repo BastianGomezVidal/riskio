@@ -76,7 +76,17 @@ export function AppRoutes() {
         </Route>
       </Route>
 
-      <Route path="*" element={<NotFoundPage />} />
+      {/*
+        No catch-all out here, and there used to be one. React Router walks the
+        table in order and the `path="*"` above already matches everything, so an
+        outer one could never be reached: dead code that read as "logged-out
+        users get a 404".
+
+        What actually happens is better than that reading suggested. An unknown
+        URL hits the inner match, `ProtectedRoute` redirects to sign-in carrying
+        the original path, and after signing in the user lands on the 404 they
+        were originally after. The redirect does the work, not a second route.
+      */}
     </Routes>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Drawer, Slider, Tag, Typography } from "antd";
 import type { StormsSort, StormsTab } from "@/domain/storm";
+import { BASIN } from "@/domain/storm";
 
 const { Text } = Typography;
 
@@ -24,11 +25,19 @@ interface Props {
   }) => void;
 }
 
-const BASINS = [
-  { code: "EP", label: "East Pacific" },
-  { code: "CP", label: "Central Pacific" },
-  { code: "AL", label: "Atlantic" },
-];
+/**
+ * Order only. The labels live in `BASIN` in the domain, and they used to be
+ * duplicated here — two lists of the same three basins that could drift without
+ * anything noticing. The order stays as it was, which is neither the record's
+ * insertion order nor anything meaningful: the storms list is mostly East
+ * Pacific, so EP first is the least surprising.
+ */
+const BASIN_ORDER = ["EP", "CP", "AL"] as const;
+
+const BASINS = BASIN_ORDER.map((code) => ({
+  code,
+  label: BASIN[code]?.label ?? code,
+}));
 
 const CATEGORIES = [
   { value: 0, label: "TS" },
