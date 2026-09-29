@@ -277,7 +277,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (rule) (audit_axe_violations)",
+          "expr": "sum by (rule) (audit_axe_violations_ratio)",
           "legendFormat": "{{rule}}"
         }
       ],

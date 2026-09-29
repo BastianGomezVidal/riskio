@@ -1,6 +1,19 @@
 # Prometheus scrapes the collector rather than receiving a push: it is
 # pull-based. The collector is the single place metrics land, and it exposes
 # them on :8889 after converting OTel resource attributes into labels.
+#
+# The audit metrics are the exception and the reason pushgateway is here. They
+# are pushed by .audit/report-metrics.mjs and only exist for as long as someone
+# runs the audit, which is not on a timer. Through the collector they reach
+# Prometheus as a normal scrape sample and go stale five minutes later, so the
+# dashboard shows the last run for five minutes and then nothing at all.
+# Verified: after one run, every audit_* series was already expired.
+#
+# Pushgateway holds the last value until it is replaced or deleted, which is
+# exactly the shape of this data. Note what that means: the panel shows the
+# most recent audit, not a history of audits. Getting a real time series would
+# mean appending a group per run and then owning the cleanup, and the retention
+# would be unbounded by default. Say which of the two you want before doing it.
 global:
   scrape_interval: 15s
   evaluation_interval: 30s
@@ -13,3 +26,8 @@ scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
+
+  - job_name: pushgateway
+    static_configs:
+      - targets: ["pushgateway:9091"]
+

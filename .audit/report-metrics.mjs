@@ -1,24 +1,25 @@
-// Pushes what audit-web.sh just measured into the collector, as OTLP metrics, so
-// the lab numbers and the accessibility findings land in the same Prometheus as
-// the RUM and can be read on one dashboard.
+// Pushes what audit-web.sh just measured into Pushgateway, in Prometheus text
+// format, so the lab numbers and the accessibility findings can be read on the
+// same dashboard as the RUM, and survive until the next run.
 //
-// Without this, the audit answers "is it broken right now" and throws the answer
-// away. With it, a colour-contrast regression that nobody noticed for six weeks
-// shows up as a step in a graph.
+// This went to the collector as OTLP first, which is the project's usual
+// ingestion path, and that was wrong for this data. Prometheus scrapes the
+// collector every 15s but the audit runs only when someone runs it, so the
+// sample went stale five minutes later and every audit_* series vanished;
+// measured, not assumed: right after a run, all of them were already expired and
+// the panels were empty. Keeping the collector copy alongside Pushgateway was
+// tried and dropped, because a bare metric name then matched two series and every
+// panel query had to remember to disambiguate. One path, one truth.
 //
-// OTLP/HTTP with a JSON body, hand-built, because the alternative is a metrics
-// SDK in the .audit dependencies to emit three gauges. The wire format for a
-// gauge is small and stable, and this keeps the audit free of another package.
+// Pushgateway holds the last value rather than a time series, so this answers
+// "how bad was the last audit", not "how did the audits trend". Turning the
+// second group on means a group per run, and then owning the cleanup.
 //
-//   node .audit/report-metrics.mjs [collector]
+//   node .audit/report-metrics.mjs [pushgateway]
 
 import { readFileSync } from "node:fs";
 
-const COLLECTOR = process.argv[2] ?? "http://localhost:4318";
-
-const str = (v) => ({ stringValue: String(v) });
-const attrs = (obj) =>
-  Object.entries(obj).map(([key, value]) => ({ key, value: str(value) }));
+const PUSHGATEWAY = process.argv[2] ?? "http://localhost:9091";
 
 const readJson = (path) => {
   try {
@@ -29,12 +30,8 @@ const readJson = (path) => {
 };
 
 const metrics = [];
-const gauge = (name, unit, value, attributes = {}) => {
-  metrics.push({
-    name,
-    unit,
-    gauge: { dataPoints: [{ asDouble: value, attributes: attrs(attributes) }] },
-  });
+const gauge = (name, unit, value, labels = {}) => {
+  metrics.push({ name, unit, value, labels });
 };
 
 // --- Lighthouse -------------------------------------------------------------
@@ -101,47 +98,63 @@ if (metrics.length === 0) {
   process.exit(0);
 }
 
-const payload = {
-  resourceMetrics: [
-    {
-      resource: {
-        attributes: [
-          { key: "service.name", value: str("riskio-audit") },
-          { key: "service.version", value: str("audit-web") },
-        ],
-      },
-      scopeMetrics: [
-        {
-          scope: { name: "riskio-audit", version: "1" },
-          metrics,
-        },
-      ],
-    },
-  ],
+// --- Pushgateway -------------------------------------------------------------
+// Prometheus scrapes the collector every 15s, and the audit runs only when
+// someone runs it, so a sample pushed through there went stale five minutes later
+// and every audit_* series disappeared. Verified rather than assumed: right
+// after a run, all of them were already expired and the panels were empty.
+// Pushgateway holds the last value until it is replaced.
+//
+// Names have to match what the dashboard queries, which are the names the
+// collector's Prometheus exporter used to produce: it turns dots into
+// underscores and appends the unit, so `audit.lcp` in ms is
+// `audit_lcp_milliseconds` and `audit.performance.score` in unitless is
+// `audit_performance_score_ratio`. Those came from asking Prometheus what it
+// actually held, not from assuming a convention.
+const UNIT_SUFFIX = { ms: "milliseconds", 1: "ratio", s: "seconds", "": "" };
+
+const exportName = (name, unit) => {
+  const base = name.replace(/\./g, "_");
+  const suffix = UNIT_SUFFIX[unit] ?? "";
+  return base.endsWith(`_${suffix}`) ? base : `${base}_${suffix}`;
 };
 
-const url = `${COLLECTOR.replace(/\/$/, "")}/v1/metrics`;
+const escapeLabel = (v) =>
+  String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+
+const exposition =
+  metrics
+    .map((m) => {
+      const name = exportName(m.name, m.unit);
+      const labels = Object.entries(m.labels)
+        .map(([k, v]) => `${k}="${escapeLabel(v)}"`)
+        .join(",");
+      // A trailing newline per block keeps the format parseable; without it
+      // Pushgateway rejects the whole body with a parsing error at EOF.
+      return `# TYPE ${name} gauge\n${name}${labels ? `{${labels}}` : ""} ${m.value}\n`;
+    })
+    .join("") + "\n";
 
 try {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+  // PUT replaces the whole job group, so a rule that stopped violating drops out
+  // of the last result instead of lingering at its old count.
+  const res = await fetch(`${PUSHGATEWAY.replace(/\/$/, "")}/metrics/job/riskio_audit`, {
+    method: "PUT",
+    headers: { "Content-Type": "text/plain; version=0.0.4" },
+    body: exposition,
   });
   if (res.ok) {
-    console.log(`  ${metrics.length} metricas enviadas a ${url}`);
+    console.log(`  ultimo resultado retenido en pushgateway (${PUSHGATEWAY})`);
     console.log(
-      "    " +
-        metrics
-          .map((m) => m.name)
-          .filter((v, i, a) => a.indexOf(v) === i)
-          .join(", "),
+      "    " + [...new Set(metrics.map((m) => exportName(m.name, m.unit)))].join(", "),
     );
   } else {
-    console.log(`  el collector respondio ${res.status}: ${(await res.text()).slice(0, 200)}`);
-    console.log("  las metricas no se han enviado; el resultado local sigue siendo valido");
+    console.log(
+      `  pushgateway respondio ${res.status}: ${(await res.text()).slice(0, 200)}`,
+    );
+    console.log("  las metricas no se han enviado; el informe local sigue siendo valido");
   }
 } catch (err) {
-  console.log(`  no se pudo contactar con ${url}: ${err.message}`);
-  console.log("  el collector esta caido o el puerto no es el 4318; el informe local sigue siendo valido");
+  console.log(`  pushgateway no disponible en ${PUSHGATEWAY}: ${err.message}`);
+  console.log("  las metricas no se han enviado; el informe local sigue siendo valido");
 }

@@ -112,10 +112,12 @@ fi
 node .audit/axe-audit.mjs "$TARGET" || rc=1
 
 step "Publicando el resultado como metricas"
-# Para que el tablero de Grafana tenga historia y no solo el "ahora". Si el
-# collector no esta, el script NO falla: la auditoria local ya ha servido para
-# decidir, y las metricas son una copia extra.
-node .audit/report-metrics.mjs "${COLLECTOR:-http://localhost:4318}" || true
+# Para que el tablero de Grafana conserve el ultimo resultado y no solo el
+# "ahora". Antes iba al collector, que lo perdiaba a los cinco minutos porque no
+# hay nada que lo empuje periodicamente; ahora va a pushgateway, que lo retiene
+# hasta la proxima auditoria. Si pushgateway no esta, el script NO falla: la
+# auditoria local ya ha servido para decidir, y las metricas son una copia extra.
+node .audit/report-metrics.mjs "${PUSHGATEWAY:-http://localhost:9091}" || true
 
 # --------------------------------------------------------------------------
 # Saltos HTTP de una sesion autenticada (opcional)
@@ -137,6 +139,6 @@ fi
 step "resumen"
 [[ $rc -eq 0 ]] && ok "todo dentro de umbrales" || warn "hay umbrales rotos o herramientas que fallaron"
 info "informes: $OUT/{lighthouse.json,axe.json}"
-info "INP no se mide aqui: requiere RUM real, y las envia .audit/report-metrics.mjs"
+info "INP no se mide aqui: requiere RUM real, que llega del navegador via el collector, no de este script"
 info "Grafana -> 'Web Vitals y accesibilidad' (http://localhost:3001)"
 exit $rc

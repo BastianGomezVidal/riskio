@@ -615,6 +615,34 @@ services:
     networks:
       - core
 
+  # Holds the last audit result so it survives between runs.
+  #
+  # The audit is not a service and nobody runs it on a timer, but its metrics
+  # went through the collector like everything else, which meant Prometheus saw
+  # one sample and marked the series stale five minutes later. Verified: after a
+  # run, all four audit_* series were already gone and the dashboard panels were
+  # empty. Pushgateway is the shape that fits: last value wins, held until it is
+  # replaced or deleted.
+  #
+  # --persistence.file is on because this container holds the thing the audit
+  # panels are for; without it, a recreate loses the last result. One small
+  # state file, and it only grows if audits are run without replacing the group.
+  # Fully qualified like the jaeger and seaweedfs images: a short name that is not
+  # already in the local store cannot be resolved without a TTY, so prom/pushgateway
+  # failed on first `up` while prom/prometheus only worked because it was pulled earlier.
+  pushgateway:
+    image: docker.io/prom/pushgateway:v1.11.3
+    restart: unless-stopped
+    command:
+      - --persistence.file=/data/metrics.db
+      - --persistence.interval=5m
+    volumes:
+      - pushgateway_data:/data
+    ports:
+      - "127.0.0.1:${PUSHGATEWAY_PORT:-9091}:9091"
+    networks:
+      - core
+
   grafana:
     image: grafana/grafana:12.3.1
     restart: unless-stopped
@@ -643,4 +671,5 @@ volumes:
   loki_data:
   grafana_data:
   prometheus_data:
+  pushgateway_data:
   jaeger_data:
