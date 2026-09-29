@@ -63,9 +63,43 @@ export class UsersService {
     const ext = file.originalname.split('.').pop() ?? 'png';
     const key = `avatars/${id}-${Date.now()}.${ext}`;
 
+    /**
+     * Resolved before the upload overwrites the column. Replacing an avatar used
+     * to leave the previous object in the bucket forever: every call wrote a new
+     * timestamped key and reassigned `avatarUrl`, and nothing ever removed the
+     * one before it. Thirteen orphans had accumulated in a development bucket
+     * holding a single live avatar.
+     */
+    const previousKey = user.avatarUrl
+      ? await this.storage.extractKey(user.avatarUrl)
+      : null;
+
     const url = await this.storage.upload(key, file.buffer, file.mimetype);
     user.avatarUrl = url;
     await this.usersRepository.save(user);
+
+    /**
+     * Deleted only after the row is saved, for the same reason the account
+     * deletion path does it outside its transaction: if the save failed, the old
+     * avatar is still the one the profile points at, and deleting it first would
+     * leave a user with no avatar because a database write failed.
+     *
+     * A failure here is logged rather than thrown. The new avatar is already
+     * live and the user has already been sent it; telling them their upload
+     * failed because an *old* file could not be removed would be a lie, and
+     * leaving one orphan behind is the cheaper outcome.
+     */
+    if (previousKey && previousKey !== key) {
+      try {
+        await this.storage.delete(previousKey);
+      } catch (error) {
+        this.logger.warn(
+          `kept the previous avatar ${previousKey} for user ${id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
 
     return this.toProfile(user);
   }
