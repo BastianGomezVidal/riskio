@@ -48,7 +48,7 @@
 #   ./dev.sh status       que hay levantado
 #   ./dev.sh stop         pararcontainers (deja caer tambien los de compose)
 #
-#   tail -f .dev-logs/api.log     ver la API mientras recompila
+#   tail -f .dev-logs/api.log      ver la API mientras recompila
 #   tail -f .dev-logs/web.log      ver vite
 #
 # VARIABLES
