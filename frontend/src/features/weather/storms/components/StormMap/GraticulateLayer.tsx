@@ -43,10 +43,32 @@ const MAX_LNG = 180;
 /** Guards against a pathological bounds/step combination emitting a huge DOM. */
 const MAX_LINES = 120;
 
+/**
+ * Swept against the rendered map, not reasoned about in the abstract.
+ *
+ * The first guess was slate-500 at 45% and 0.75px. Over OSM land that blends to
+ * 1.74:1 on paper and measures about 1.5:1 on screen, because a sub-pixel stroke
+ * is spread across its single pixel by antialiasing and no pixel ever reaches
+ * the nominal colour. It was too faint to do its job.
+ *
+ * Weight turned out to matter more than opacity: at 0.75px every opacity change
+ * was nearly invisible, because the line never fills a pixel. Measured means
+ * over the graticule, sweeping on the live map:
+ *
+ *     #475569 0.75/0.75 -> 1.77:1     #334155 1.25/0.85 -> 2.39:1
+ *     #475569 1.25/0.85 -> 2.07:1     #334155 1.50/0.90 -> 2.88:1
+ *     #334155 1.00/1.00 -> 2.10:1     #1E293B 1.50/0.90 -> 3.67:1
+ *
+ * 1.25px is the knee: past it the graticule starts competing with the 3px track
+ * polyline, and slate-800 is close enough to the track's navy that the two are
+ * easy to confuse. The 3:1 guideline covers graphical objects needed to
+ * understand the content; the graticule is a supplementary reference, and what
+ * it does need is to be actually visible, which it now is.
+ */
 const PATH_OPTIONS = {
-  color: "#64748b",
-  weight: 0.75,
-  opacity: 0.45,
+  color: "#334155",
+  weight: 1.25,
+  opacity: 0.9,
   interactive: false,
 } as const;
 
