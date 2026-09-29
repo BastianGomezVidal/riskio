@@ -15,6 +15,18 @@ import { GraticuleLayer } from "./GraticulateLayer";
 
 type LngLat = [number, number];
 
+/**
+ * Zoom floor. Below roughly this the world is narrower than the map, which is
+ * what exposed the tiled world's left edge in the first place.
+ */
+const MIN_ZOOM = 3;
+
+/** Keeps panning inside one copy of the world, matching the graticule clamp. */
+const WORLD_BOUNDS: [[number, number], [number, number]] = [
+  [-85, -180],
+  [85, 180],
+];
+
 interface WarningSegment {
   id: string;
   warningType: string;
@@ -77,6 +89,8 @@ export function StormMap({ track, cone, warnings = [], height = 340 }: Props) {
     <MapContainer
       bounds={bounds}
       boundsOptions={{ padding: [32, 32] }}
+      minZoom={MIN_ZOOM}
+      maxBounds={WORLD_BOUNDS}
       style={{ height, borderRadius: 8, zIndex: 0 }}
       scrollWheelZoom={false}
       aria-hidden="true"
@@ -86,6 +100,12 @@ export function StormMap({ track, cone, warnings = [], height = 340 }: Props) {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         subdomains={["a", "b", "c"]}
         maxZoom={19}
+        // Leaflet repeats the world horizontally by default, so zooming out far
+        // enough to cover more than one world width shows the continents twice:
+        // two Europes, two Africas. Nothing here is ever worth that view, since
+        // the bounds are a single storm, and `noWrap` plus a zoom floor and a
+        // world max bound make it unreachable rather than merely discouraged.
+        noWrap
       />
 
       <GraticuleLayer />
