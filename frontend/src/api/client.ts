@@ -289,6 +289,15 @@ export const api = {
     });
   },
 
+  /**
+   * End the session server-side.
+   *
+   * Optional by design: the caller clears local state either way, so a failure
+   * here (offline, expired token) must never be the reason someone stays signed
+   * in. `signOut` swallows the rejection rather than checking for one.
+   */
+  logout: () => requestEmpty("/auth/logout", { method: "POST" }),
+
   deleteMe: () => requestEmpty("/users/me", { method: "DELETE" }),
 
 };

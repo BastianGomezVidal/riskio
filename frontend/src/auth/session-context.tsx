@@ -13,7 +13,7 @@ import { useNavigate } from "react-router-dom";
 import type { Session } from "@/domain/auth";
 import type { User } from "@/domain/users";
 import { queryKeys, meQuery } from "@/data/queries";
-import { setUnauthorizedHandler } from "@/api/client";
+import { api, setUnauthorizedHandler } from "@/api/client";
 import { useInactivityLogout } from "./use-inactivity-logout";
 
 import {
@@ -118,6 +118,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
 
   const signOut = useCallback(() => {
+    /**
+     * Tell the server before dropping the token, because the token is the only
+     * credential the call can carry.
+     *
+     * Fire and forget, and never awaited by the caller: the local clear below
+     * has to happen either way. Someone on a train who signs out must end up
+     * signed out, not stuck because the request could not land. The rejection
+     * is swallowed for the same reason — an unhandled one would surface as an
+     * error in the console and imply the sign-out failed when it did not.
+     *
+     * This is what makes signing in again not report displacing another
+     * session. The server reads a non-null `currentSessionId` as "there was a
+     * live session here", so without this call a sign-out followed by a sign-in
+     * told the user their own session had been closed on another device.
+     */
+    void api.logout().catch(() => {});
+
     clearAccessToken();
     setUser(null);
     setWarningOpen(false);

@@ -16,6 +16,7 @@ import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
+  ApiNoContentResponse,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiUnauthorizedResponse,
@@ -178,6 +179,22 @@ export class AuthController {
     } catch {
       response.redirect(this.buildFrontendCallbackUrl('error', 'oauth_failed'));
     }
+  }
+
+  @Post('logout')
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'End the current session',
+    description:
+      'Clears the session server-side so the token in the client stops being ' +
+      'accepted immediately, and so signing in again does not report displacing ' +
+      'another session.',
+  })
+  @ApiNoContentResponse({ description: 'Session ended' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT' })
+  async logout(@CurrentUser() user: AuthPrincipal): Promise<void> {
+    await this.auth.logout(user.id);
   }
 
   @Post('tokens')

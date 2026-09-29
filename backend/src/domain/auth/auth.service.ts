@@ -331,6 +331,25 @@ export class AuthService {
    * promised it did not; see ApiTokenDto for why the digest is not harmless
    * just because it is one-way.
    */
+  /**
+   * End the current session.
+   *
+   * This existed only on the client until now, which had two consequences worth
+   * naming. A token copied out of local storage stayed valid until it expired,
+   * because nothing server-side ever ended the session. And signing out then
+   * signing back in reported "you signed in on another device", because
+   * `currentSessionId` was still set and `session()` reads a non-null value as
+   * "there was a live session to displace". The user had displaced it
+   * themselves, seconds earlier, in the same browser.
+   *
+   * Nulling the field is what makes both true: the stale token now fails the
+   * sessionId comparison on its next use, and the next login has nothing to
+   * invalidate, so the message stays reserved for the case it describes.
+   */
+  async logout(userId: string): Promise<void> {
+    await this.usersRepository.update(userId, { currentSessionId: null });
+  }
+
   async listApiTokens(userId: string): Promise<ApiTokenDto[]> {
     const tokens = await this.tokensRepository.find({
       where: { user: { id: userId }, revokedAt: IsNull() },
