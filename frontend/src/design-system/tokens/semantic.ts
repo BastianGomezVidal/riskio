@@ -53,6 +53,10 @@ export const semantic = {
 
   accents: {
     primary: primitives.colors.blue[600],
+    // The hover step for a solid primary fill, deliberately lighter than
+    // `primary` so every button in the app lightens under the pointer instead of
+    // only some of them. See blue[550] for why it is not 500.
+    primaryHover: primitives.colors.blue[550],
     primaryLight: primitives.colors.blue[500],
     warm: primitives.colors.red[600],
     cool: primitives.colors.gray[50],

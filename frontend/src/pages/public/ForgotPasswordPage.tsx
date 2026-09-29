@@ -65,7 +65,7 @@ export function ForgotPasswordPage() {
 
           <Link
             to="/"
-            className="mt-6 block w-full rounded-md bg-gray-900 py-2 text-center text-sm font-medium text-white hover:bg-gray-800"
+            className="mt-6 block w-full rounded-md bg-[#2563EB]! py-2 text-center text-sm font-medium text-white! hover:bg-[#2C6CEE]!"
           >
             Back to sign in
           </Link>
@@ -116,7 +116,7 @@ export function ForgotPasswordPage() {
         </form>
 
         <div className="mt-4 text-center text-sm">
-          <Link to="/" className="font-medium text-gray-900 hover:underline">
+          <Link to="/" className="font-medium hover:underline">
             Back to sign in
           </Link>
         </div>

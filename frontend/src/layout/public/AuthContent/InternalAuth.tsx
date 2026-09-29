@@ -19,6 +19,21 @@ interface AuthErrors {
 
 const EMPTY_ERRORS: AuthErrors = { form: null, fields: {} };
 
+/*
+ * No link in this file sets a `text-*` colour, on purpose.
+ *
+ * The links take `semantic.colors.link` (#1D4ED8) through antd's `colorLink`.
+ * They used to carry `text-gray-600` / `text-gray-900`, which never applied:
+ * antd injects `:where(.css-hash) a { background: transparent; color: ... }`
+ * unlayered, and unlayered normal declarations outrank every layer, so Tailwind
+ * lost regardless of specificity. The className was describing a grey link while
+ * the browser painted a blue one, which is worse than having no colour at all:
+ * the next person to read it believes the design is grey.
+ *
+ * Hover is underline rather than a darker grey, because there is no darker
+ * version of this blue to reach for and underline is the honest affordance.
+ */
+
 export function InternalAuth({ mode }: InternalAuthProps) {
   const { signIn } = useSession();
   const isSignIn = mode === "sign-in";
@@ -89,7 +104,9 @@ export function InternalAuth({ mode }: InternalAuthProps) {
     <div className="mt-6">
       <div className="flex items-center gap-3">
         <div className="h-px flex-1 bg-gray-300" />
-        <span className="text-xs text-gray-500">OR CONTINUE WITH EMAIL</span>
+        <h3 className="text-xs font-medium text-gray-500">
+          {isSignIn ? "Sign in with email" : "Create your account"}
+        </h3>
         <div className="h-px flex-1 bg-gray-300" />
       </div>
 
@@ -181,7 +198,7 @@ export function InternalAuth({ mode }: InternalAuthProps) {
             {isSignIn && (
               <Link
                 to="/forgot"
-                className="text-xs font-medium text-gray-600 hover:text-gray-900 hover:underline"
+                className="text-xs font-medium hover:underline"
               >
                 Forgot password?
               </Link>
@@ -215,7 +232,7 @@ export function InternalAuth({ mode }: InternalAuthProps) {
         </span>
         <Link
           to={isSignIn ? "/signup" : "/"}
-          className="font-medium text-gray-900 hover:underline"
+          className="font-medium hover:underline"
         >
           {isSignIn ? "Create an account" : "Sign in"}
         </Link>

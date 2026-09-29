@@ -78,7 +78,7 @@ export function ResetPasswordPage() {
 
           <Link
             to="/"
-            className="mt-6 block w-full rounded-md bg-gray-900 py-2 text-center text-sm font-medium text-white hover:bg-gray-800"
+            className="mt-6 block w-full rounded-md bg-[#2563EB]! py-2 text-center text-sm font-medium text-white! hover:bg-[#2C6CEE]!"
           >
             Go to sign in
           </Link>
@@ -109,7 +109,7 @@ export function ResetPasswordPage() {
 
           <Link
             to="/forgot"
-            className="mt-6 block w-full rounded-md bg-gray-900 py-2 text-center text-sm font-medium text-white hover:bg-gray-800"
+            className="mt-6 block w-full rounded-md bg-[#2563EB]! py-2 text-center text-sm font-medium text-white! hover:bg-[#2C6CEE]!"
           >
             Request a new link
           </Link>

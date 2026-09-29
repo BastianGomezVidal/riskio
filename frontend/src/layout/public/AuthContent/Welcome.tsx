@@ -10,7 +10,7 @@ export function Welcome({ mode }: WelcomeProps) {
   return (
     <div>
       <h2 className="text-lg font-semibold">
-        {isSignIn ? "Welcome back" : "Create your account"}
+        {isSignIn ? "Welcome back" : "Join Riskio"}
       </h2>
       <p className="mt-1 text-sm text-gray-600">
         {isSignIn
