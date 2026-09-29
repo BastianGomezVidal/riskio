@@ -1,10 +1,10 @@
-# Shared environment blocks.
+# Shared environment blocks, and the shared backend image.
 #
-# Anchors (the `&name` / `*name` syntax) let backend-api and backend-worker
-# share one definition instead of repeating it. Compose merges them with the
-# YAML merge key `<<`, so a change to the S3 config can never drift between the
-# two services. The `x-` prefix marks these as extension fields: Compose skips
-# them as services.
+# Anchors (the `&name` / `*name` syntax) let the seven backend processes share
+# one definition instead of repeating it. Compose merges them with the YAML
+# merge key `<<`, so a change to the S3 config can never drift between two
+# services. The `x-` prefix marks these as extension fields: Compose skips them
+# as services.
 x-storage-env: &storage-env
   STORAGE_DRIVER: s3
   # Internal address: resolved by Docker/Podman DNS, never by the browser.
@@ -185,6 +185,13 @@ services:
       start_period: 5s
 
   backend-api:
+    # All seven backend processes run the SAME image tag and differ only by
+    # `command`. Without an explicit `image:` Compose derives one tag per service
+    # name — seven identical 651 MB images — and `podman-compose build
+    # backend-api` silently leaves `backend-auth` on yesterday's code, which
+    # presents as a fix that does not work. Recreate all seven after a backend
+    # build; an unnecessary recreate is cheap, the wrong one is the bug.
+    image: localhost/riskio_backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -236,6 +243,13 @@ services:
   # only process that holds JWT_SECRET or reads the users table, and the only
   # one that can hash a password.
   backend-auth:
+    # All seven backend processes run the SAME image tag and differ only by
+    # `command`. Without an explicit `image:` Compose derives one tag per service
+    # name — seven identical 651 MB images — and `podman-compose build
+    # backend-api` silently leaves `backend-auth` on yesterday's code, which
+    # presents as a fix that does not work. Recreate all seven after a backend
+    # build; an unnecessary recreate is cheap, the wrong one is the bug.
+    image: localhost/riskio_backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -279,6 +293,13 @@ services:
   # /storms, /storms/:atcfId and /advisories/* are served from. The dashboard
   # reads it over HTTP, so the API holds no repository for these tables.
   backend-weather:
+    # All seven backend processes run the SAME image tag and differ only by
+    # `command`. Without an explicit `image:` Compose derives one tag per service
+    # name — seven identical 651 MB images — and `podman-compose build
+    # backend-api` silently leaves `backend-auth` on yesterday's code, which
+    # presents as a fix that does not work. Recreate all seven after a backend
+    # build; an unnecessary recreate is cheap, the wrong one is the bug.
+    image: localhost/riskio_backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -325,6 +346,13 @@ services:
   # scheduler alive across an API restart, and now the scheduler lives next to
   # the ingestion it drives.
   backend-feeds:
+    # All seven backend processes run the SAME image tag and differ only by
+    # `command`. Without an explicit `image:` Compose derives one tag per service
+    # name — seven identical 651 MB images — and `podman-compose build
+    # backend-api` silently leaves `backend-auth` on yesterday's code, which
+    # presents as a fix that does not work. Recreate all seven after a backend
+    # build; an unnecessary recreate is cheap, the wrong one is the bug.
+    image: localhost/riskio_backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -379,6 +407,13 @@ services:
   # to be healthy: the API degrades to uncached reads instead of refusing to
   # start, which is the whole point of extracting it.
   backend-cache:
+    # All seven backend processes run the SAME image tag and differ only by
+    # `command`. Without an explicit `image:` Compose derives one tag per service
+    # name — seven identical 651 MB images — and `podman-compose build
+    # backend-api` silently leaves `backend-auth` on yesterday's code, which
+    # presents as a fix that does not work. Recreate all seven after a backend
+    # build; an unnecessary recreate is cheap, the wrong one is the bug.
+    image: localhost/riskio_backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -421,6 +456,13 @@ services:
   # HTTP and cached for 30s, so it owns no table and reads none. The env
   # contract is what keeps it that way.
   backend-dashboard:
+    # All seven backend processes run the SAME image tag and differ only by
+    # `command`. Without an explicit `image:` Compose derives one tag per service
+    # name — seven identical 651 MB images — and `podman-compose build
+    # backend-api` silently leaves `backend-auth` on yesterday's code, which
+    # presents as a fix that does not work. Recreate all seven after a backend
+    # build; an unnecessary recreate is cheap, the wrong one is the bug.
+    image: localhost/riskio_backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -460,6 +502,13 @@ services:
       start_period: 15s
 
   backend-storage:
+    # All seven backend processes run the SAME image tag and differ only by
+    # `command`. Without an explicit `image:` Compose derives one tag per service
+    # name — seven identical 651 MB images — and `podman-compose build
+    # backend-api` silently leaves `backend-auth` on yesterday's code, which
+    # presents as a fix that does not work. Recreate all seven after a backend
+    # build; an unnecessary recreate is cheap, the wrong one is the bug.
+    image: localhost/riskio_backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile

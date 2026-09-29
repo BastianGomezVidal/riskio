@@ -40,20 +40,43 @@ Dos trampas concretas:
 
 Para no adivinar, `podman-compose config --services` siempre tiene razón.
 
-## 3. backend-api y backend-auth comparten imagen
+## 3. Los siete procesos de backend comparten una imagen
 
-Ambos se construyen desde el mismo contexto y la misma etiqueta
-(`localhost/riskio_backend-api:latest`). Lo que los distingue es el `command`:
+Una sola etiqueta, `localhost/riskio_backend:latest`, y lo que los distingue es el
+`command`:
 
 | Servicio | `command` |
 |---|---|
-| `backend-api` | ninguno, usa el CMD del image (`start:prod`) |
+| `backend-api` | ninguno, usa el CMD de la imagen (`start:prod`) |
 | `backend-auth` | `["npm", "run", "start:auth"]` |
+| `backend-weather` | `["npm", "run", "start:weather"]` |
+| `backend-dashboard` | `["npm", "run", "start:dashboard"]` |
+| `backend-feeds` | `["npm", "run", "start:feeds"]` |
+| `backend-storage` | `["npm", "run", "start:storage"]` |
+| `backend-cache` | `["npm", "run", "start:cache"]` |
 
-Y esto importa: un cambio en código compartido, por ejemplo
-`users.controller.ts` o `auth-proxy.middleware.ts`, hay que **desplegar en los
-dos**. Recrear solo `backend-api` deja el servicio de auth con la imagen
-anterior, y da la impresión de que el arreglo no funciona.
+Cada servicio declara `image:` de forma explícita y los siete apuntan a la misma
+etiqueta. **No era así**, y esta sección decía lo contrario:
+
+Sin `image:`, Compose deriva una etiqueta por nombre de servicio. Habia siete
+imagenes identicas de 651 MB — mas una octava, `backend-worker`, de un servicio
+que ya no existe — y `podman-compose build backend-api` no tocaba
+`backend-auth`. El sintoma era el peor posible: un cambio en codigo compartido
+desplegaba en un proceso y no en el otro, y se veia como un arreglo que no
+funciona. Pasó de verdad durante el trabajo de Swagger: `/docs` del gateway
+devolvio el documento nuevo mientras el del servicio de auth seguia dando 404.
+
+Dos consecuencias practicas:
+
+1. **Un build, siete recreados.** La etiqueta es comun, asi que hay que recrear
+   los siete despues de compilar el backend. Recrear de mas es barato; recrear
+   el equivocado era el bug.
+2. **`--force-recreate` no es de fiar con un solo servicio.** Pedir
+   `podman-compose up -d --force-recreate backend-auth` informa haber recreado
+   `backend-api` y `frontend`, y se salta el servicio que nombro. Hay que pasar
+   los siete, o comprobar despues con
+   `podman inspect -f '{{.ImageName}}' riskio_backend-auth_1`.
+
 
 ## 4. Redes
 
@@ -132,11 +155,23 @@ Solo el frontend:
 podman-compose up -d --build --no-cache frontend
 ```
 
-Backend (los dos, ver la nota del punto 3):
+Backend. Los siete procesos comparten etiqueta, asi que un build se despliega
+recreando los siete (ver §3):
 
 ```bash
 podman-compose build --no-cache backend-api
-podman-compose up -d --force-recreate backend-api backend-auth
+podman-compose up -d --force-recreate --no-deps \
+  backend-api backend-auth backend-weather backend-dashboard \
+  backend-feeds backend-storage backend-cache
+```
+
+Comprobar que los siete tienen la imagen nueva, porque `--force-recreate` con
+un solo servicio no es de fiar:
+
+```bash
+for s in api auth weather dashboard feeds storage cache; do
+  podman inspect -f "{{.ImageName}} {{.State.Health.Status}}" "riskio_backend-$s"_1
+done
 ```
 
 Cuando algo va mal y hay que empezar de cero en los contenedores, sin tocar los
