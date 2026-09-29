@@ -83,6 +83,7 @@ Outlook need §6 first.
 | Frontend build (typechecks) | `cd frontend && npm run build` |
 | Frontend dev server | `cd frontend && npm run dev` |
 | Web performance audit | `./audit-web.sh` |
+| Everything that can fail | `./check.sh` |
 
 ### After changing backend code
 
@@ -350,22 +351,64 @@ a log is a working credential. The API says so at boot while it is active.
 
 ---
 
-## 8. Testing
+## 8. Testing and quality
+
+One command runs everything that can fail:
 
 ```bash
-cd backend && npm test          # 271 tests, 25 files
-cd backend && npm run lint      # oxlint
-cd frontend && npm run build    # tsc -b + vite build
+./check.sh          # typecheck, lint, tests, coverage, dead code, build
+./check.sh --fast   # same, minus coverage
 ```
 
-The frontend has no unit test suite. Typecheck and build are the gate, plus
-`audit-web.sh` for what users actually experience.
+It exits non-zero if any step failed. The GitHub Actions workflow calls this exact
+script, so a green local run is a green run on the remote — there is no second list
+of commands to drift.
 
-One gap worth knowing about: `src/domain/feeds/ingestion/ingestion.service.spec.ts`
-declares 20 tests and runs 1. A `/*` on line 130 is not closed until line 883, so
-most of the file is one comment. `oxlint` reports its `expect` and `service` imports
-as unused and is right — the only test that used them is inside the comment. They
-are left in place because they are the scaffolding for tests that have to come back.
+| Check | Command | What it catches |
+|---|---|---|
+| Backend typecheck | `cd backend && npm run typecheck` | type errors, including in specs |
+| Backend lint | `cd backend && npm run lint` | `oxlint`: unused imports, dead locals |
+| Backend tests | `cd backend && npm test` | behaviour |
+| Backend coverage | `cd backend && npm run coverage` | below-threshold coverage, fails the run |
+| Frontend typecheck | `cd frontend && npm run typecheck` | type errors |
+| Frontend dead code | `cd frontend && npm run knip` | unused files, unused and undeclared deps |
+| Frontend build | `cd frontend && npm run build` | production build succeeds |
+
+### Coverage
+
+```
+Statements   71.94%  ( 818/1137 )
+Branches     68.39%  ( 474/693  )
+Functions    72.95%  ( 143/196  )
+Lines        72.39%  ( 771/1065 )
+```
+
+Thresholds live in `backend/vitest.config.ts` and **`npm run coverage` fails below
+them**: 70% lines, 70% functions, 70% statements, 65% branches. So coverage is a
+gate, not a decoration. The HTML report is at `backend/coverage/index.html`.
+
+The thresholds sit just under the measured numbers on purpose. A threshold set
+exactly at today's figure turns red the first time anyone adds an uncovered line,
+and gets disabled the same week. Raise them deliberately as coverage improves.
+
+`coverage-metrics/summary.json` in the repo root is the machine-readable snapshot,
+and the CI workflow rewrites and commits it on every push to `main`, so the numbers
+in this README are never more than one push behind reality. The workflow also
+comments the table onto the commit and uploads the HTML report as an artifact.
+
+Files are counted only when a test imports them, so adding an untested file does not
+silently move the number. The `exclude` list holds entrypoints, modules, DTOs,
+entities, migrations and DI tokens — files with no unit-testable behaviour.
+
+The frontend has no unit test suite. Its gate is typecheck, `knip` and a successful
+build, plus `audit-web.sh` for what users actually experience.
+
+### Where the gaps are
+
+`users.service.ts` (~30%) and `storms.service.ts` are the two lowest-covered
+service files. `computeFindMany` in particular assembles a filter list where a
+mistake is invisible to a type checker, so it is the first place to write tests
+next.
 
 ---
 
@@ -398,3 +441,7 @@ being true, replace it rather than deleting it.
 
 **Secrets never enter git.** `.env` is ignored. `.env.example` carries no real
 values.
+
+**A number nobody reproduces is a rumour.** Coverage figures, bundle sizes and
+latency claims in this file were measured, and `check.sh` is how you re-measure
+them. If one goes stale, replace it.

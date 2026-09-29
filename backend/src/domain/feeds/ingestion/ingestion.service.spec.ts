@@ -3,8 +3,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { NhcProvider } from '../providers/nhc/nhc.provider.js';
 import { IngestionService } from './ingestion.service.js';
-import { StormsService } from '../../weather/storms/storms.service.js';
-import { AdvisoriesService } from '../../weather/advisories/advisories.service.js';
+import { StormWriter } from './writers/storm-writer.js';
+import { AdvisoryWriter } from './writers/advisory-writer.js';
+import type { CacheService } from '../../cache/cache.service.js';
 
 const FIXTURES_DIR = join(
   __dirname,
@@ -33,6 +34,7 @@ function makeServices() {
   const replaceForecastPoints = vi.fn();
   const setTrackCone = vi.fn();
   const replaceWarnings = vi.fn();
+  const invalidate = vi.fn();
 
   const nhc = {
     fetchBasinSummary,
@@ -40,20 +42,32 @@ function makeServices() {
     fetchAdvisoryProduct,
   } as unknown as NhcProvider;
 
-  const storms = {
+  /*
+   * The two writers, not the services that used to sit here.
+   *
+   * The ingestion service depends on `StormWriter` and `AdvisoryWriter`, which is
+   * the narrower pair: a writer is the part that touches the database, so this
+   * spec asserts on what gets persisted rather than on two services that also
+   * cache, compose and serve reads.
+   */
+  const stormWriter = {
     reconcileFromFeed,
     findOneRaw: findStorm,
-  } as unknown as StormsService;
+  } as unknown as StormWriter;
 
-  const advisories = {
-    upsertFromIngestion: upsertAdvisory,
+  const advisoryWriter = {
+    upsert: upsertAdvisory,
     replaceForecastPoints,
     setTrackCone,
     replaceWarnings,
-  } as unknown as AdvisoriesService;
+  } as unknown as AdvisoryWriter;
+
+  const cache = {
+    invalidate,
+  } as unknown as CacheService;
 
   return {
-    //service: new IngestionService(nhc, storms, advisories),
+    service: new IngestionService(nhc, stormWriter, advisoryWriter, cache),
     fetchBasinSummary,
     fetchForecastAdvisory,
     fetchAdvisoryProduct,
@@ -63,6 +77,7 @@ function makeServices() {
     replaceForecastPoints,
     setTrackCone,
     replaceWarnings,
+    invalidate,
   };
 }
 
@@ -77,11 +92,12 @@ describe('IngestionService', () => {
   let replaceForecastPoints: ReturnType<typeof vi.fn>;
   let setTrackCone: ReturnType<typeof vi.fn>;
   let replaceWarnings: ReturnType<typeof vi.fn>;
+  let invalidate: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     const built = makeServices();
 
-    //service = built.service;
+    service = built.service;
     fetchBasinSummary = built.fetchBasinSummary;
     fetchForecastAdvisory = built.fetchForecastAdvisory;
     fetchAdvisoryProduct = built.fetchAdvisoryProduct;
@@ -91,6 +107,24 @@ describe('IngestionService', () => {
     replaceForecastPoints = built.replaceForecastPoints;
     setTrackCone = built.setTrackCone;
     replaceWarnings = built.replaceWarnings;
+    invalidate = built.invalidate;
+
+    /*
+     * Anything not stubbed per-test returns undefined, which for a boolean
+     * "was this advisory already there" answer would read as a false inserted
+     * flag. Defaulting it to inserted:true makes an un-stubbed run assert
+     * something instead of quietly taking the skipped branch.
+     */
+    upsertAdvisory.mockResolvedValue({
+      advisory: { id: 'adv-1', advisoryNumber: 2 },
+      inserted: true,
+    });
+    replaceForecastPoints.mockResolvedValue(0);
+    setTrackCone.mockResolvedValue(undefined);
+    replaceWarnings.mockResolvedValue(0);
+    fetchAdvisoryProduct.mockResolvedValue(null);
+    reconcileFromFeed.mockResolvedValue(undefined);
+    invalidate.mockResolvedValue(0);
   });
 
   describe('ingestBasin', () => {
@@ -111,8 +145,6 @@ describe('IngestionService', () => {
 
       fetchForecastAdvisory.mockResolvedValue(fixture('tcm-ep4.xml'));
 
-      fetchAdvisoryProduct.mockResolvedValue(null);
-
       reconcileFromFeed.mockResolvedValue(undefined);
       findStorm.mockResolvedValue(storm);
 
@@ -125,9 +157,9 @@ describe('IngestionService', () => {
       setTrackCone.mockResolvedValue(undefined);
       replaceWarnings.mockResolvedValue(0);
 
-      //const report = await service.ingestBasin('ep');
+      const report = await service.ingestBasin('ep');
 
-      /*expect(report).toMatchObject({
+      expect(report).toMatchObject({
         basin: 'ep',
         stormsSeen: 1,
         stormsUpserted: 1,
@@ -160,6 +192,37 @@ describe('IngestionService', () => {
       expect(setTrackCone).toHaveBeenCalledWith('adv-1', null, null);
 
       expect(replaceWarnings).toHaveBeenCalledWith(advisory, []);
+    });
+
+    it('busts the cache only when an advisory was actually inserted', async () => {
+      fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
+      fetchForecastAdvisory.mockResolvedValue(fixture('tcm-ep4.xml'));
+      findStorm.mockResolvedValue({
+        atcfId: 'EP142026',
+        name: null,
+        basin: 'EP',
+      });
+
+      upsertAdvisory.mockResolvedValue({
+        advisory: { id: 'adv-1', advisoryNumber: 2 },
+        inserted: true,
+      });
+      replaceForecastPoints.mockResolvedValue(8);
+
+      await service.ingestBasin('ep');
+
+      expect(invalidate).toHaveBeenCalledWith('dashboard:*');
+      expect(invalidate).toHaveBeenCalledWith('storms:*');
+
+      invalidate.mockClear();
+      upsertAdvisory.mockResolvedValue({
+        advisory: { id: 'adv-1', advisoryNumber: 2 },
+        inserted: false,
+      });
+
+      await service.ingestBasin('ep');
+
+      expect(invalidate).not.toHaveBeenCalled();
     });
 
     it('returns the advisory as skipped when it already exists', async () => {
@@ -257,6 +320,7 @@ describe('IngestionService', () => {
       expect(report.stormsSeen).toBe(0);
       expect(report.errors).toHaveLength(1);
       expect(report.errors[0]).toContain('network down');
+      expect(report.errors[0]).toContain('fetch/parse failed');
 
       expect(reconcileFromFeed).not.toHaveBeenCalled();
     });
@@ -317,6 +381,36 @@ describe('IngestionService', () => {
       expect(upsertAdvisory).not.toHaveBeenCalled();
     });
 
+    it('records an empty TCM feed without aborting the basin', async () => {
+      fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
+
+      /*
+       * A well-formed feed carrying zero items, which is a different failure
+       * from unparseable XML. The parser has to accept this one so the
+       * "no items" branch below is reached at all; the empty `<channel>` without
+       * an `<item>` parses, but an RSS document with no channel element does not
+       * and is caught earlier as a parse error.
+       */
+      fetchForecastAdvisory.mockResolvedValue(
+        fixture('tcm-ep4.xml').replace(/<item>[\s\S]*?<\/item>/, ''),
+      );
+
+      findStorm.mockResolvedValue({
+        atcfId: 'EP142026',
+        name: null,
+        basin: 'EP',
+      });
+
+      const report = await service.ingestBasin('ep');
+
+      expect(report.stormsUpserted).toBe(1);
+      expect(report.advisoriesInserted).toBe(0);
+      expect(report.errors).toHaveLength(1);
+      expect(report.errors[0]).toContain('TCM feed contains no items');
+
+      expect(upsertAdvisory).not.toHaveBeenCalled();
+    });
+
     it('skips a storm when the advisory number cannot be parsed', async () => {
       fetchBasinSummary.mockResolvedValue(fixture('nhc-ep-active.xml'));
 
@@ -364,7 +458,7 @@ describe('IngestionService', () => {
           <channel>
             <item>
               <title>
-                $$ FORECAST/ADVISORY NUMBER 2 FOR TROPICAL STORM LOWELL
+                FORECAST/ADVISORY NUMBER 2 FOR TROPICAL STORM LOWELL
               </title>
             </item>
           </channel>
@@ -877,10 +971,6 @@ describe('IngestionService', () => {
       expect(spy).toHaveBeenCalledTimes(3);
 
       spy.mockRestore();
-    });
-  });
-});
-*/
     });
   });
 });

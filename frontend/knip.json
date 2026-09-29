@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["src/main.tsx", "vite.config.ts"],
+  "project": ["src/**/*.ts", "src/**/*.tsx"],
+  "ignore": [],
+  "ignoreDependencies": ["tailwindcss"],
+  "ignoreBinaries": [],
+  "rules": {
+    "files": "error",
+    "dependencies": "error",
+    "unlisted": "error",
+    "binaries": "error",
+    "unresolved": "error",
+    "exports": "warn",
+    "types": "warn",
+    "enumMembers": "warn",
+    "duplicates": "warn"
+  }
+}
