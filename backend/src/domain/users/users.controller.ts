@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -74,7 +75,18 @@ export class UsersController {
         const ok = ['image/png', 'image/jpeg', 'image/webp'].includes(
           file.mimetype,
         );
-        cb(ok ? null : new Error('Only PNG, JPEG or WebP allowed'), ok);
+        /**
+         * A `BadRequestException`, not a bare `Error`. Multer hands whatever is
+         * passed to `cb` straight to Nest's exception layer, and Nest only maps
+         * a `HttpException` to its status; anything else is a 500. A rejected
+         * upload is the caller's mistake and has to read as 400, not as our
+         * fault. This was unreachable until the proxy stopped dropping the
+         * body: every upload used to die earlier, in the multipart parser.
+         */
+        cb(
+          ok ? null : new BadRequestException('Only PNG, JPEG or WebP allowed'),
+          ok,
+        );
       },
     }),
   )

@@ -20,11 +20,33 @@ import { AUTH_CHECKER, type AuthChecker } from '../../common/authz/authz.ports.j
  *   local and cheap, so the decision is never taken on a proxy's word.
  * - **A rejection keeps its reason.** "Your session was closed because you
  *   signed in elsewhere" survives the hop instead of becoming a flat 401.
+ *
+ * Bodies are forwarded, but not uniformly, and the difference matters.
+ * `express.json()` fills `req.body` for `application/json` and leaves the
+ * stream alone for everything else, so for multipart `req.body` is `undefined`
+ * while the bytes are still sitting on the request. Forwarding
+ * `JSON.stringify(req.body)` therefore sent the `content-type` header, boundary
+ * included, and no body at all: the auth service ran busboy over an empty
+ * stream and answered `400 Multipart: Unexpected end of form` for every avatar
+ * upload. `POST /users/me/avatar` was unreachable, and it was not nginx's
+ * doing — the same request failed identically straight against the API.
+ *
+ * So anything that is not JSON is read off the stream and forwarded as bytes.
  */
 @Injectable()
 export class AuthProxyMiddleware implements NestMiddleware {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
+
+  /**
+   * Ceiling for a non-JSON body buffered here. nginx already refuses anything
+   * over 2 MB with `client_max_body_size`, and multer caps the avatar at the
+   * same 2 MB, so this is not a limit the app relies on. It exists because a
+   * middleware that concatenates chunks onto its own heap is a memory
+   * amplification point if a future caller reaches the API without nginx in
+   * front, and answering 413 is better than an out-of-memory kill.
+   */
+  private static readonly MAX_RAW_BODY_BYTES = 2 * 1024 * 1024;
 
   constructor(
     @Inject(AUTH_CHECKER) private readonly checker: AuthChecker,
@@ -34,6 +56,80 @@ export class AuthProxyMiddleware implements NestMiddleware {
       .get<string>('AUTH_SERVICE_URL', 'http://backend-auth:3008')
       .replace(/\/+$/, '');
     this.timeoutMs = Number(config.get('AUTH_SERVICE_TIMEOUT_MS', 5_000));
+  }
+
+  /**
+   * The body to forward, or `undefined` when there is none.
+   *
+   * An `ArrayBuffer` for a non-JSON body so fetch sends the bytes and sets
+   * `content-length` from them. Forwarding the header the client sent instead
+   * would be a way to reintroduce the very mismatch being fixed.
+   *
+   * `ArrayBuffer` rather than `Buffer`: the `BodyInit` that applies here comes
+   * from lib.dom, which does not accept Node's `Buffer` even though the two
+   * carry identical bytes. `Buffer.concat` can hand back a slice of a shared
+   * pool, so the bytes are copied out rather than aliased.
+   */
+  private async readBody(
+    req: Request,
+  ): Promise<ArrayBuffer | string | undefined> {
+    if (req.method === 'GET' || req.method === 'HEAD') {
+      return undefined;
+    }
+    if (req.body !== undefined) {
+      return JSON.stringify(req.body);
+    }
+    if (req.readableEnded) {
+      return undefined;
+    }
+    return this.readRawBody(req);
+  }
+
+  private readRawBody(req: Request): Promise<ArrayBuffer | undefined> {
+    const limit = AuthProxyMiddleware.MAX_RAW_BODY_BYTES;
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      let total = 0;
+      let refused = false;
+      req.on('data', (chunk: Buffer) => {
+        if (refused) {
+          return;
+        }
+        total += chunk.length;
+        if (total > limit) {
+          refused = true;
+          const error = new Error('Request body too large');
+          Object.assign(error, { status: 413 });
+          /**
+           * Pause, do not destroy. Destroying the socket is what made this
+           * unanswerable: the client saw the 100 Continue and then a dead
+           * connection instead of the 413 the caller is about to write. Pausing
+           * stops the heap from growing while the rest of the upload stays in
+           * the socket, and the response below still gets out.
+           */
+          req.pause();
+          reject(error);
+          return;
+        }
+        chunks.push(chunk);
+      });
+      req.on('end', () => {
+        if (!refused) {
+          const joined = Buffer.concat(chunks);
+          resolve(
+            joined.buffer.slice(
+              joined.byteOffset,
+              joined.byteOffset + joined.byteLength,
+            ),
+          );
+        }
+      });
+      req.on('error', (error) => {
+        if (!refused) {
+          reject(error);
+        }
+      });
+    });
   }
 
   async use(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -76,6 +172,27 @@ export class AuthProxyMiddleware implements NestMiddleware {
       headers['x-api-key'] = apiKeyValue;
     }
 
+    let body: ArrayBuffer | string | undefined;
+    try {
+      body = await this.readBody(req);
+    } catch (error) {
+      // Only the size ceiling reaches here. It has to be answered before the
+      // fetch, because the auth service would be handed a truncated body and
+      // report it as malformed rather than as too large. The connection is
+      // closed because the request body was never read to the end, and the
+      // client is most likely still uploading.
+      const status = (error as { status?: number }).status ?? 413;
+      res
+        .setHeader('connection', 'close')
+        .status(status)
+        .json({
+          statusCode: status,
+          error: 'Payload Too Large',
+          message: 'the request body is too large',
+        });
+      return;
+    }
+
     try {
       const upstream = await fetch(
         `${this.baseUrl}${req.originalUrl}`,
@@ -89,10 +206,7 @@ export class AuthProxyMiddleware implements NestMiddleware {
            * every DELETE, so `/users/me` and `/auth/tokens` fell through to
            * Nest's own 404 and looked like missing endpoints.
            */
-          body:
-            req.method === 'GET' || req.method === 'HEAD' || req.body === undefined
-              ? undefined
-              : JSON.stringify(req.body),
+          body,
           signal: AbortSignal.timeout(this.timeoutMs),
         },
       );
