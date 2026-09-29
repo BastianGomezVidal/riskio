@@ -1,4 +1,5 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Public } from '../domain/auth/decorators/public.decorator.js';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -11,11 +12,13 @@ import { DataSource } from 'typeorm';
  * guard would have guarded the check that says whether it can serve at all.
  */
 @Public()
+@ApiTags('health')
 @Controller('health')
 export class AuthHealthController {
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
   @Get()
+  @ApiOperation({ summary: 'Health probe (liveness & readiness)' })
   async check(): Promise<{ status: string; database: string }> {
     try {
       await this.dataSource.query('SELECT 1');

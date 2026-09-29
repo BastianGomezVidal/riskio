@@ -1,4 +1,5 @@
 import { All, Controller, Param, Query, Req, Res } from '@nestjs/common';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
@@ -35,16 +36,41 @@ export class WeatherProxyController {
   }
 
   @All('/storms')
+  @ApiOperation({
+    summary: 'List storms',
+    description:
+      'Filterable storm list. Basin, category, year range and sort come from the ' +
+      'query string; the same parameters the UI sends are the ones this accepts.',
+    tags: ['storms'],
+  })
+  @ApiQuery({ name: 'basin', required: false, description: 'Comma-separated NHC basin codes: AL, EP, CP' })
+  @ApiQuery({ name: 'cat', required: false, description: 'Comma-separated category numbers, 0-5' })
+  @ApiQuery({ name: 'from', required: false, description: 'Earliest first-seen year, inclusive' })
+  @ApiQuery({ name: 'to', required: false, description: 'Latest first-seen year, inclusive' })
+  @ApiQuery({ name: 'sort', required: false, description: 'newest | oldest | name_asc | name_desc' })
+  @ApiQuery({ name: 'tab', required: false, description: 'active | past' })
+  @ApiQuery({ name: 'q', required: false, description: 'Free-text match on name or ATCF id' })
+  @ApiBearerAuth('bearer')
+  @ApiOkResponse({ description: 'Matching storms, most recent first' })
   storms(@Req() req: Request, @Res() res: Response): Promise<void> {
     return this.forward(req, res, `${this.baseUrl}/storms`);
   }
 
   @All('/storms/:atcfId')
+  @ApiOperation({ summary: 'One storm by ATCF id', tags: ['storms'] })
+  @ApiParam({ name: 'atcfId', description: 'ATCF identifier, e.g. EP152026' })
+  @ApiBearerAuth('bearer')
+  @ApiOkResponse({ description: 'The storm, or 404 if unknown' })
   storm(@Param('atcfId') atcfId: string, @Req() req: Request, @Res() res: Response): Promise<void> {
     return this.forward(req, res, `${this.baseUrl}/storms/${encodeURIComponent(atcfId)}`);
   }
 
   @All('/storms/:atcfId/advisories/:n')
+  @ApiOperation({ summary: 'One advisory of one storm', tags: ['advisories'] })
+  @ApiParam({ name: 'atcfId', description: 'ATCF identifier' })
+  @ApiParam({ name: 'n', description: 'Advisory number, or `latest`' })
+  @ApiBearerAuth('bearer')
+  @ApiOkResponse({ description: 'The advisory with its track and forecast cone' })
   stormAdvisory(
     @Param('atcfId') atcfId: string,
     @Param('n') n: string,
@@ -59,6 +85,10 @@ export class WeatherProxyController {
   }
 
   @All('/advisories/:id')
+  @ApiOperation({ summary: 'One advisory by id', tags: ['advisories'] })
+  @ApiParam({ name: 'id', description: 'Advisory UUID' })
+  @ApiBearerAuth('bearer')
+  @ApiOkResponse({ description: 'The advisory' })
   advisory(@Param('id') id: string, @Req() req: Request, @Res() res: Response): Promise<void> {
     return this.forward(req, res, `${this.baseUrl}/advisories/${encodeURIComponent(id)}`);
   }

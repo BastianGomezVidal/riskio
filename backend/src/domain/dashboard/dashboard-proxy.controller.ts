@@ -2,6 +2,7 @@ import { All, Controller, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 
 /**
  * Forwards `/dashboard` to the dashboard service.
@@ -39,11 +40,30 @@ export class DashboardProxyController {
    * the whole prefix instead, and cannot drift out of date.
    */
   @All('/dashboard')
+  @ApiOperation({
+    summary: 'Dashboard summary',
+    description:
+      'Aggregated counts and the active advisory list. The splat route below ' +
+      'covers the rest of the prefix, so sub-routes appear here without a ' +
+      'code change.',
+    tags: ['dashboard'],
+  })
+  @ApiBearerAuth('bearer')
+  @ApiOkResponse({ description: 'Aggregated dashboard payload' })
   bare(@Req() req: Request, @Res() res: Response): void {
     void this.forward(req, res, `${this.baseUrl}${req.originalUrl}`);
   }
 
   @All('/dashboard/*splat')
+  @ApiOperation({
+    summary: 'Any other dashboard sub-resource',
+    description:
+      'Declared because the splat exists to keep sub-routes from 404ing. ' +
+      'Known today: /dashboard/summary.',
+    tags: ['dashboard'],
+  })
+  @ApiBearerAuth('bearer')
+  @ApiOkResponse({ description: 'Dashboard sub-resource payload' })
   summary(@Req() req: Request, @Res() res: Response): void {
     // originalUrl already carries the path and the query string, so the
     // upstream URL is the base plus the request, unchanged.

@@ -1,9 +1,10 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
 import { Logger } from 'nestjs-pino';
+import { buildOpenApi } from './common/openapi.js';
 
 /**
  * Start the HTTP server.
@@ -39,43 +40,31 @@ async function bootstrap(): Promise<void> {
     origin: corsOrigins.length > 0 ? corsOrigins : true,
   });
 
-  const config = new DocumentBuilder()
-    .setTitle('Riskio API')
-    .setDescription('Tropical cyclone data ingested from NOAA NHC feeds.')
-    .setVersion('0.1.0')
-    .addTag('storms', 'Tropical cyclone storm records')
-    .addTag('advisories', 'Per-storm forecast advisories')
-    .addTag('ingestion', 'Manual ingestion triggers')
-    .addTag('auth', 'Account registration, login and API tokens')
-    .addTag('health', 'Liveness and readiness probes')
-    /**
-     * Without these the Authorize button does not exist, and the seven
-     * operations annotated `@ApiBearerAuth()` were pointing at a scheme that
-     * was never registered — references to nothing.
-     */
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        description:
-          'Access token from POST /auth/login. Works for any account: the ' +
-          'admin role is only needed by the /admin endpoints.',
-      },
-      'bearer',
-    )
-    /**
-     * The admin-only endpoints also require this header. It is a second thing
-     * to paste, which is why the two schemes are separate rather than the
-     * bearer token alone being treated as sufficient.
-     */
-    .addApiKey(
-      { type: 'apiKey', name: 'x-api-key', in: 'header' },
-      'api-key',
-    )
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  /**
+   * Docs for the gateway itself. `/auth/*` and `/users/*` are answered by
+   * `AuthProxyMiddleware` before Nest routes them, so their controllers belong
+   * to the auth service and are documented there; this document covers what
+   * this process actually owns.
+   */
+  const document = buildOpenApi(app, {
+    title: 'Riskio API (gateway)',
+    tags: [
+      { name: 'storms', description: 'Tropical cyclone records, filterable' },
+      { name: 'advisories', description: 'Per-storm advisories, tracks and cones' },
+      { name: 'dashboard', description: 'Aggregated dashboard payload' },
+      { name: 'ingestion', description: 'Manual NHC ingestion triggers (admin)' },
+      { name: 'health', description: 'Liveness and readiness probes' },
+    ],
+    description:
+      'Tropical cyclone data from NOAA NHC. This process is a gateway: it owns ' +
+      'the public routes, forwards them to the service that holds the data, and ' +
+      'holds no domain state of its own. Storm, advisory and dashboard responses ' +
+      'are streamed through untouched, so the service that owns a resource is the ' +
+      'only place its shape is defined.',
+  });
+  SwaggerModule.setup('docs', app, document, {
+    swaggerOptions: { defaultModelsExpandDepth: 0 },
+  });
 
   await app.listen(process.env.PORT ?? 3000);
 }

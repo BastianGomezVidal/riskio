@@ -1,6 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { Logger as PinoLogger } from 'nestjs-pino';
+import { SwaggerModule } from '@nestjs/swagger';
+import { buildOpenApi } from '../common/openapi.js';
 import { AuthServiceModule } from './auth.module.js';
 
 /**
@@ -39,6 +41,40 @@ async function bootstrap(): Promise<void> {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
+
+  /**
+   * These endpoints are the ones the browser authenticates against, and they
+   * cannot be documented from the API: `AuthProxyMiddleware` answers `/auth/*`
+   * and `/users/*` before Nest routes them, so the API never introspects these
+   * controllers. Its bearer scheme used to point at a `POST /auth/login` that
+   * was not in the document at all.
+   *
+   * Served on the loopback-mapped port only, so it is a local reference rather
+   * than a second public surface. The browser still reaches these paths through
+   * the API.
+   */
+  const document = buildOpenApi(app, {
+    title: 'Riskio API (auth)',
+    tags: [
+      { name: 'auth', description: 'Registration, login, password reset, OAuth entry' },
+      { name: 'users', description: 'The signed-in profile, including the avatar' },
+      { name: 'health', description: 'Liveness and readiness probes' },
+    ],
+    /**
+     * `/internal/*` is how the API asks this service for a decision over the
+     * compose network. It is not part of the contract the browser sees, and
+     * `POST /internal/auth/check` answers "is this token valid, and who is it"
+     * — not something to advertise.
+     */
+    excludePaths: ['/internal'],
+    description:
+      'Accounts, sessions and the profile. Owned by the auth service, which ' +
+      'holds `JWT_SECRET` and the users table. The browser calls these paths on ' +
+      'the API origin; the API forwards them here before its own router runs.',
+  });
+  SwaggerModule.setup('docs', app, document, {
+    swaggerOptions: { defaultModelsExpandDepth: 0 },
+  });
 
   const port = Number(process.env.AUTH_SERVICE_PORT ?? 3008);
   await app.listen(port, '0.0.0.0');
