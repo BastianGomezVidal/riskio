@@ -39,9 +39,15 @@ interface AppLayoutProps {
  *
  * `sr-only` until focused. `focus-visible` and not `focus`, so tabbing reveals it
  * and a click does not; the trade-off is that `:focus-visible` leans on the
- * browser's heuristic where `:focus` always shows. `inset-x-0` rather than
- * `w-full`, so revealing it cannot collide with `not-sr-only` resetting `width`
- * to `auto`.
+ * browser's heuristic where `:focus` always shows.
+ *
+ * On focus it becomes `static`, so it takes up real space in the flex column and
+ * pushes the header down instead of covering it. It was `fixed` and overlaid the
+ * header, which is the common implementation but the wrong one here: the link
+ * appears over a header the user has not scrolled away from, so it hides the
+ * navigation rather than offering it, and the first thing on screen is a bar
+ * with unrelated blue showing through beside it. The cost is a reflow when it
+ * reveals, which is a fair trade for not hiding the thing it is offering.
  *
  * Nothing here moves focus on navigation. A skip link is a target the user
  * chooses with Tab; auto-focusing it would put Enter one press away from firing
@@ -54,7 +60,7 @@ function SkipLink() {
   return (
     <a
       href="#main"
-      className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:inset-x-0 focus-visible:top-0 focus-visible:z-50 focus-visible:bg-gray-900 focus-visible:text-white"
+      className="sr-only focus-visible:not-sr-only focus-visible:static focus-visible:w-full focus-visible:bg-gray-900 focus-visible:text-white"
     >
       <span className="mx-auto flex w-full max-w-6xl items-center px-4 py-3 text-base font-semibold sm:px-6 lg:px-8">
         Skip to main content
