@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button } from "antd";
+import { ActionButton } from "@/design-system/controls";
 
 const CONSENT_KEY = "riskio.cookieConsent";
 
@@ -59,10 +59,10 @@ export function CookieBanner({ consent, onConsent }: CookieBannerProps) {
       )}
 
       <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button onClick={() => onConsent("declined")}>Decline</Button>
-        <Button type="primary" onClick={() => onConsent("accepted")}>
+        <ActionButton onClick={() => onConsent("declined")}>Decline</ActionButton>
+        <ActionButton variant="primary" onClick={() => onConsent("accepted")}>
           Accept
-        </Button>
+        </ActionButton>
       </div>
     </aside>
   );

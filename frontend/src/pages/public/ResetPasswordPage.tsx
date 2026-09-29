@@ -1,6 +1,6 @@
 import { useActionState, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Button, Input } from "antd";
+import { ActionButton, TextField } from "@/design-system/controls";
 import { api, authErrorMessage } from "@/api/client";
 import { FieldError, FormError } from "@/layout/public/AuthError/AuthError";
 import { AuthLayout } from "@/layout/public/AuthLayout";
@@ -128,46 +128,38 @@ export function ResetPasswordPage() {
         </p>
 
         <form action={formAction} noValidate className="mt-8 space-y-4">
-          <div>
-            <label
-              htmlFor="newPassword"
-              className="mb-1 block text-sm font-medium text-gray-900"
-            >
-              New password
-            </label>
-            <Input.Password
-              id="newPassword"
-              name="newPassword"
-              autoComplete="new-password"
-              autoFocus
-            />
-          </div>
+            <div>
+              <TextField
+                id="newPassword"
+                name="newPassword"
+                type="password"
+                label="New password"
+                autoComplete="new-password"
+                autoFocus
+              />
+            </div>
 
-          <div>
-            <label
-              htmlFor="confirmPassword"
-              className="mb-1 block text-sm font-medium text-gray-900"
-            >
-              Confirm new password
-            </label>
-            <Input.Password
-              id="confirmPassword"
-              name="confirmPassword"
-              autoComplete="new-password"
-            />
-            <FieldError>{errors.password}</FieldError>
-          </div>
+            <div>
+              <TextField
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                label="Confirm new password"
+                autoComplete="new-password"
+              />
+              <FieldError>{errors.password}</FieldError>
+            </div>
 
           {errors.form && <FormError message={errors.form} />}
 
-          <Button
-            type="primary"
-            htmlType="submit"
+          <ActionButton
+            type="submit"
+            variant="primary"
             loading={pending}
             className="w-full"
           >
             Set new password
-          </Button>
+          </ActionButton>
         </form>
       </section>
     </AuthLayout>

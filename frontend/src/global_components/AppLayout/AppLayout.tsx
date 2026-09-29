@@ -5,6 +5,7 @@ import { AppFooter } from "../AppFooter/AppFooter";
 import { PageFallback } from "../PageFallBack/PageFallBack";
 import { RouteErrorBoundary } from "../ErrorBoundary/RouteErrorBoundary";
 import { useScrollToTop } from "@/hooks/useScrollToTop";
+import { ThemeProvider } from "@/design-system/ThemeProvider";
 
 interface AppLayoutProps {
   children?: ReactNode;
@@ -77,11 +78,19 @@ function SkipLink() {
  * pages, and an Error Boundary scoped to the page. The BackButton is
  * rendered here for now; it will move out of the layout once the
  * individual pages migrate to breadcrumb navigation.
+ *
+ * This is also where `ThemeProvider` now lives. It renders antd's
+ * `ConfigProvider` and `AntdApp`, so while it sat in `main.tsx` every public
+ * page inherited antd: the sign-in page downloaded a 182 KiB vendor chunk it
+ * never used, because the bundler follows the import graph on sight rather than
+ * on render. Only authenticated routes are inside this layout, so only they pay
+ * for it. Public pages style themselves from the design tokens instead.
  */
 export function AppLayout({ children }: AppLayoutProps) {
   useScrollToTop();
   return (
-    <div className="flex min-h-dvh flex-col">
+    <ThemeProvider>
+      <div className="flex min-h-dvh flex-col">
       <SkipLink />
 
       <AppHeader />
@@ -98,5 +107,6 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       <AppFooter />
     </div>
+    </ThemeProvider>
   );
 }

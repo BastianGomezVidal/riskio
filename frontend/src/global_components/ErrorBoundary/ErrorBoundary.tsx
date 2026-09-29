@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { Button } from "antd";
+import { ActionButton } from "@/design-system/controls";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -22,9 +22,9 @@ function DefaultFallback({ error, retry }: DefaultFallbackProps) {
     <div className="mx-auto flex w-full max-w-md flex-col items-center gap-4 p-8 text-center">
       <h2 className="text-lg font-semibold">Something went wrong</h2>
       <p className="text-sm text-gray-600">{error.message || "An unexpected error occurred."}</p>
-      <Button type="primary" onClick={retry}>
+      <ActionButton variant="primary" onClick={retry}>
         Try again
-      </Button>
+      </ActionButton>
     </div>
   );
 }

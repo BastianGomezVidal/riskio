@@ -1,6 +1,6 @@
 import { useActionState, useState } from "react";
 import { Link } from "react-router-dom";
-import { Button, Input } from "antd";
+import { ActionButton, TextField } from "@/design-system/controls";
 import { api, authErrorMessage } from "@/api/client";
 import type { ForgotPasswordResult } from "@/domain/auth";
 import { EMAIL_PATTERN } from "@/auth/validation";
@@ -84,35 +84,30 @@ export function ForgotPasswordPage() {
         </p>
 
         <form action={formAction} noValidate className="mt-8 space-y-4">
-          <div>
-            <label
-              htmlFor="email"
-              className="mb-1 block text-sm font-medium text-gray-900"
-            >
-              Email address
-            </label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="you@company.com"
-              autoComplete="email"
-              autoFocus
-              onChange={clearFieldError}
-            />
-            <FieldError>{errors.field}</FieldError>
-          </div>
+            <div>
+              <TextField
+                id="email"
+                name="email"
+                type="email"
+                label="Email address"
+                placeholder="you@company.com"
+                autoComplete="email"
+                autoFocus
+                onChange={clearFieldError}
+              />
+              <FieldError>{errors.field}</FieldError>
+            </div>
 
           {errors.form && <FormError message={errors.form} />}
 
-          <Button
-            type="primary"
-            htmlType="submit"
+          <ActionButton
+            type="submit"
+            variant="primary"
             loading={pending}
             className="w-full"
           >
             Request reset
-          </Button>
+          </ActionButton>
         </form>
 
         <div className="mt-4 text-center text-sm">

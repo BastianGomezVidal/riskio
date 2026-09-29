@@ -1,11 +1,14 @@
 import { Route, Routes } from "react-router-dom";
 import { PublicOnlyRoute, ProtectedRoute } from "./guards";
 import { lazyPage } from "./lazyPage";
-import { AppLayout } from "@/global_components/AppLayout/AppLayout";
 
 // Every route is loaded on demand. Keeping these imports inside lazy() is what
 // keeps leaflet and the per-page component trees out of the initial chunk: the
 // sign-in screen should not pay for the storm map.
+const AppLayout = lazyPage(
+  () => import("@/global_components/AppLayout/AppLayout"),
+  "AppLayout",
+);
 const SignInPage = lazyPage(
   () => import("@/pages/public/SignInPage"),
   "SignInPage",

@@ -1,7 +1,22 @@
 import type { ReactNode } from "react";
-import { Alert, Button } from "antd";
+import { lazy, Suspense } from "react";
+import { ActionButton } from "@/design-system/controls";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { ErrorEmpty } from "../StatusEmpty/StatusEmpty";
+
+/**
+ * Loaded on demand, and only for the full-size variant.
+ *
+ * `ErrorEmpty` renders antd's `Empty`, and this file is imported by
+ * `AuthLayout`, which is public. A static import here put antd in the entry
+ * bundle and the sign-in page downloaded 182 KiB for a fallback it never showed.
+ * The compact variant below is the one the public layout actually uses, and it
+ * no longer needs antd; the full-size variant only renders inside `AppLayout`,
+ * behind authentication, so pulling its chunk then costs a signed-in user
+ * nothing they were not already paying.
+ */
+const ErrorEmpty = lazy(() =>
+  import("../StatusEmpty/StatusEmpty").then((m) => ({ default: m.ErrorEmpty })),
+);
 
 interface RouteErrorBoundaryProps {
   children: ReactNode;
@@ -10,6 +25,32 @@ interface RouteErrorBoundaryProps {
    * the sign-in card where the full empty-state presentation does not fit.
    */
   compact?: boolean;
+}
+
+/**
+ * The compact fallback, rebuilt without antd.
+ *
+ * This is the markup an antd `Alert type="error"` produced here: a bordered,
+ * tinted box, the message, and the retry action on the right. `role="alert"` is
+ * antd's own live-region behaviour and is kept on purpose, so an error that
+ * appears is still announced rather than just appearing.
+ */
+function CompactError({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div
+      role="alert"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-200 bg-red-200/25 px-3 py-2"
+    >
+      <span className="text-sm text-red-600">{message}</span>
+      <ActionButton onClick={onRetry}>Try again</ActionButton>
+    </div>
+  );
 }
 
 /**
@@ -30,22 +71,15 @@ export function RouteErrorBoundary({
 }: RouteErrorBoundaryProps) {
   return (
     <ErrorBoundary
-      fallback={(error, retry) =>
-        compact ? (
-          <Alert
-            type="error"
-            showIcon
-            message={error.message || "Something went wrong."}
-            action={
-              <Button size="small" onClick={retry}>
-                Try again
-              </Button>
-            }
-          />
-        ) : (
-          <ErrorEmpty message={error.message || undefined} onRetry={retry} />
-        )
-      }
+        fallback={(error, retry) =>
+          compact ? (
+            <CompactError message={error.message || "Something went wrong."} onRetry={retry} />
+          ) : (
+            <Suspense fallback={null}>
+              <ErrorEmpty message={error.message || undefined} onRetry={retry} />
+            </Suspense>
+          )
+        }
     >
       {children}
     </ErrorBoundary>

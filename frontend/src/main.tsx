@@ -5,7 +5,7 @@ import "@fontsource-variable/sora/wght.css";
 import App from "./app/App";
 import { BrowserRouter } from "react-router-dom";
 import { SessionProvider } from "./auth/session-context";
-import { ThemeProvider } from "./design-system/ThemeProvider";
+import { ToastProvider } from "./design-system/toast";
 import { QueryProvider } from "./data/QueryProvider";
 import "./index.css";
 import { ErrorBoundary } from "./global_components/ErrorBoundary/ErrorBoundary";
@@ -37,11 +37,23 @@ if (root) {
         <Root>
           <BrowserRouter>
             <SessionProvider>
-              <ThemeProvider>
+              {/*
+                The toast provider stays here, above every route, because a
+                session can be closed from anywhere and the notification has to
+                survive the navigation. It has no antd dependency, so it costs
+                the public pages nothing.
+
+                `ThemeProvider` is deliberately absent. It renders antd's
+                `ConfigProvider` and `AntdApp`, and importing it from here put
+                antd's 182 KiB vendor chunk in the entry bundle, which the
+                sign-in page downloaded before it could draw anything. It now
+                lives in `AppLayout`, so only the authenticated routes load it.
+              */}
+              <ToastProvider>
                 <Suspense fallback={<PageFallback />}>
                   <App />
                 </Suspense>
-              </ThemeProvider>
+              </ToastProvider>
             </SessionProvider>
           </BrowserRouter>
         </Root>

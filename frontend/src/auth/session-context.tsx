@@ -7,8 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { lazy, Suspense } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { message } from "antd";
 import { useNavigate } from "react-router-dom";
 import type { Session } from "@/domain/auth";
 import type { User } from "@/domain/users";
@@ -23,7 +23,22 @@ import {
   hasValidSession,
   storeAccessToken,
 } from "./session";
-import { SessionExpiryModal } from "@/global_components/SessionExpiryModal/SessionExpiryModal";
+import { useToast } from "@/design-system/toast";
+
+/**
+ * Loaded on demand.
+ *
+ * It renders an antd `Modal`, and it was the last thing keeping antd's 182 KiB
+ * vendor chunk in the entry bundle: a static import from this file is a static
+ * import from `main.tsx`, and the sign-in page paid for it. The modal only opens
+ * after an idle warning, which needs a signed-in user, so the login page never
+ * reaches it and never has to download it.
+ */
+const SessionExpiryModal = lazy(() =>
+  import("@/global_components/SessionExpiryModal/SessionExpiryModal").then((m) => ({
+    default: m.SessionExpiryModal,
+  })),
+);
 
 interface SessionContextValue {
   user: User | null;
@@ -116,6 +131,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [now, setNow] = useState(() => Date.now());
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const signOut = useCallback(() => {
     /**
@@ -176,8 +192,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setUnauthorizedHandler(() => {
       clearAccessToken();
       setUser(null);
-      message.warning(
+      toast.notify(
         "Your session was closed because you signed in on another device or browser.",
+        "warning",
       );
       window.location.href = "/";
     });
@@ -199,7 +216,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     },
     onExpire: () => {
       signOut();
-      message.info("You were signed out due to inactivity.");
+      toast.notify("You were signed out due to inactivity.");
       navigate("/", { replace: true });
     },
   });
@@ -240,7 +257,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // letting the first reader refetch what we are holding.
         queryClient.setQueryData(queryKeys.me.all, session.user);
         if (session.previousSessionInvalidated) {
-          message.info(
+          toast.notify(
             "You were signed in on another device or browser. That session has been closed.",
           );
         }
@@ -255,11 +272,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   return (
     <SessionContext.Provider value={value}>
       {children}
-      <SessionExpiryModal
-        open={warningOpen}
-        secondsLeft={secondsLeft}
-        onStay={() => setWarningOpen(false)}
-      />
+      {warningOpen ? (
+        <Suspense fallback={null}>
+          <SessionExpiryModal
+            open
+            secondsLeft={secondsLeft}
+            onStay={() => setWarningOpen(false)}
+          />
+        </Suspense>
+      ) : null}
     </SessionContext.Provider>
   );
 }

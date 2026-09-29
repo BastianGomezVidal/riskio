@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Spin } from "antd";
+import { Spinner } from "@/design-system/controls";
 
 /**
  * Neutral loading placeholder, deliberately without any layout chrome.
@@ -33,7 +33,7 @@ export function PageFallback() {
       className="flex items-center justify-center"
       style={{ minHeight: "40vh" }}
     >
-      <Spin size="large" />
+      <Spinner />
     </div>
   );
 }

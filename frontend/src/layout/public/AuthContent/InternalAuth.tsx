@@ -1,12 +1,12 @@
 // src/components/AuthContent/InternalAuth.tsx
 import { useActionState, useState } from "react";
 import { Link } from "react-router-dom";
-import { Button, Input } from "antd";
 import { api, authErrorMessage } from "@/api/client";
 import type { AuthMode } from "@/auth/auth-mode";
 import { useSession } from "@/auth/session-context";
 import { EMAIL_PATTERN } from "@/auth/validation";
-import { FieldError, FormError } from "../AuthError/AuthError";
+import { FormError } from "../AuthError/AuthError";
+import { ActionButton, TextField } from "@/design-system/controls";
 
 interface InternalAuthProps {
   mode: AuthMode;
@@ -114,54 +114,38 @@ export function InternalAuth({ mode }: InternalAuthProps) {
         {!isSignIn && (
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label
-                htmlFor="firstName"
-                className="mb-1 block text-sm font-medium text-gray-900"
-              >
-                First name
-              </label>
-              <Input
+              <TextField
                 id="firstName"
                 name="firstName"
+                label="First name"
                 placeholder="Ada"
                 maxLength={80}
                 autoComplete="given-name"
                 onChange={() => clearError("firstName")}
               />
-              <FieldError>{errors.fields.firstName}</FieldError>
             </div>
 
             <div>
-              <label
-                htmlFor="lastName"
-                className="mb-1 block text-sm font-medium text-gray-900"
-              >
-                Last name
-              </label>
-              <Input
+              <TextField
                 id="lastName"
                 name="lastName"
+                label="Last name"
                 placeholder="Lovelace"
                 maxLength={80}
                 autoComplete="family-name"
                 onChange={() => clearError("lastName")}
               />
-              <FieldError>{errors.fields.lastName}</FieldError>
             </div>
           </div>
         )}
 
         {!isSignIn && (
           <div>
-            <label
-              htmlFor="phone"
-              className="mb-1 block text-sm font-medium text-gray-900"
-            >
-              Phone (optional)
-            </label>
-            <Input
+            <TextField
               id="phone"
               name="phone"
+              type="tel"
+              label="Phone (optional)"
               placeholder="+1 555 010 1234"
               maxLength={20}
               autoComplete="tel"
@@ -170,60 +154,49 @@ export function InternalAuth({ mode }: InternalAuthProps) {
         )}
 
         <div>
-          <label
-            htmlFor="email"
-            className="mb-1 block text-sm font-medium text-gray-900"
-          >
-            Email address
-          </label>
-          <Input
+          <TextField
             id="email"
             name="email"
             type="email"
+            label="Email address"
             placeholder="you@company.com"
             autoComplete="email"
             onChange={() => clearError("email")}
           />
-          <FieldError>{errors.fields.email}</FieldError>
         </div>
 
         <div>
-          <div className="mb-1 flex items-center justify-between">
-            <label
-              htmlFor="password"
-              className="text-sm font-medium text-gray-900"
-            >
-              Password
-            </label>
-            {isSignIn && (
-              <Link
-                to="/forgot"
-                className="text-xs font-medium hover:underline"
-              >
-                Forgot password?
-              </Link>
-            )}
-          </div>
-          <Input.Password
+          <TextField
             id="password"
             name="password"
+            type="password"
+            label="Password"
             placeholder={isSignIn ? "Your password" : "At least 8 characters"}
             autoComplete={isSignIn ? "current-password" : "new-password"}
             onChange={() => clearError("password")}
+            labelAccessory={
+              isSignIn ? (
+                <Link
+                  to="/forgot"
+                  className="text-xs font-medium hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              ) : null
+            }
           />
-          <FieldError>{errors.fields.password}</FieldError>
         </div>
 
         {errors.form && <FormError message={errors.form} />}
 
-        <Button
-          type="primary"
-          htmlType="submit"
+        <ActionButton
+          type="submit"
+          variant="primary"
           loading={pending}
           className="w-full"
         >
           {isSignIn ? "Sign in" : "Create account"}
-        </Button>
+        </ActionButton>
       </form>
 
       <div className="mt-4 text-center text-sm">
