@@ -9,7 +9,7 @@ import {
 import type { ReactNode } from "react";
 import type { StormAggregate, StormRiskLevel } from "@/domain/storm";
 import { formatUTC, formatDuration, formatRelative } from "@/domain/datetime";
-import { stormDisplayName, toWhen } from "@/domain/storm";
+import { basinLabel, stormDisplayName, toWhen } from "@/domain/storm";
 
 function Root({
   storm,
@@ -54,11 +54,18 @@ function Body({ storm }: { storm: StormAggregate }) {
   const from = formatUTC(storm.firstSeenAt);
   const to = toWhen(storm.isActive, storm);
   const duration = formatDuration(storm.firstSeenAt, storm.lastSeenAt);
+  const basin = basinLabel(storm.basin);
 
   return (
     <div className="space-y-1">
       <div className="font-medium">
-        {storm.basin} · {name}
+        {name}
+        {basin ? (
+          <span className="font-normal text-(--ant-color-text-secondary)">
+            {" · "}
+            {basin}
+          </span>
+        ) : null}
       </div>
       <div className="font-mono text-xs text-(--ant-color-text-secondary)">
         {storm.atcfId}

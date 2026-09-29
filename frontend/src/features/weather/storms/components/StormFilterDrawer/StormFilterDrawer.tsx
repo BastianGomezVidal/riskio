@@ -119,31 +119,41 @@ export function StormsFilterDrawer({
       title={null}
       closeIcon={null}
       styles={{
-        body: { padding: 0 },
+        // A flex column so the footer can sit on the floor of the drawer. It used
+        // to be pinned with `maxHeight: calc(100vh - 160px)` on the body, which
+        // only worked while the content happened to be taller than that: with a
+        // short filter set the footer floated up right under the last control
+        // instead of staying at the bottom.
+        body: {
+          padding: 0,
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+        },
+        // antd skips its own header when both title and closeIcon are null, but
+        // the bar below is hand-rolled and there is no reason to depend on that.
         header: { display: "none" },
       }}
       footer={null}
       maskClosable
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between border-b border-(--ant-color-border-secondary) bg-(--ant-color-fill-secondary) px-6 py-4">
         <button
           type="button"
           onClick={handleCancel}
           aria-label="Close filters"
-          className="rounded p-1 text-(--ant-color-text-secondary) transition-colors hover:bg-(--ant-color-fill-quaternary)"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-(--ant-color-text) transition-colors hover:bg-(--ant-color-fill-tertiary)"
         >
           <CloseIcon />
         </button>
         <span className="text-base font-semibold">Filter</span>
-        <span className="w-6" aria-hidden />
+        {/* Balances the 8x8 close button so the title stays optically centred. */}
+        <span className="w-8 shrink-0" aria-hidden />
       </div>
 
       {/* Body */}
-      <div
-        className="space-y-6 overflow-y-auto p-4"
-        style={{ maxHeight: "calc(100vh - 160px)" }}
-      >
+      <div className="flex-1 space-y-6 overflow-y-auto p-4">
         {/* Basin */}
         <Section title="Basin">
           <div className="flex flex-wrap gap-2">
@@ -211,7 +221,7 @@ export function StormsFilterDrawer({
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-end gap-2 border-t px-4 py-3">
+      <div className="flex shrink-0 items-center justify-end gap-3 border-t border-(--ant-color-border-secondary) bg-(--ant-color-fill-secondary) px-6 py-4">
         <Button onClick={handleCancel}>Cancel</Button>
         <Button type="primary" onClick={handleApply}>
           Apply
@@ -241,16 +251,16 @@ function Section({
 function CloseIcon() {
   return (
     <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
       <path
-        d="M4 4L12 12M12 4L4 12"
+        d="M4.5 4.5L13.5 13.5M13.5 4.5L4.5 13.5"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.75"
         strokeLinecap="round"
       />
     </svg>
