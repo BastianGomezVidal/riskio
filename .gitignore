@@ -50,3 +50,17 @@ backend/.dev-fixtures/
 # Deps e informes de audit-web.sh
 .audit/node_modules/
 .audit/out/
+# Los informes Lighthouse son artefactos locales y pueden pesar bastante.
+# El historico de runs esta en .audit/lighthouse-run-*.json.
+.audit/*.json
+
+# Documentacion local, no compartida.
+#
+# Los ARCHITECTURE-*.md y el README del backend SI se versionan: son la
+# referencia del proyecto. Estos tres no.
+#
+# Los archivos siguen en el disco; solo dejan de estar en git. Para volver a
+# subirlos, `git add -f <archivo>`.
+AGENTS.md
+PLAN-ACCION.md
+backend/README.md

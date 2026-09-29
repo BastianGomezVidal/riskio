@@ -137,6 +137,31 @@ app_latency_seconds          <- producción
 test_app_latency_seconds     <- prueba
 ```
 
+### 4.1 El audit falla por diseño, y eso también es información
+
+`audit-web.sh` corre Lighthouse `LH_RUNS=3` y compara **medianas**, no el mejor
+run ni la media. Un único run oscila demasiado para decidir nada.
+
+| Métrica | Umbral | Estado |
+|---|---|---|
+| TBT | `TBT_MAX_MS=300` | mediana medida entre 257 y 264 ms |
+| LCP, CLS, FCP, SI | los de Lighthouse | pasan |
+
+Sobre el TBT: el umbral **subió de 200 a 300** (`c9db865`). Los 200 de Google se
+mantienen como objetivo documentado, pero como puerta solo generaban un rojo
+permanente, porque la mediana medida cae dentro de ese rango. Bajar de 300 exige
+quitar antd de las páginas públicas de auth, no tocar una variable. El detalle
+está en [ARCHITECTURE-FRONTEND.md](ARCHITECTURE-FRONTEND.md) §11.
+
+Consecuencia para este documento: `audit_web_vitals_tbt_ms` **sube y baja con
+cada ejecución** del script, porque Pushgateway guarda un único valor. No es una
+serie y no se le deben hacer gráficos de tendencia.
+
+El histórico vive en `.audit/`, que está **en `.gitignore`**: son artefactos
+locales, no están en el repo ni en ninguna máquina que no haya corrido el script.
+Ahí quedan `lighthouse-run-*.json` (uno por run) y `lighthouse.json` (el último
+informe completo). Si hace falta comparar sesiones, hay que guardarlos a mano.
+
 ## 5. Jaeger está configurado con muestreo, así que parece vacío
 
 El pipeline de trazas tiene `tail_sampling` antes de exportar:
@@ -178,7 +203,7 @@ loki_distributor_lines_received_total{tenant="fake"}  9103
 loki_ingester_memory_streams{tenant="fake"}              7
 ```
 
-Streams por servicio, en las últimas 48 h:
+Streams por servicio, en las últimas 48 h **en el momento de escribir esto**:
 
 | Servicio | Streams |
 |---|---|
@@ -186,6 +211,11 @@ Streams por servicio, en las últimas 48 h:
 | `riskio-cache` | 1 |
 | `riskio-auth` | 1 |
 | `riskio-web` | **0** |
+
+El 0 de `riskio-web` es el dato estable. Los otros son una foto del momento: los
+siete procesos backend emiten con el mismo nombre de servicio, así que pueden
+aparecer `riskio-weather` o `riskio-storage` según qué haya hecho cada uno. Para
+ver el estado real, la consulta del final de esta sección los lista todos.
 
 Los labels que trae cada línea son los de la auto-instrumentación:
 `http_method`, `http_url`, `http_response_statusCode`, `process_command`,
@@ -226,14 +256,19 @@ collector salga vacío, y la respuesta es que nunca estuvo.
 
 Todo en volúmenes Docker locales. **Nada de esto va a SeaweedFS.**
 
-| Servicio | Volumen | Contenido |
-|---|---|---|
-| Prometheus | `prometheus_data` | TSDB, 15 días |
-| Jaeger | `jaeger_data` | Badger: `data/ keys/ values/`, TTL 15 días |
-| Loki | `loki_data` | `chunks/`, con logs del backend |
-| Grafana | `grafana_data` | dashboards y estado |
-| Pushgateway | `pushgateway_data` | último resultado de auditoría |
-| SeaweedFS | `storage_data` | almacenamiento de objetos de la app, nada que ver |
+| Servicio | Puerto host | Volumen | Contenido |
+|---|---|---|---|
+| Prometheus | `127.0.0.1:9090` | `prometheus_data` | TSDB, 15 días |
+| Pushgateway | `127.0.0.1:9091` | `pushgateway_data` | último resultado de auditoría |
+| Jaeger | `127.0.0.1:16686` | `jaeger_data` | Badger: `data/ keys/ values/`, TTL 15 días |
+| Loki | **no publicado** | `loki_data` | `chunks/`, con logs del backend |
+| Grafana | `127.0.0.1:3001` | `grafana_data` | dashboards y estado |
+| otel-collector | `127.0.0.1:4318` | — | recibe del navegador, reparte a los tres |
+| SeaweedFS | `8333` | `storage_data` | objetos de la app, nada que ver |
+
+Loki es el único sin puerto, y eso es lo que hace que "vacío" y "no publicado" se
+confundan. La consulta verificada está en
+[ARCHITECTURE-PODMAN.md](ARCHITECTURE-PODMAN.md) §5.
 
 **Por qué no Prometheus scrapea SeaweedFS:** Prometheus scrapea *endpoints
 HTTP*. No lee buckets S3 ni almacenes de objetos: solo consume un `/metrics`. Las

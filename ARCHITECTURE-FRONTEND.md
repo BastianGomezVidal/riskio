@@ -395,3 +395,83 @@ El numero baja cuando el bundle baje. No subirlo para tapar una regresion.
 
 INP sigue sin medirse aqui: necesita RUM real, que llega del navegador via el
 collector y se ve en el panel de Grafana.
+
+## 12. Subida de avatar: el camino completo
+
+Esta ruta merecio un apartado propio porque durante semanas estuvo **completamente
+rota** y el fallo no era del frontend. La cadena es:
+
+```
+Navegador ──POST /api/users/me/avatar (FormData)──▶ frontend:80 (nginx)
+           ──proxy /api/──▶ backend-api:3000 (AuthProxyMiddleware)
+           ──multipart crudo──▶ backend-auth:3008 (multer)
+           ──▶ SeaweedFS, y la respuesta trae una URL absoluta a :8333
+```
+
+### Lo que el cliente hace bien
+
+`uploadAvatar` en `frontend/src/api/client.ts` construye un `FormData` y **no**
+pone `Content-Type`. No es descuido: `buildHeaders` solo aplica
+`application/json` cuando no hay header y el cuerpo no es `FormData`, porque si se
+fijara a mano se perdería el `boundary` y el servidor no podría reconstruir las
+partes.
+
+```ts
+if (!headers.has("Content-Type") && !(init?.body instanceof FormData)) {
+  headers.set("Content-Type", "application/json");
+}
+```
+
+Ese `instanceof` es la linea que evita un fallo de upload. El `Content-Length` lo
+calcula el navegador, asi que el cliente no lo toca.
+
+### Por que el almacenamiento se publica en el puerto 8333
+
+`STORAGE_PUBLIC_URL` es una **URL absoluta** a SeaweedFS, no un path relativo. El
+frontend la pinta tal cual en un `<img src>`, asi que el navegador tiene que
+poder resolverla: de ahi que el bucket este publicado sin restringir a loopback.
+
+El coste es que los avatares son publicos para quien conozca la URL. Ver el
+riesgo en [ARCHITECTURE-COMPOSE.md](ARCHITECTURE-COMPOSE.md) §6.
+
+### El limite de 2 MB esta en tres sitios
+
+| Sitio | Valor | Que pasa si se supera |
+|---|---|---|
+| `frontend/nginx.conf` `client_max_body_size` | `2m` | nginx corta la conexion antes de llegar a la API |
+| `AuthProxyMiddleware.MAX_RAW_BODY_BYTES` | `2 * 1024 * 1024` | 413 con `Connection: close` |
+| multer `limits.fileSize` en `users.controller.ts` | `2 * 1024 * 1024` | 400 |
+
+Los tres hacen falta. nginx sola no cubre las peticiones directas a la API, y el
+middleware solo no cubre nada porque nginx corta antes.
+
+## 13. Errores que la sesion autenticada no distingue
+
+`toApiError` en `frontend/src/api/client.ts` hace esto ante **cualquier** 401, sin
+mirar el motivo:
+
+```ts
+if (response.status === 401 && getAccessToken()) {
+  onUnauthorized?.();   // dispara el logout
+}
+```
+
+El backend si distingue los casos, pero por el **mensaje**, no por el codigo:
+
+| Situacion | Mensaje del backend |
+|---|---|
+| token expirado o invalido | `Invalid or expired token` |
+| sesion cerrada por otro login | `Your session was closed because you signed in on another device or browser.` |
+| API key revocada | `Invalid or revoked API token` |
+
+Los tres son `401`. El cliente descarta el cuerpo, llama al logout y el usuario ve
+un cierre de sesion sin motivo, siendo que en el segundo caso merecia un aviso
+("has iniciado sesion en otro sitio"). El mensaje llega al `ApiError`, pero para
+entonces el logout ya se ha ejecutado.
+
+El guard `&& getAccessToken()` evita el worse: un 401 de login con contrasena
+erronea no cierra la sesion de nadie.
+
+No se ha cambiado. Queda anotado como deuda, no como bug arreglado. Lo barato
+seria mirar el mensaje en `onUnauthorized`; lo correcto es un codigo o un
+`reason` estructurado.
