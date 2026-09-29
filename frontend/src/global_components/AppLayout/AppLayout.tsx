@@ -1,6 +1,5 @@
 import { Outlet } from "react-router-dom";
 import { ReactNode, Suspense } from "react";
-import { createPortal } from "react-dom";
 import { AppHeader } from "../AppHeader/AppHeader";
 import { AppFooter } from "../AppFooter/AppFooter";
 import { PageFallback } from "../PageFallBack/PageFallBack";
@@ -12,32 +11,47 @@ interface AppLayoutProps {
 }
 
 /**
- * The skip link, portalled into `<body>`.
+ * The skip link.
  *
- * Portalled rather than rendered in place because the layout is a flex column
- * that the header sits inside: anything here is a sibling of the header, not an
- * overlay on it, so it competes for the same stacking context and depends on
- * winning a z-index fight. In `<body>` it is above everything by construction.
+ * It is the first element inside the layout and nothing portals it, which is the
+ * whole point: a skip link exists to be the *first* thing Tab reaches
+ * (WCAG 2.4.1, Bypass Blocks). An earlier version rendered it through
+ * `createPortal` into `<body>` to win the stacking fight with the header, and
+ * that is exactly what broke it. A portal appends to the end of the body, so the
+ * link became the *last* focusable element in the document and you had to tab
+ * through the whole page to reach it.
  *
- * It is a full-width bar, not a small slab. A slab reads as a button sitting on
- * the page, which is the opposite of "you are now somewhere else". The bar
- * spans the viewport and its contents reuse the header's own container
- * (`max-w-6xl` and the same responsive padding), so the label sits on the same
- * left edge and measure as the navigation it is replacing.
+ * Stacking does not need a portal. Measured, not assumed: the parent flex
+ * container creates no stacking context, the link is `fixed` at `z-50` against
+ * the header's `z-30`, and `document.elementFromPoint` over the header returns
+ * the link. First in the tab order and on top of the header, without the two
+ * requirements fighting each other.
  *
- * `sr-only` until focused. `focus-visible` and not `focus`, so tabbing reveals
- * it and a mouse click does not; the trade-off is that `:focus-visible` leans on
- * the browser's heuristic where `:focus` always shows. `inset-x-0` rather than
- * `w-full` so that revealing it cannot collide with `not-sr-only` resetting
- * `width` to `auto`.
+ * A full-width bar rather than a small slab, because a slab reads as a button
+ * sitting on the page, which is the opposite of "you are now somewhere else".
+ * Its contents reuse the header's own container, so the label sits on the same
+ * left edge and measure as the navigation it replaces.
  *
- * White on grey[900] is 17.7:1, so this clears AAA rather than sitting on the AA
- * line, and the label is 16px semibold so it is not carried by size alone.
+ * Kept outside `<header>` on purpose. GOV.UK, USWDS and the a11y project all put
+ * the skip link as the first element of the body, *before* the landmark. Inside
+ * the nav it would be a non-navigation link inside a navigation landmark, which
+ * is what a screen reader's landmark menu is for.
+ *
+ * `sr-only` until focused. `focus-visible` and not `focus`, so tabbing reveals it
+ * and a click does not; the trade-off is that `:focus-visible` leans on the
+ * browser's heuristic where `:focus` always shows. `inset-x-0` rather than
+ * `w-full`, so revealing it cannot collide with `not-sr-only` resetting `width`
+ * to `auto`.
+ *
+ * Nothing here moves focus on navigation. A skip link is a target the user
+ * chooses with Tab; auto-focusing it would put Enter one press away from firing
+ * it for anyone who merely pressed Tab.
+ *
+ * White on gray[900] is 17.7:1, so this clears AAA rather than sitting on the AA
+ * line.
  */
 function SkipLink() {
-  if (typeof document === "undefined") return null;
-
-  return createPortal(
+  return (
     <a
       href="#main"
       className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:inset-x-0 focus-visible:top-0 focus-visible:z-50 focus-visible:bg-gray-900 focus-visible:text-white"
@@ -45,8 +59,7 @@ function SkipLink() {
       <span className="mx-auto flex w-full max-w-6xl items-center px-4 py-3 text-base font-semibold sm:px-6 lg:px-8">
         Skip to main content
       </span>
-    </a>,
-    document.body,
+    </a>
   );
 }
 
