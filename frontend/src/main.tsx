@@ -9,7 +9,7 @@ import { ThemeProvider } from "./design-system/ThemeProvider";
 import { QueryProvider } from "./data/QueryProvider";
 import "./index.css";
 import { ErrorBoundary } from "./global_components/ErrorBoundary/ErrorBoundary";
-import { AppFallback } from "./global_components/AppFallback/AppFallback";
+import { PageFallback } from "./global_components/PageFallBack/PageFallBack";
 import { initTracing } from "./observability/telemetry";
 import { reportWebVitals } from "./observability/web-vitals";
 
@@ -38,7 +38,7 @@ if (root) {
           <BrowserRouter>
             <SessionProvider>
               <ThemeProvider>
-                <Suspense fallback={<AppFallback />}>
+                <Suspense fallback={<PageFallback />}>
                   <App />
                 </Suspense>
               </ThemeProvider>
