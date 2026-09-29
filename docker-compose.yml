@@ -55,6 +55,10 @@ x-auth-env-only: &auth-env-only
   JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
   ADMIN_EMAILS: ${ADMIN_EMAILS:-}
   PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3000}
+  # Public base of the API including the nginx /api prefix. This is the
+  # redirect_uri Google and Microsoft call back on, so it has to be the URL
+  # a browser can actually reach. Empty falls back to PUBLIC_BASE_URL + /api.
+  API_PUBLIC_BASE_URL: ${API_PUBLIC_BASE_URL:-}
   FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
   GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
   GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}

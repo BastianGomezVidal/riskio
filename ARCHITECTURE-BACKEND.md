@@ -137,7 +137,45 @@ dice con `previousSessionInvalidated`. Al probar rutas autenticadas hay que usar
 **token recién emitido**; usar uno de un login anterior da 401 y parece un fallo
 de autenticación cuando es el comportamiento correcto.
 
-## 8. Dónde vive cada cosa
+## 8. OAuth: tres URL y una que tiene que coincidir al carácter
+
+Google y Microsoft no fallan nunca aquí: el flujo funciona entero en código, pero sin
+`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (o los de Microsoft) el endpoint de
+arranque responde **503 `<provider> login is not configured`**, y la UI enseña
+botones que no pueden funcionar. No hay 501 en el backend; el 501 que aparecía
+en notas antiguas no corresponde a ningún código.
+
+Lo que hay que configurar, y por qué son tres variables y no una:
+
+| Variable | Para qué | Ejemplo |
+|---|---|---|
+| `PUBLIC_BASE_URL` | origen público de la API | `http://riskio.test` |
+| `API_PUBLIC_BASE_URL` | **el `redirect_uri`**, con el prefijo `/api` incluido | `http://riskio.test/api` |
+| `FRONTEND_URL` | a dónde vuelve el navegador al terminar | `http://riskio.test` |
+
+El prefijo `/api` no es opcional: `frontend/nginx.conf` sirve la API en
+`location /api/` y su `proxy_pass` **quita** el `/api` antes de llegar a la
+gateway. La gateway sirve sus rutas en la raíz, sin prefijo global. Es decir, la
+URL pública es `/api/auth/oauth/<provider>/callback` y dentro del contenedor es
+`/auth/oauth/<provider>/callback`. Construir el `redirect_uri` con el origen pelado
+daba `http://<host>:<puerto gateway>/auth/oauth/...`, que no existe: ni es
+alcanzable desde el navegador ni lleva el prefijo. Google y Microsoft responden
+`redirect_uri_mismatch` — después de que la persona ya haya iniciado sesión y
+aceptado el consentimiento, que es el peor momento para fallar.
+
+Si `API_PUBLIC_BASE_URL` viene vacía se usa `PUBLIC_BASE_URL` + `/api`. El valor
+tiene que ser **exactamente** el que se registró en el proveedor, y en la
+consola del proveedor se registra con la misma `redirect_uri` que aparece en la
+petición. Con eso, la vuelta al SPA la hace el navegador siguiendo el 302, no el
+proxy: `auth-proxy.middleware.ts` pide `redirect: 'manual'` a propósito, porque
+`FRONTEND_URL` puede existir solo en el `/etc/hosts` del host, y dentro de la red
+de contenedores resolvería al loopback del propio contenedor.
+
+Coherente con §7, un login por sesión: si al volver del callback el token ya no es
+el vigente, la respuesta es 401 y el flujo termina en `/` con el aviso de "sesión
+cerrada", no en un error de OAuth.
+
+## 9. Dónde vive cada cosa
 
 | Cosa | Dónde |
 |---|---|
@@ -148,7 +186,7 @@ de autenticación cuando es el comportamiento correcto.
 | puertos de authz | `backend/src/common/authz/authz.ports.ts` (`AUTH_CHECKER`, `API_KEY_VERIFIER`) |
 | telemetría | `backend/src/instrumentation.ts` |
 
-## 9. Para añadir un servicio
+## 10. Para añadir un servicio
 
 1. `src/<nombre>-service/main.ts` con su `useGlobalPipes` **solo si sus cuerpos
    son DTOs**.

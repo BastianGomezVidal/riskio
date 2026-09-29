@@ -56,7 +56,7 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 export class OAuthService {
   private readonly clientIds: Record<OAuthProviderName, string>;
   private readonly clientSecrets: Record<OAuthProviderName, string>;
-  private readonly redirectBase: string;
+  private readonly apiPublicBase: string;
   private readonly pendingStates = new Map<string, PendingState>();
 
   constructor(config: ConfigService) {
@@ -68,7 +68,18 @@ export class OAuthService {
       [OAuthProviderName.Google]: config.get<string>('GOOGLE_CLIENT_SECRET', ''),
       [OAuthProviderName.Outlook]: config.get<string>('MICROSOFT_CLIENT_SECRET', ''),
     };
-    this.redirectBase = config.get<string>('PUBLIC_BASE_URL', 'http://localhost:3000');
+
+    // The callback has to be the URL the provider will actually reach, which is
+    // the nginx that serves the SPA with the `/api` prefix still on it. Using the
+    // bare origin produced `http://host:3000/auth/oauth/<p>/callback`, which is
+    // neither publicly routed nor prefixed, and Google and Microsoft both reject
+    // that as `redirect_uri_mismatch` — after the user had already signed in and
+    // consented, which is the worst place to fail.
+    const publicOrigin = config
+      .get<string>('PUBLIC_BASE_URL', '')
+      .replace(/\/+$/, '');
+    const apiBase = config.get<string>('API_PUBLIC_BASE_URL', '').trim();
+    this.apiPublicBase = (apiBase || `${publicOrigin}/api`).replace(/\/+$/, '');
   }
 
   /** Whether the provider has credentials configured. */
@@ -141,8 +152,13 @@ export class OAuthService {
     };
   }
 
+  /**
+   * The `redirect_uri` for a provider, sent both in the consent URL and in the
+   * token exchange. It must be byte-identical in both, and identical to the URL
+   * registered with the provider, or the exchange is rejected.
+   */
   private redirectUri(provider: OAuthProviderName): string {
-    return `${this.redirectBase}/auth/oauth/${provider}/callback`;
+    return `${this.apiPublicBase}/auth/oauth/${provider}/callback`;
   }
 
   private async exchangeCode(

@@ -26,8 +26,25 @@ export const envValidationSchema = Joi.object({
    * Every other account is a `client`.
    */
   ADMIN_EMAILS: Joi.string().allow('').default(''),
-  /** Public base URL of this API, used to build OAuth callback URLs. */
+  /**
+   * Public origin of this API.
+   *
+   * Not used on its own for the OAuth callback: the browser reaches the API
+   * through the same nginx that serves the SPA, under an `/api` prefix that the
+   * proxy strips. The callback needs the origin plus that prefix, which is what
+   * `API_PUBLIC_BASE_URL` is for.
+   */
   PUBLIC_BASE_URL: Joi.string().uri().default('http://localhost:3000'),
+  /**
+   * Public base URL of the API *including* any path prefix, e.g.
+   * `https://riskio.example.com/api`.
+   *
+   * This is the `redirect_uri` sent to Google and Microsoft, so it has to match
+   * the URL the provider calls back, character for character, or the exchange is
+   * rejected with `redirect_uri_mismatch`. Empty falls back to `PUBLIC_BASE_URL`
+   * plus `/api`.
+   */
+  API_PUBLIC_BASE_URL: Joi.string().allow('').default(''),
   /** Base URL of the frontend SPA, used to return from OAuth callbacks. */
   FRONTEND_URL: Joi.string().uri().default('http://localhost:5173'),
   /** Optional Google OAuth2 client credentials (enables Gmail sign-in). */
@@ -221,9 +238,10 @@ export const authEnvValidationSchema = Joi.object({
   JWT_SECRET: Joi.string().min(16).required(),
   JWT_EXPIRES_IN: Joi.string().default('15m'),
 
-  ADMIN_EMAILS: Joi.string().allow('').default(''),
-  PUBLIC_BASE_URL: Joi.string().uri().default('http://localhost:3000'),
-  FRONTEND_URL: Joi.string().uri().default('http://localhost:5173'),
+    ADMIN_EMAILS: Joi.string().allow('').default(''),
+    PUBLIC_BASE_URL: Joi.string().uri().default('http://localhost:3000'),
+    API_PUBLIC_BASE_URL: Joi.string().allow('').default(''),
+    FRONTEND_URL: Joi.string().uri().default('http://localhost:5173'),
 
   GOOGLE_CLIENT_ID: Joi.string().allow('').default(''),
   GOOGLE_CLIENT_SECRET: Joi.string().allow('').default(''),
