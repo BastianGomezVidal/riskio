@@ -56,11 +56,19 @@ backend/.dev-fixtures/
 
 # Documentacion local, no compartida.
 #
-# Los ARCHITECTURE-*.md y el README del backend SI se versionan: son la
-# referencia del proyecto. Estos tres no.
+# El README.md de la raiz SI se versiona: es la referencia del proyecto, y lo
+# que una persona nueva necesita para levantar esto. Todo lo demas no.
 #
 # Los archivos siguen en el disco; solo dejan de estar en git. Para volver a
 # subirlos, `git add -f <archivo>`.
 AGENTS.md
 PLAN-ACCION.md
+contexto.txt
 backend/README.md
+
+# Los ARCHITECTURE-*.md se fusionaron en el README y se borraron del repo. Las
+# copias historicas, con el detalle de por que se tomo cada decision, quedan
+# fuera de git a proposito: son un registro de lo que se intento y lo que
+# fallo, no instruccion para quien llega. Si se necesitan:
+#   git show <commit>^:ARCHITECTURE-BACKEND.md
+ARCHITECTURE-*.md
