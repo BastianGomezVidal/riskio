@@ -23,7 +23,14 @@ const AUTHOR_SHORT = "J.S.G.V.";
 const VERSION = "v1.0.0";
 const YEAR = new Date().getFullYear();
 
-const SWAGGER_URL = "http://localhost:3000/docs";
+/**
+ * The API is proxied under `/api`, so the docs are reachable same-origin and
+ * the link does not have to know a host. It used to be a hardcoded
+ * `http://localhost:3000/docs`, which is a link to the reader's own machine
+ * from any machine that is not the developer's — broken in every environment
+ * except this one.
+ */
+const SWAGGER_URL = "/api/docs";
 const GITHUB_URL = "https://github.com/JuanseGomez/riskio";
 
 /**

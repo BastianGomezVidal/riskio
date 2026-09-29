@@ -8,7 +8,6 @@ import { useSession } from "@/auth/session-context";
 import type { StormsQuery } from "@/domain/storm";
 import type { User } from "@/domain/users";
 import {
-  apiTokensQuery,
   dashboardSummaryQuery,
   queryKeys,
   stormAdvisoryQuery,
@@ -90,11 +89,6 @@ export function useDeleteMe() {
  * The list is per-user, so it is refetched whenever the profile changes: a
  * different account in the same tab must not see the previous one's tokens.
  */
-export function useApiTokens() {
-  const { user } = useSession();
-  return useQuery(apiTokensQuery(user?.id ?? null));
-}
-
 /**
  * Create a token and show the plaintext.
  *
@@ -103,22 +97,3 @@ export function useApiTokens() {
  * cache is refreshed separately once the secret has been displayed. Invalidating
  * first would race the modal's copy button against a refetch.
  */
-export function useCreateApiToken() {
-  return useMutation({
-    mutationFn: (name: string) => api.createApiToken(name),
-  });
-}
-
-export function useRevokeApiToken() {
-  const queryClient = useQueryClient();
-  const { user } = useSession();
-
-  return useMutation({
-    mutationFn: (id: string) => api.revokeApiToken(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.apiTokens.list(user?.id ?? null),
-      });
-    },
-  });
-}
