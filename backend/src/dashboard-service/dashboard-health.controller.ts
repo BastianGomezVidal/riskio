@@ -19,13 +19,29 @@ export class DashboardHealthController {
 
   @Get()
   async check(): Promise<{ status: string; cache: string }> {
-    // Fail open is this cache client's contract, so a dead cache answers
-    // "unreachable" here instead of throwing, which is the honest report: the
-    // dashboard still renders, just slower.
-    const value = await this.cache.get<string>('__health__');
-    return {
-      status: 'ok',
-      cache: value === undefined ? 'unreachable' : 'reachable',
-    };
+    // A write and a read, not a read of a key that was never written.
+    //
+    // Reading `__health__` and treating undefined as "unreachable" reported
+    // unreachable on a cache that was up and reachable: nothing ever sets that
+    // key, so a miss and an outage were indistinguishable, and the check could
+    // only ever answer one of the two. The round trip is also the honest
+    // question. This client fails open, so a dead cache resolves to undefined
+    // rather than throwing, which is the intended degradation for a page read
+    // and useless as a health signal.
+    const probe = `__health__:${process.pid}`;
+    try {
+      await this.cache.set(probe, 'ok', 5_000);
+      const value = await this.cache.get<string>(probe);
+      await this.cache.del(probe);
+      return {
+        status: 'ok',
+        cache: value === 'ok' ? 'reachable' : 'unreachable',
+      };
+    } catch {
+      // The client is contracted not to throw, so reaching here means the
+      // contract changed. Report the outage rather than a 500 that says nothing
+      // about which dependency is at fault.
+      return { status: 'ok', cache: 'unreachable' };
+    }
   }
 }
