@@ -89,7 +89,7 @@ describe('Warning segments (integration)', () => {
   const getAdvisory = (id: string) =>
     request(app.getHttpServer())
       .get(`/advisories/${id}`)
-      .set(...(bearer(token) as [string, string]));
+      .set(...bearer(token));
 
   it('returns each warning with its type and geometry', async () => {
     const res = await getAdvisory(withWarnings).expect(200);
@@ -130,7 +130,7 @@ describe('Warning segments (integration)', () => {
   it('exposes the same segments on the storm-scoped advisory route', async () => {
     const res = await request(app.getHttpServer())
       .get('/storms/AL112017/advisories/latest')
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .expect(200);
 
     expect(res.body.advisory.warnings).toHaveLength(2);

@@ -33,7 +33,7 @@ describe('envValidationSchema', () => {
     const { error } = envValidationSchema.validate({
       ...validEnv,
       JWT_SECRET: undefined,
-    } as never);
+    });
 
     expect(error).toBeDefined();
     expect(error!.message).toContain('JWT_SECRET');

@@ -5,7 +5,6 @@ import { readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import pactPkg from '@pact-foundation/pact';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { createTestApp, registerAndLogin } from '../helpers/test-app.js';
 import { NhcProvider } from '../../src/domain/feeds/providers/nhc/nhc.provider.js';
 import { Storm } from '../../src/domain/weather/storms/entities/storm.entity.js';
@@ -379,16 +378,10 @@ describe('riskio-api provider verification', () => {
    * the fixture that actually broke.
    */
   const clearAllData = async () => {
-    const warnings = app.get(
-      getRepositoryToken(Warning),
-    ) as Repository<Warning>;
-    const points = app.get(
-      getRepositoryToken(ForecastPoint),
-    ) as Repository<ForecastPoint>;
-    const advisories = app.get(
-      getRepositoryToken(Advisory),
-    ) as Repository<Advisory>;
-    const storms = app.get(getRepositoryToken(Storm)) as Repository<Storm>;
+    const warnings = app.get(getRepositoryToken(Warning));
+    const points = app.get(getRepositoryToken(ForecastPoint));
+    const advisories = app.get(getRepositoryToken(Advisory));
+    const storms = app.get(getRepositoryToken(Storm));
 
     await points.createQueryBuilder().delete().execute();
     await warnings.createQueryBuilder().delete().execute();
@@ -402,10 +395,8 @@ describe('riskio-api provider verification', () => {
    * authenticate during provider verification.
    */
   const seedPactAdminToken = async () => {
-    const users = app.get(getRepositoryToken(User)) as Repository<User>;
-    const tokens = app.get(
-      getRepositoryToken(ApiToken),
-    ) as Repository<ApiToken>;
+    const users = app.get(getRepositoryToken(User));
+    const tokens = app.get(getRepositoryToken(ApiToken));
 
     await users.delete({ email: 'pact-admin@test.local' });
 
@@ -430,7 +421,7 @@ describe('riskio-api provider verification', () => {
 
   const seedStorm = async () => {
     await clearAllData();
-    const storms = app.get(getRepositoryToken(Storm)) as Repository<Storm>;
+    const storms = app.get(getRepositoryToken(Storm));
     await storms.insert({
       atcfId: STORM_ID,
       name: 'Lowell',
@@ -442,9 +433,7 @@ describe('riskio-api provider verification', () => {
 
   const seedAdvisory = async () => {
     await seedStorm();
-    const advisories = app.get(
-      getRepositoryToken(Advisory),
-    ) as Repository<Advisory>;
+    const advisories = app.get(getRepositoryToken(Advisory));
     /*
      * `ingestedAt` is set explicitly rather than left to `@CreateDateColumn`.
      *
@@ -478,9 +467,7 @@ describe('riskio-api provider verification', () => {
      * the argument for seeding the whole detail rather than whatever the first
      * mismatch complains about.
      */
-    const warnings = app.get(
-      getRepositoryToken(Warning),
-    ) as Repository<Warning>;
+    const warnings = app.get(getRepositoryToken(Warning));
     await warnings.insert({
       id: WARNING_ID,
       warningType: 'Hurricane Watch',
@@ -494,12 +481,10 @@ describe('riskio-api provider verification', () => {
       advisory: { id: ADVISORY_ID } as Advisory,
     });
 
-    const points = app.get(
-      getRepositoryToken(ForecastPoint),
-    ) as Repository<ForecastPoint>;
+    const points = app.get(getRepositoryToken(ForecastPoint));
     await points.insert([
       {
-        advisory: { id: ADVISORY_ID } as Advisory,
+        advisory: { id: ADVISORY_ID },
         validAt: new Date('2026-09-10T12:00:00.000Z'),
         latitude: 16.7,
         longitude: -118.5,
@@ -508,7 +493,7 @@ describe('riskio-api provider verification', () => {
         category: 1,
       },
       {
-        advisory: { id: ADVISORY_ID } as Advisory,
+        advisory: { id: ADVISORY_ID },
         validAt: new Date('2026-09-11T00:00:00.000Z'),
         latitude: 16.8,
         longitude: -121.1,

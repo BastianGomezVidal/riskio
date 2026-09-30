@@ -129,7 +129,7 @@ describe('StormsService', () => {
     it('scopes the active tab to active storms and reads through the cache', async () => {
       getRawMany.mockResolvedValue([rawRow()]);
 
-      const result = await service.findMany({ tab: StormTab.Active } as never);
+      const result = await service.findMany({ tab: StormTab.Active });
 
       expect(andWhere).toHaveBeenCalledWith('s.isActive = :isActive', {
         isActive: true,
@@ -154,7 +154,7 @@ describe('StormsService', () => {
     it('does not filter on isActive for the past tab', async () => {
       getRawMany.mockResolvedValue([rawRow({ isActive: false })]);
 
-      await service.findMany({ tab: StormTab.Past } as never);
+      await service.findMany({ tab: StormTab.Past });
 
       expect(andWhere).toHaveBeenCalledWith('s.isActive = :isActive', {
         isActive: false,
@@ -167,7 +167,7 @@ describe('StormsService', () => {
       await service.findMany({
         tab: StormTab.Active,
         q: 'ODILE',
-      } as never);
+      });
 
       expect(andWhere).toHaveBeenCalledWith(
         '(LOWER(s.name) LIKE :q OR LOWER(s.atcfId) LIKE :q)',
@@ -181,7 +181,7 @@ describe('StormsService', () => {
       await service.findMany({
         tab: StormTab.Active,
         basin: 'ep, cp',
-      } as never);
+      });
 
       expect(andWhere).toHaveBeenCalledWith('s.basin IN (:...basins)', {
         basins: ['EP', 'CP'],
@@ -194,7 +194,7 @@ describe('StormsService', () => {
       await service.findMany({
         tab: StormTab.Active,
         cat: 'ts,3',
-      } as never);
+      });
 
       expect(andWhere).toHaveBeenCalledWith(
         expect.stringContaining('IN (:...cats)'),
@@ -208,7 +208,7 @@ describe('StormsService', () => {
       await service.findMany({
         tab: StormTab.Active,
         cat: 'not-a-number',
-      } as never);
+      });
 
       expect(andWhere).not.toHaveBeenCalledWith(
         expect.stringContaining('IN (:...cats)'),
@@ -223,7 +223,7 @@ describe('StormsService', () => {
         tab: StormTab.Active,
         yearFrom: 2020,
         yearTo: 2026,
-      } as never);
+      });
 
       expect(andWhere).toHaveBeenCalledWith(
         'EXTRACT(YEAR FROM s."firstSeenAt") >= :yearFrom',
@@ -238,7 +238,7 @@ describe('StormsService', () => {
     it('orders by the requested sort, defaulting to newest', async () => {
       getRawMany.mockResolvedValue([]);
 
-      await service.findMany({ tab: StormTab.Active } as never);
+      await service.findMany({ tab: StormTab.Active });
       expect(orderBy).toHaveBeenCalledWith(
         's.lastSeenInFeedAt',
         'DESC',
@@ -249,14 +249,14 @@ describe('StormsService', () => {
       await service.findMany({
         tab: StormTab.Active,
         sort: StormSort.NameAsc,
-      } as never);
+      });
       expect(orderBy).toHaveBeenCalledWith('s.name', 'ASC', 'NULLS LAST');
 
       orderBy.mockClear();
       await service.findMany({
         tab: StormTab.Active,
         sort: StormSort.Oldest,
-      } as never);
+      });
       expect(orderBy).toHaveBeenCalledWith(
         's.lastSeenInFeedAt',
         'ASC',
@@ -267,7 +267,7 @@ describe('StormsService', () => {
     it('converts the advisory count from a string, as Postgres returns it', async () => {
       getRawMany.mockResolvedValue([rawRow({ advisoryCount: '7' })]);
 
-      const [storm] = await service.findMany({ tab: StormTab.Active } as never);
+      const [storm] = await service.findMany({ tab: StormTab.Active });
 
       expect(storm.advisoryCount).toBe(7);
       expect(typeof storm.advisoryCount).toBe('number');
@@ -282,7 +282,7 @@ describe('StormsService', () => {
         }),
       ]);
 
-      const [storm] = await service.findMany({ tab: StormTab.Active } as never);
+      const [storm] = await service.findMany({ tab: StormTab.Active });
 
       expect(storm.advisoryCount).toBe(0);
       expect(storm.latestAdvisoryNumber).toBeNull();

@@ -289,10 +289,7 @@ export async function seedStorm(
     }
 
     if (advisory.warnings && advisory.warnings.length > 0) {
-      await advisoryWriter.replaceWarnings(
-        savedAdvisory,
-        advisory.warnings as never[],
-      );
+      await advisoryWriter.replaceWarnings(savedAdvisory, advisory.warnings);
     }
   }
 
@@ -314,7 +311,7 @@ export async function listAdvisoryIds(
 ): Promise<string[]> {
   const res = await request(app.getHttpServer())
     .get(`/storms/${atcfId}`)
-    .set(...(bearer(token) as [string, string]))
+    .set(...bearer(token))
     .expect(200);
 
   return (res.body.advisories ?? []).map((a: { id: string }) => a.id);
@@ -328,6 +325,6 @@ export async function fetchAdvisory(
 ) {
   return request(app.getHttpServer())
     .get(`/advisories/${id}`)
-    .set(...(bearer(token) as [string, string]))
+    .set(...bearer(token))
     .expect(200);
 }

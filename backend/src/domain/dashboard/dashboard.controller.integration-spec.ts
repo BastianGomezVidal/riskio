@@ -99,7 +99,7 @@ describe('Dashboard summary endpoint (integration)', () => {
   it('returns season totals and per-storm latest-advisory summaries', async () => {
     const res = await request(app.getHttpServer())
       .get('/dashboard/summary')
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .expect(200);
 
     expect(res.body.generatedAt).toEqual(expect.any(String));
@@ -120,7 +120,7 @@ describe('Dashboard summary endpoint (integration)', () => {
   it('picks the newest advisory per storm', async () => {
     const res = await request(app.getHttpServer())
       .get('/dashboard/summary')
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .expect(200);
 
     const odile = res.body.storms.find(
@@ -139,7 +139,7 @@ describe('Dashboard summary endpoint (integration)', () => {
   it('exposes low-intensity points without inflating totals', async () => {
     const res = await request(app.getHttpServer())
       .get('/dashboard/summary')
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .expect(200);
 
     const al = res.body.storms.find(
@@ -155,7 +155,7 @@ describe('Dashboard summary endpoint (integration)', () => {
   it('sets latestAdvisory to null for storms without advisories', async () => {
     const res = await request(app.getHttpServer())
       .get('/dashboard/summary')
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .expect(200);
 
     const zeta = res.body.storms.find(
@@ -170,7 +170,7 @@ describe('Dashboard summary endpoint (integration)', () => {
   it('excludes storms that are no longer active', async () => {
     const res = await request(app.getHttpServer())
       .get('/dashboard/summary')
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .expect(200);
 
     const ghost = res.body.storms.find(

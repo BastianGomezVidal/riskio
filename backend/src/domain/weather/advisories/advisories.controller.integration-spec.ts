@@ -66,7 +66,7 @@ describe('Advisories endpoints (integration)', () => {
     // storm as lightweight refs, so that is what this asserts.
     const res = await request(app.getHttpServer())
       .get('/storms/EP142026')
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .expect(200);
 
     expect(res.body.advisories).toHaveLength(2);
@@ -78,7 +78,7 @@ describe('Advisories endpoints (integration)', () => {
   it('returns an advisory with forecast points', async () => {
     const res = await request(app.getHttpServer())
       .get(`/advisories/${advisoryId}`)
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .expect(200);
 
     expect(res.body.advisoryNumber).toBe(2);
@@ -94,7 +94,7 @@ describe('Advisories endpoints (integration)', () => {
   it('returns forecast points ordered by validAt ascending', async () => {
     const res = await request(app.getHttpServer())
       .get(`/advisories/${advisoryId}`)
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .expect(200);
 
     expect(res.body.forecastPoints).toHaveLength(2);
@@ -104,7 +104,7 @@ describe('Advisories endpoints (integration)', () => {
   it('rejects an unknown advisory id', async () => {
     await request(app.getHttpServer())
       .get('/advisories/00000000-0000-0000-0000-000000000000')
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .expect(404);
   });
 
@@ -142,7 +142,7 @@ describe('Advisories endpoints (integration)', () => {
     const ids = await listAdvisoryIds(app, 'AL012026', token);
     const res = await request(app.getHttpServer())
       .get(`/advisories/${ids[0]}`)
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .expect(200);
 
     expect(res.body).toMatchObject({

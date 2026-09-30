@@ -40,7 +40,7 @@ describe('RedisCacheService', () => {
 
   beforeEach(() => {
     store = makeStore();
-    service = new RedisCacheService(store as unknown as KeyvLike);
+    service = new RedisCacheService(store);
   });
 
   it('returns undefined for a key that is not there', async () => {
@@ -122,7 +122,7 @@ describe('RedisCacheService', () => {
         throw new Error('down');
       },
     };
-    const down = new RedisCacheService(broken as unknown as KeyvLike);
+    const down = new RedisCacheService(broken);
     await expect(down.isReachable()).resolves.toBe(false);
   });
 });

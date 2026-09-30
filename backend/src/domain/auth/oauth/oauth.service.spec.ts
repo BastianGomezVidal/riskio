@@ -105,12 +105,12 @@ describe('OAuthService', () => {
           return {
             ok: true,
             json: async () => ({ access_token: 'at' }),
-          } as unknown as Response;
+          };
         }
         return {
           ok: true,
           json: async () => ({ email: 'a@b.co' }),
-        } as unknown as Response;
+        };
       });
 
       const service = new OAuthService(configStub());
@@ -149,7 +149,16 @@ describe('OAuthService', () => {
       const fetchSpy = stubFetch(async (url: string, init?: RequestInit) => {
         if (url === 'https://oauth2.googleapis.com/token') {
           expect(init?.method).toBe('POST');
-          const body = String(init?.body);
+          // The service sends URLSearchParams, not a string. String() on the
+          // union happened to produce the form-encoded body, which is why this
+          // assertion used to pass, and would also have produced
+          // "[object URLSearchParams]" for any other body type.
+          const body =
+            init?.body instanceof URLSearchParams
+              ? init.body.toString()
+              : typeof init?.body === 'string'
+                ? init.body
+                : '';
           expect(body).toContain('grant_type=authorization_code');
           expect(body).toContain('code=the-code');
           return new Response(JSON.stringify({ access_token: 'at-123' }), {

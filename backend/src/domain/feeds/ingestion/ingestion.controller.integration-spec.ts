@@ -96,14 +96,14 @@ describe('Ingestion endpoints (integration)', () => {
   it('rejects a request without an API key', async () => {
     await request(app.getHttpServer())
       .post('/admin/ingest/run/ep')
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .expect(401);
   });
 
   it('POST /admin/ingest/run/ep ingests storm + advisory + points', async () => {
     const res = await request(app.getHttpServer())
       .post('/admin/ingest/run/ep')
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .set('x-api-key', adminKey)
       .expect(200);
 
@@ -121,13 +121,13 @@ describe('Ingestion endpoints (integration)', () => {
   it('is idempotent: re-running skips the same advisory', async () => {
     await request(app.getHttpServer())
       .post('/admin/ingest/run/ep')
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .set('x-api-key', adminKey)
       .expect(200);
 
     const second = await request(app.getHttpServer())
       .post('/admin/ingest/run/ep')
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .set('x-api-key', adminKey)
       .expect(200);
 
@@ -142,7 +142,7 @@ describe('Ingestion endpoints (integration)', () => {
   it('POST /admin/ingest/run ingests all basins', async () => {
     const res = await request(app.getHttpServer())
       .post('/admin/ingest/run')
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .set('x-api-key', adminKey)
       .expect(200);
 
@@ -195,7 +195,7 @@ describe('Ingestion endpoints (integration)', () => {
     try {
       const res = await request(kmzApp.getHttpServer())
         .post('/admin/ingest/run/ep')
-        .set(...(bearer(token) as [string, string]))
+        .set(...bearer(token))
         .set('x-api-key', adminKey)
         .expect(200);
 
@@ -206,7 +206,7 @@ describe('Ingestion endpoints (integration)', () => {
       const ids = await listAdvisoryIds(kmzApp, 'EP142026', token);
       const adv = await request(kmzApp.getHttpServer())
         .get(`/advisories/${ids[0]}`)
-        .set(...(bearer(token) as [string, string]))
+        .set(...bearer(token))
         .expect(200);
       expect(adv.body.track).toMatchObject({ type: 'LineString' });
       expect(adv.body.cone).toMatchObject({ type: 'Polygon' });
@@ -226,7 +226,7 @@ describe('Ingestion endpoints (integration)', () => {
   it('rejects an unknown basin', async () => {
     const res = await request(app.getHttpServer())
       .post('/admin/ingest/run/xx')
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .set('x-api-key', adminKey)
       .expect(400);
 

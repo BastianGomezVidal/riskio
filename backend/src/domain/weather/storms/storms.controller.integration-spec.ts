@@ -92,7 +92,7 @@ describe('Storms endpoints (integration)', () => {
     const res = await request(app.getHttpServer())
       .get('/storms')
       .expect(200)
-      .set(...(bearer(token) as [string, string]));
+      .set(...bearer(token));
 
     const ids = res.body.map((s: { atcfId: string }) => s.atcfId);
 
@@ -112,7 +112,7 @@ describe('Storms endpoints (integration)', () => {
   it('GET /storms/:atcfId exposes the activity flags', async () => {
     const res = await request(app.getHttpServer())
       .get(`/storms/${INACTIVE_NEW}`)
-      .set(...(bearer(token) as [string, string]))
+      .set(...bearer(token))
       .expect(200);
 
     expect(res.body).toMatchObject({
@@ -127,6 +127,6 @@ describe('Storms endpoints (integration)', () => {
     await request(app.getHttpServer())
       .get('/storms/ZZ999999')
       .expect(404)
-      .set(...(bearer(token) as [string, string]));
+      .set(...bearer(token));
   });
 });

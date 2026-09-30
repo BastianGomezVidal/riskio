@@ -40,7 +40,7 @@ describe('AuthService API tokens', () => {
       revokedAt: null,
       user: { id: userId } as User,
       ...overrides,
-    } as ApiToken;
+    };
   }
 
   beforeEach(() => {
