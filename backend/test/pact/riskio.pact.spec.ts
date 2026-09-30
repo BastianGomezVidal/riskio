@@ -11,6 +11,7 @@ import { NhcProvider } from '../../src/domain/feeds/providers/nhc/nhc.provider.j
 import { Storm } from '../../src/domain/weather/storms/entities/storm.entity.js';
 import { Advisory } from '../../src/domain/weather/advisories/entities/advisory.entity.js';
 import { ForecastPoint } from '../../src/domain/weather/advisories/entities/forecast-point.entity.js';
+import { Warning } from '../../src/domain/weather/advisories/entities/warning.entity.js';
 import { User } from '../../src/domain/auth/entities/user.entity.js';
 import { ApiToken } from '../../src/domain/auth/entities/api-token.entity.js';
 import { hashToken } from '../../src/domain/auth/auth.utils.js';
@@ -31,6 +32,7 @@ const PACT_FILE = join(PACT_DIR, `${CONSUMER}-${PROVIDER}.json`);
 // provider verification state handlers seed into the database.
 const STORM_ID = 'EP142026';
 const ADVISORY_ID = '11111111-1111-4111-8111-111111111111';
+const WARNING_ID = '33333333-3333-4333-8333-333333333333';
 const ISSUED_AT = '2026-09-10T02:33:27.000Z';
 
 const dt = Matchers.iso8601DateTimeWithMillis(ISSUED_AT);
@@ -143,6 +145,22 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
       });
   });
 
+  /**
+   * The storm detail embeds a *reduced* advisory, on purpose.
+   *
+   * `StormsService.findOne` selects `id`, `advisoryNumber` and `issuedAt` for
+   * the relation and nothing else. The full advisory arrives from
+   * `/storms/:atcfId/advisories/:n`, which is one request per advisory. The
+   * contract used to expect the whole advisory inline, which asked the list view
+   * to carry detail the implementation deliberately leaves out — a contract that
+   * pins a payload nobody intended to send.
+   */
+  const stormAdvisorySummary = {
+    id: Matchers.string(ADVISORY_ID),
+    advisoryNumber: Matchers.integer(2),
+    issuedAt: dt,
+  };
+
   it('gets a storm with its advisories', async () => {
     await pact
       .addInteraction()
@@ -152,7 +170,7 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
       .willRespondWith(200, (b) =>
         b.jsonBody({
           ...stormBody,
-          advisories: Matchers.eachLike(advisoryBody),
+          advisories: Matchers.eachLike(stormAdvisorySummary),
         }),
       )
       .executeTest(async (mockServer) => {
@@ -189,26 +207,42 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
   it("gets a storm's latest advisory", async () => {
     await pact
       .addInteraction()
-      .given(`storm ${STORM_ID} exists with advisory 2`)
+      .given(
+        `advisory ${ADVISORY_ID} has 2 forecast points`,
+      )
       .uponReceiving('a request for the latest advisory of a storm')
       .withRequest('GET', `/storms/${STORM_ID}/advisories/latest`)
       .willRespondWith(200, (b) =>
+        /*
+         * A wrapper, not a bare advisory.
+         *
+         * `StormAdvisoryDetailDto` is `{ storm, advisory }`: the storm context
+         * travels with the advisory so the screen that renders it does not need a
+         * second call for the header. The contract expected the advisory alone.
+         */
         b.jsonBody({
-          ...advisoryBody,
-          forecastPoints: Matchers.eachLike(forecastPointBody),
-          warnings: Matchers.eachLike({}),
-          track: Matchers.like(null),
-          cone: Matchers.like(null),
+          storm: Matchers.like({ atcfId: STORM_ID, basin: 'EP' }),
+          advisory: {
+            ...advisoryBody,
+            forecastPoints: Matchers.eachLike(forecastPointBody),
+            warnings: Matchers.eachLike({
+              id: Matchers.string(WARNING_ID),
+              warningType: Matchers.string('Hurricane Watch'),
+            }),
+            track: Matchers.like(null),
+            cone: Matchers.like(null),
+          },
         }),
       )
       .executeTest(async (mockServer) => {
-        const advisory = await riskioClient.getAdvisoryForStorm(
+        const result = await riskioClient.getAdvisoryForStorm(
           mockServer.url,
           STORM_ID,
           'latest',
         );
-        expect(advisory.advisoryNumber).toBe(2);
-        expect(Array.isArray(advisory.forecastPoints)).toBe(true);
+        expect(result.advisory.advisoryNumber).toBe(2);
+        expect(result.storm.atcfId).toBe(STORM_ID);
+        expect(Array.isArray(result.advisory.forecastPoints)).toBe(true);
       });
   });
 
@@ -351,6 +385,9 @@ describe('riskio-api provider verification', () => {
    * the fixture that actually broke.
    */
   const clearAllData = async () => {
+    const warnings = app.get(
+      getRepositoryToken(Warning),
+    ) as Repository<Warning>;
     const points = app.get(
       getRepositoryToken(ForecastPoint),
     ) as Repository<ForecastPoint>;
@@ -360,6 +397,7 @@ describe('riskio-api provider verification', () => {
     const storms = app.get(getRepositoryToken(Storm)) as Repository<Storm>;
 
     await points.createQueryBuilder().delete().execute();
+    await warnings.createQueryBuilder().delete().execute();
     await advisories.createQueryBuilder().delete().execute();
     await storms.createQueryBuilder().delete().execute();
   };
@@ -413,10 +451,20 @@ describe('riskio-api provider verification', () => {
     const advisories = app.get(
       getRepositoryToken(Advisory),
     ) as Repository<Advisory>;
+    /*
+     * `ingestedAt` is set explicitly rather than left to `@CreateDateColumn`.
+     *
+     * The contract pins it with `Matchers.iso8601DateTimeWithMillis`, and the
+     * value a row gets from a column default is "now" — which matches the
+     * *type* but not the fixed example the pact was recorded against, so
+     * verification failed on a field the test never controlled. A contract
+     * fixture has to be a value, not a side effect of when the suite ran.
+     */
     await advisories.insert({
       id: ADVISORY_ID,
       advisoryNumber: 2,
       issuedAt: new Date(ISSUED_AT),
+      ingestedAt: new Date(ISSUED_AT),
       rawText: 'TCM - forecast advisory',
       storm: { atcfId: STORM_ID } as Storm,
     });
@@ -424,6 +472,34 @@ describe('riskio-api provider verification', () => {
 
   const seedAdvisoryWithPoints = async () => {
     await seedAdvisory();
+
+    /*
+     * A warning segment as well as the forecast points.
+     *
+     * `AdvisoryDetailDto.warnings` is part of the contract, and the pact pins it
+     * with `eachLike`, which asserts a minimum of one element. Seeding only
+     * points left the array empty, so the interaction failed on data the
+     * fixture had simply never created. If warnings had been seeded without the
+     * points the same failure would have appeared on the other field, which is
+     * the argument for seeding the whole detail rather than whatever the first
+     * mismatch complains about.
+     */
+    const warnings = app.get(
+      getRepositoryToken(Warning),
+    ) as Repository<Warning>;
+    await warnings.insert({
+      id: WARNING_ID,
+      warningType: 'Hurricane Watch',
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [-80.5, 25.9],
+          [-80.4, 26.1],
+        ],
+      } as never,
+      advisory: { id: ADVISORY_ID } as Advisory,
+    });
+
     const points = app.get(
       getRepositoryToken(ForecastPoint),
     ) as Repository<ForecastPoint>;
@@ -455,21 +531,28 @@ describe('riskio-api provider verification', () => {
     app = await createTestApp([{ provide: NhcProvider, useValue: nhcMock }]);
     await seedPactAdminToken();
 
-    /*
-     * A real access token, minted the way a client gets one.
-     *
-     * The verifier needs a valid JWT for the guarded read routes, and the
-     * obvious shortcuts both fail: a made-up string is rejected by the
-     * JwtAuthGuard, and reusing PACT_API_KEY does not work either because that
-     * is an API token checked against its own hash, not a JWT. Registering and
-     * logging in goes through the same path production uses, so the contract is
-     * verified against the auth that actually ships.
-     */
-    bearerToken = await registerAndLogin(app, 'pact-reader@test.local');
-
     await app.listen(0, '127.0.0.1');
     const address = app.getHttpServer().address() as { port: number };
     baseUrl = `http://127.0.0.1:${address.port}`;
+
+    /*
+     * A real access token, minted the way a client gets one, and taken *after*
+     * the server is listening.
+     *
+     * The verifier needs a valid JWT for the guarded read routes, and the
+     * shortcuts both fail: a made-up string is rejected by the JwtAuthGuard, and
+     * PACT_API_KEY does not work either, because that is an API token checked
+     * against its own hash rather than a JWT.
+     *
+     * The ordering matters and was not obvious. `registerAndLogin` goes through
+     * supertest, which calls `listen(0)` on the underlying server and closes it
+     * again. Doing that before `app.listen()` leaves Nest holding a server it
+     * thinks it already started, and every proxied request from the verifier
+     * then timed out at 30s — including `/health`, which has no state handler
+     * and never touches this code. Listening first means supertest reuses the
+     * live server instead of taking it over and giving it back.
+     */
+    bearerToken = await registerAndLogin(app, 'pact-reader@test.local');
   });
 
   afterAll(async () => {
@@ -489,24 +572,29 @@ describe('riskio-api provider verification', () => {
       pactUrls: [PACT_FILE],
       logLevel: 'error' as const,
       /*
-       * The verifier replays the recorded interactions against the running app,
-       * and a recorded interaction is only a path and a body. It carries no
-       * credentials, so every guarded route answered 401 and the mismatch was
-       * reported as a body shape error, which is a misleading way to learn that
-       * a header was missing.
+       * Inject the credentials the verifier cannot have.
        *
-       * A contract test that cannot authenticate proves nothing about the
-       * contract. Injecting the header here is what makes the verification
-       * reach the controller at all.
+       * A recorded interaction is a path and a body. It carries no
+       * credentials, so every guarded route answered 401 and the mismatch was
+       * reported as a body shape error — a misleading way to learn a header was
+       * missing. A contract test that cannot authenticate proves nothing about
+       * the contract.
+       *
+       * This is Express middleware, not a transformer: it must call `next()`.
+       * Returning a modified request object does nothing, and because pact
+       * registers it for *every* path, a filter that never calls next hangs the
+       * whole proxy — which showed up as all ten interactions timing out at 30s,
+       * including `/health`, which needs no credentials at all. That is what
+       * made this look like an unreachable provider.
        */
-      requestFilter: (req) => ({
-        ...req,
-        headers: {
+      requestFilter: (req, _res, next) => {
+        req.headers = {
           ...req.headers,
           authorization: `Bearer ${bearerToken}`,
           'x-api-key': PACT_API_KEY,
-        },
-      }),
+        };
+        next();
+      },
       stateHandlers: {
         'there are storms in the database': seedStorm,
         'storm EP142026 exists with advisory 2': seedAdvisory,

@@ -131,7 +131,7 @@ export const riskioClient = {
     baseUrl: string,
     atcfId: string,
     n: string,
-  ): Promise<AdvisoryDetail> {
+  ): Promise<{ storm: Storm; advisory: AdvisoryDetail }> {
     return get(
       baseUrl,
       `/storms/${encodeURIComponent(atcfId)}/advisories/${encodeURIComponent(n)}`,

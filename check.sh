@@ -42,6 +42,20 @@ run "backend typecheck"  bash -c 'cd backend && npx tsc --noEmit -p tsconfig.jso
 run "backend lint"       bash -c 'cd backend && npx oxlint src/ test/'
 run "backend tests"      bash -c 'cd backend && npx vitest run'
 
+# The contract test needs a live Postgres, unlike everything above it. Skipped
+# rather than failed when the database is not up, so a laptop without the stack
+# running still gets the other four checks; CI runs it against a service
+# container and there it is not optional.
+if bash -c 'cd backend && node -e "
+  const {Client} = require(\"pg\");
+  const c = new Client({connectionString: \"postgresql://riskio:riskio_dev_password@localhost:5432/riskio\"});
+  c.connect().then(()=>c.end()).then(()=>process.exit(0)).catch(()=>process.exit(1));
+"' 2>/dev/null; then
+  run "contract test" bash -c 'cd backend && npx vitest run --config ./vitest.config.pact.ts --testTimeout=300000'
+else
+  printf '\n\033[33m    SKIPPED contract test — no Postgres on localhost:5432\033[0m\n'
+fi
+
 if [ "$FAST" -eq 0 ]; then
   run "backend coverage" bash -c 'cd backend && npx vitest run --coverage'
 fi

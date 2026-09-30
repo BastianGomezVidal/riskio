@@ -180,9 +180,7 @@
               {
                 "advisoryNumber": 2,
                 "id": "11111111-1111-4111-8111-111111111111",
-                "ingestedAt": "2026-09-10T02:33:27.000Z",
-                "issuedAt": "2026-09-10T02:33:27.000Z",
-                "rawText": "TCM - forecast advisory"
+                "issuedAt": "2026-09-10T02:33:27.000Z"
               }
             ],
             "atcfId": "EP142026",
@@ -223,17 +221,7 @@
               "combine": "AND",
               "matchers": [
                 {
-                  "match": "regex",
-                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
-                }
-              ]
-            },
-            "$.advisories[*].ingestedAt": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "regex",
-                  "regex": "^\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d(:?[0-5]\\d)?|Z)$"
+                  "match": "type"
                 }
               ]
             },
@@ -243,14 +231,6 @@
                 {
                   "match": "regex",
                   "regex": "^\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d(:?[0-5]\\d)?|Z)$"
-                }
-              ]
-            },
-            "$.advisories[*].rawText": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "type"
                 }
               ]
             },
@@ -438,7 +418,7 @@
       "pending": false,
       "providerStates": [
         {
-          "name": "storm EP142026 exists with advisory 2"
+          "name": "advisory 11111111-1111-4111-8111-111111111111 has 2 forecast points"
         }
       ],
       "request": {
@@ -448,27 +428,36 @@
       "response": {
         "body": {
           "content": {
-            "advisoryNumber": 2,
-            "cone": null,
-            "forecastPoints": [
-              {
-                "category": 1,
-                "id": "22222222-2222-4222-8222-222222222222",
-                "latitude": 16.7,
-                "longitude": -118.5,
-                "pressureMb": 1006,
-                "validAt": "2026-09-10T02:33:27.000Z",
-                "windSpeedKt": 35
-              }
-            ],
-            "id": "11111111-1111-4111-8111-111111111111",
-            "ingestedAt": "2026-09-10T02:33:27.000Z",
-            "issuedAt": "2026-09-10T02:33:27.000Z",
-            "rawText": "TCM - forecast advisory",
-            "track": null,
-            "warnings": [
-              {}
-            ]
+            "advisory": {
+              "advisoryNumber": 2,
+              "cone": null,
+              "forecastPoints": [
+                {
+                  "category": 1,
+                  "id": "22222222-2222-4222-8222-222222222222",
+                  "latitude": 16.7,
+                  "longitude": -118.5,
+                  "pressureMb": 1006,
+                  "validAt": "2026-09-10T02:33:27.000Z",
+                  "windSpeedKt": 35
+                }
+              ],
+              "id": "11111111-1111-4111-8111-111111111111",
+              "ingestedAt": "2026-09-10T02:33:27.000Z",
+              "issuedAt": "2026-09-10T02:33:27.000Z",
+              "rawText": "TCM - forecast advisory",
+              "track": null,
+              "warnings": [
+                {
+                  "id": "33333333-3333-4333-8333-333333333333",
+                  "warningType": "Hurricane Watch"
+                }
+              ]
+            },
+            "storm": {
+              "atcfId": "EP142026",
+              "basin": "EP"
+            }
           },
           "contentType": "application/json",
           "encoded": false
@@ -480,7 +469,7 @@
         },
         "matchingRules": {
           "body": {
-            "$.advisoryNumber": {
+            "$.advisory.advisoryNumber": {
               "combine": "AND",
               "matchers": [
                 {
@@ -488,7 +477,7 @@
                 }
               ]
             },
-            "$.cone": {
+            "$.advisory.cone": {
               "combine": "AND",
               "matchers": [
                 {
@@ -496,7 +485,7 @@
                 }
               ]
             },
-            "$.forecastPoints": {
+            "$.advisory.forecastPoints": {
               "combine": "AND",
               "matchers": [
                 {
@@ -505,7 +494,7 @@
                 }
               ]
             },
-            "$.forecastPoints[*].category": {
+            "$.advisory.forecastPoints[*].category": {
               "combine": "AND",
               "matchers": [
                 {
@@ -513,7 +502,7 @@
                 }
               ]
             },
-            "$.forecastPoints[*].id": {
+            "$.advisory.forecastPoints[*].id": {
               "combine": "AND",
               "matchers": [
                 {
@@ -522,7 +511,7 @@
                 }
               ]
             },
-            "$.forecastPoints[*].latitude": {
+            "$.advisory.forecastPoints[*].latitude": {
               "combine": "AND",
               "matchers": [
                 {
@@ -530,7 +519,7 @@
                 }
               ]
             },
-            "$.forecastPoints[*].longitude": {
+            "$.advisory.forecastPoints[*].longitude": {
               "combine": "AND",
               "matchers": [
                 {
@@ -538,7 +527,7 @@
                 }
               ]
             },
-            "$.forecastPoints[*].pressureMb": {
+            "$.advisory.forecastPoints[*].pressureMb": {
               "combine": "AND",
               "matchers": [
                 {
@@ -546,7 +535,7 @@
                 }
               ]
             },
-            "$.forecastPoints[*].validAt": {
+            "$.advisory.forecastPoints[*].validAt": {
               "combine": "AND",
               "matchers": [
                 {
@@ -555,7 +544,7 @@
                 }
               ]
             },
-            "$.forecastPoints[*].windSpeedKt": {
+            "$.advisory.forecastPoints[*].windSpeedKt": {
               "combine": "AND",
               "matchers": [
                 {
@@ -563,7 +552,7 @@
                 }
               ]
             },
-            "$.id": {
+            "$.advisory.id": {
               "combine": "AND",
               "matchers": [
                 {
@@ -572,7 +561,7 @@
                 }
               ]
             },
-            "$.ingestedAt": {
+            "$.advisory.ingestedAt": {
               "combine": "AND",
               "matchers": [
                 {
@@ -581,7 +570,7 @@
                 }
               ]
             },
-            "$.issuedAt": {
+            "$.advisory.issuedAt": {
               "combine": "AND",
               "matchers": [
                 {
@@ -590,7 +579,7 @@
                 }
               ]
             },
-            "$.rawText": {
+            "$.advisory.rawText": {
               "combine": "AND",
               "matchers": [
                 {
@@ -598,7 +587,7 @@
                 }
               ]
             },
-            "$.track": {
+            "$.advisory.track": {
               "combine": "AND",
               "matchers": [
                 {
@@ -606,12 +595,36 @@
                 }
               ]
             },
-            "$.warnings": {
+            "$.advisory.warnings": {
               "combine": "AND",
               "matchers": [
                 {
                   "match": "type",
                   "min": 1
+                }
+              ]
+            },
+            "$.advisory.warnings[*].id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.advisory.warnings[*].warningType": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.storm": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
                 }
               ]
             }
