@@ -81,7 +81,12 @@ jobs:
             ].join('\n');
 
             const { owner, repo } = context.repo;
-            const number = context.issue.number;
+            // On a push there is no issue context, so the commit SHA is what
+            // the comments API takes as the issue number. Reading
+            // context.issue.number here yields undefined and a 404.
+            const number = context.payload.pull_request
+              ? context.issue.number
+              : context.sha;
             const { data: comments } = await github.rest.issues.listComments({
               owner, repo, issue_number: number,
             });
