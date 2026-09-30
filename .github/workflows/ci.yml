@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   check:
@@ -50,14 +51,50 @@ jobs:
           path: backend/coverage
           retention-days: 14
 
-      # The numbers on the run page, readable without opening an artifact.
+      # The numbers on the commit, readable without opening an artifact.
+      # First-party `github-script` rather than a coverage-report action: the
+      # popular ones expect a Vite config, and this project's coverage comes
+      # from a NestJS/Vitest run that has no vite.config at all.
       - name: Comment coverage on the commit
         if: github.event_name == 'push'
-        uses: davelosert/vitest-coverage-report-action@v1
+        uses: actions/github-script@v7
         with:
-          name: Backend coverage
-          json-summary-path: backend/coverage-summary.json
-          json-summary-final-path: backend/coverage/coverage-summary.json
+          script: |
+            const fs = require('fs');
+            const t = JSON.parse(
+              fs.readFileSync('backend/coverage/coverage-summary.json', 'utf8')
+            ).total;
+            const marker = '<!-- backend-coverage -->';
+            const row = (k, v) => `| ${k} | ${v} |`;
+            const body = [
+              marker,
+              '## Backend coverage',
+              '',
+              '| Metric | % |',
+              '| --- | --- |',
+              row('Lines', t.lines.pct),
+              row('Statements', t.statements.pct),
+              row('Functions', t.functions.pct),
+              row('Branches', t.branches.pct),
+              '',
+              `_${t.lines.covered} of ${t.lines.total} lines. Thresholds live in \`backend/vitest.config.ts\`._`,
+            ].join('\n');
+
+            const { owner, repo } = context.repo;
+            const number = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner, repo, issue_number: number,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: number, body,
+              });
+            }
 
   # A committed snapshot, so the README and the repository always carry the
   # measured numbers rather than a claim someone has to re-verify by hand.
