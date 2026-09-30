@@ -15,11 +15,7 @@ import { Warning } from '../../src/domain/weather/advisories/entities/warning.en
 import { User } from '../../src/domain/auth/entities/user.entity.js';
 import { ApiToken } from '../../src/domain/auth/entities/api-token.entity.js';
 import { hashToken } from '../../src/domain/auth/auth.utils.js';
-import {
-  riskioClient,
-  PACT_API_KEY,
-  PACT_BEARER_TOKEN,
-} from './riskio-client.js';
+import { riskioClient, PACT_API_KEY } from './riskio-client.js';
 
 const { PactV4, Matchers, SpecificationVersion, Verifier } = pactPkg;
 

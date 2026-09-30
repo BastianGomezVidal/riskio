@@ -1,0 +1,5 @@
+# Runs on staged files only, so a commit costs a second rather than the half
+# minute the full gate takes. The gate that actually protects main is
+# ./check.sh in CI, and `main` is protected on the remote: a hook you can
+# bypass is ergonomics, not a rule.
+npx lint-staged

@@ -11,7 +11,13 @@
 #   ./check.sh          run everything
 #   ./check.sh --fast   skip coverage, which is the slow part
 #
-# Exit code is non-zero if any step failed, so CI can call it and stop.
+# The same script is the CI gate. `./check.sh` is the only list of commands that
+# decides whether this code is good; the workflow calls it rather than repeating
+# it, so a green laptop run and a green run on the remote cannot disagree.
+#
+# The pre-commit hook runs a smaller subset, on staged files only, because a
+# hook that costs half a minute stops being used. A hook is ergonomics; this
+# script, and the branch protection on the remote, is the rule.
 
 set -uo pipefail
 
@@ -38,9 +44,12 @@ run() {
 
 echo "=== Riskio quality gate ==="
 
-run "backend typecheck"  bash -c 'cd backend && npx tsc --noEmit -p tsconfig.json'
-run "backend lint"       bash -c 'cd backend && npx oxlint src/ test/'
-run "backend tests"      bash -c 'cd backend && npx vitest run'
+run "backend format"      bash -c 'cd backend && npm run --silent format:check'
+run "backend lint fast"   bash -c 'cd backend && npm run --silent lint:fast'
+run "backend typecheck"   bash -c 'cd backend && npx tsc --noEmit -p tsconfig.json'
+run "backend lint typed"  bash -c 'cd backend && npm run --silent lint:types'
+run "backend duplication" bash -c 'cd backend && npm run --silent dupes'
+run "backend tests"       bash -c 'cd backend && npx vitest run'
 
 # The contract test needs a live Postgres, unlike everything above it. Skipped
 # rather than failed when the database is not up, so a laptop without the stack
@@ -60,9 +69,10 @@ if [ "$FAST" -eq 0 ]; then
   run "backend coverage" bash -c 'cd backend && npx vitest run --coverage'
 fi
 
-run "frontend typecheck" bash -c 'cd frontend && npx tsc --noEmit'
-run "frontend knip"      bash -c 'cd frontend && npx knip'
-run "frontend build"     bash -c 'cd frontend && npx vite build'
+run "frontend format"     bash -c 'cd frontend && npm run --silent format:check'
+run "frontend typecheck"  bash -c 'cd frontend && npx tsc --noEmit'
+run "frontend knip"       bash -c 'cd frontend && npx knip'
+run "frontend build"      bash -c 'cd frontend && npx vite build'
 
 printf '\n=== summary ===\n'
 if [ ${#FAILED[@]} -eq 0 ]; then

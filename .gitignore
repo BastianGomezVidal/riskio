@@ -72,3 +72,7 @@ backend/README.md
 # fallo, no instruccion para quien llega. Si se necesitan:
 #   git show <commit>^:ARCHITECTURE-BACKEND.md
 ARCHITECTURE-*.md
+
+# jscpd writes its report here by default
+report/
+backend/report/

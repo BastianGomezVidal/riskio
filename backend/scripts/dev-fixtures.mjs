@@ -33,7 +33,13 @@
  *   node scripts/dev-fixtures.mjs --port 9000
  */
 import { createServer } from 'node:http';
-import { readFile, writeFile, mkdir, readdir, copyFile } from 'node:fs/promises';
+import {
+  readFile,
+  writeFile,
+  mkdir,
+  readdir,
+  copyFile,
+} from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -77,7 +83,9 @@ export async function maxAdvisoryInDatabase(stormAtcfId, options = {}) {
     const value = rows?.[0]?.n;
     return { max: value == null ? null : Number(value) };
   } catch (error) {
-    return { unavailable: error instanceof Error ? error.message : String(error) };
+    return {
+      unavailable: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
@@ -112,7 +120,12 @@ async function queryViaPg(url, stormAtcfId) {
  * case on the host, where the port is not published. That is a lesser tool, not
  * a broken one: it may collide, and the run will say so.
  */
-export async function nextAdvisory({ explicit, outDir, stormAtcfId, query } = {}) {
+export async function nextAdvisory({
+  explicit,
+  outDir,
+  stormAtcfId,
+  query,
+} = {}) {
   if (explicit !== undefined) {
     const pedido = Number(explicit);
     if (!Number.isInteger(pedido) || pedido < 1) {
@@ -161,7 +174,9 @@ async function lastAdvisoryFromFile(outDir) {
   try {
     last = JSON.parse(await readFile(statePath, 'utf8')).lastAdvisoryNumber;
   } catch (error) {
-    console.log(`  state.json ilegible (${error instanceof Error ? error.message : error}); empezando en 2`);
+    console.log(
+      `  state.json ilegible (${error instanceof Error ? error.message : error}); empezando en 2`,
+    );
     return 3;
   }
 
@@ -170,22 +185,38 @@ async function lastAdvisoryFromFile(outDir) {
 
 const pad = (n, w = 2) => String(n).padStart(w, '0');
 
-const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTHS = [
+  'JAN',
+  'FEB',
+  'MAR',
+  'APR',
+  'MAY',
+  'JUN',
+  'JUL',
+  'AUG',
+  'SEP',
+  'OCT',
+  'NOV',
+  'DEC',
+];
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function variables(advisoryNumber, issuedAt) {
   return {
     ADVISORY_NUMBER: String(advisoryNumber),
     // "Thu, 10 Sep 2026 02:33:27 +0000", the RSS pubDate format.
-    ISSUED_RFC822: `${DAYS[issuedAt.getUTCDay()]}, ${pad(issuedAt.getUTCDate())} ` +
+    ISSUED_RFC822:
+      `${DAYS[issuedAt.getUTCDay()]}, ${pad(issuedAt.getUTCDate())} ` +
       `${MONTHS[issuedAt.getUTCMonth()]} ${issuedAt.getUTCFullYear()} ` +
       `${pad(issuedAt.getUTCHours())}:${pad(issuedAt.getUTCMinutes())}:` +
       `${pad(issuedAt.getUTCSeconds())} +0000`,
     // The WMO header stamp is DDHHMM, which is why the original read 100233
     // for day 10 at 02:33.
-    WMO_STAMP: `${pad(issuedAt.getUTCDate())}${pad(issuedAt.getUTCHours())}` +
+    WMO_STAMP:
+      `${pad(issuedAt.getUTCDate())}${pad(issuedAt.getUTCHours())}` +
       `${pad(issuedAt.getUTCMinutes())}`,
-    HEADER_UTC: `${pad(issuedAt.getUTCHours())}${pad(issuedAt.getUTCMinutes())} UTC ` +
+    HEADER_UTC:
+      `${pad(issuedAt.getUTCHours())}${pad(issuedAt.getUTCMinutes())} UTC ` +
       `${DAYS[issuedAt.getUTCDay()].toUpperCase()} ${MONTHS[issuedAt.getUTCMonth()]} ` +
       `${issuedAt.getUTCFullYear()}`,
   };
@@ -235,13 +266,23 @@ async function renderAll(outDir, advisoryNumber) {
     // templates/tcm-ep4.xml.tmpl -> xml/TCMEP4.xml
     const nombre = plantilla.replace(/\.xml\.tmpl$/, '');
     const wallet = nombre.split('-').pop().toUpperCase();
-    const xml = render(await readFile(join(templatesDir, plantilla), 'utf8'), vars);
+    const xml = render(
+      await readFile(join(templatesDir, plantilla), 'utf8'),
+      vars,
+    );
     await writeFile(join(outDir, 'xml', `TCM${wallet}.xml`), xml);
   }
 
   await writeFile(
     join(outDir, 'state.json'),
-    JSON.stringify({ lastAdvisoryNumber: advisoryNumber, renderedAt: issuedAt.toISOString() }, null, 2),
+    JSON.stringify(
+      {
+        lastAdvisoryNumber: advisoryNumber,
+        renderedAt: issuedAt.toISOString(),
+      },
+      null,
+      2,
+    ),
   );
 
   return { advisoryNumber, issuedAt, outDir };
@@ -262,7 +303,9 @@ async function main() {
   let current = advisoryNumber;
 
   console.log(`fixtures renderizadas en ${outDir}`);
-  console.log(`  advisory number: ${advisoryNumber}  (issued ${issuedAt.toISOString()})`);
+  console.log(
+    `  advisory number: ${advisoryNumber}  (issued ${issuedAt.toISOString()})`,
+  );
 
   if (hasFlag('render-only')) return;
 
@@ -284,7 +327,10 @@ async function main() {
       return;
     }
 
-    const file = join(outDir, path === '/' ? 'index-ep.xml' : path.replace(/^\/+/, ''));
+    const file = join(
+      outDir,
+      path === '/' ? 'index-ep.xml' : path.replace(/^\/+/, ''),
+    );
     if (!file.startsWith(outDir)) {
       res.writeHead(403).end('fuera del directorio de fixtures');
       return;
@@ -292,7 +338,9 @@ async function main() {
     try {
       const body = await readFile(file);
       const ext = file.slice(file.lastIndexOf('.'));
-      res.writeHead(200, { 'Content-Type': MIME[ext] ?? 'text/plain' }).end(body);
+      res
+        .writeHead(200, { 'Content-Type': MIME[ext] ?? 'text/plain' })
+        .end(body);
     } catch {
       res.writeHead(404).end('no existe en los fixtures');
     }
@@ -304,8 +352,12 @@ async function main() {
     console.log(`    NHC_BASE_URL=http://host.containers.internal:${port} \\`);
     console.log('      podman-compose up -d --force-recreate backend-api');
     console.log('    curl -X POST http://localhost:3000/admin/ingest/run \\');
-    console.log('      -H "Authorization: Bearer $TOKEN" -H "x-api-key: $API_KEY"');
-    console.log('\n  Advance to a new advisory (so the next run actually inserts):');
+    console.log(
+      '      -H "Authorization: Bearer $TOKEN" -H "x-api-key: $API_KEY"',
+    );
+    console.log(
+      '\n  Advance to a new advisory (so the next run actually inserts):',
+    );
     console.log(`    curl -X POST http://localhost:${port}/__next`);
     console.log('\n  Remember to point it back at NOAA afterwards:');
     console.log('    podman-compose up -d --force-recreate backend-api');
@@ -314,6 +366,9 @@ async function main() {
 
 // Only when run as a program. Imported by its spec, which needs the functions
 // above without a server starting.
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   await main();
 }

@@ -1,0 +1,27 @@
+{
+  "name": "riskio",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Tooling that spans both projects. The applications live in backend/ and frontend/ and keep their own package.json; this file exists for the things that have to work across the whole repository.",
+  "scripts": {
+    "prepare": "husky",
+    "setup": "npm --prefix backend ci && npm --prefix frontend ci",
+    "check": "./check.sh"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2"
+  },
+  "lint-staged": {
+    "backend/src/**/*.ts": [
+      "backend/node_modules/.bin/prettier --check",
+      "backend/node_modules/.bin/oxlint"
+    ],
+    "backend/test/**/*.ts": [
+      "backend/node_modules/.bin/prettier --check"
+    ],
+    "frontend/src/**/*.{ts,tsx,css}": [
+      "frontend/node_modules/.bin/prettier --check"
+    ]
+  }
+}
