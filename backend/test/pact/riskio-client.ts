@@ -49,8 +49,24 @@ export interface HealthResponse {
   details: Record<string, { status: string; responseTime?: number }>;
 }
 
-async function get<T>(baseUrl: string, path: string): Promise<T> {
-  const res = await fetch(`${baseUrl}${path}`);
+/**
+ * Bearer token for the read endpoints.
+ *
+ * The API mounts a global JwtAuthGuard, so `/storms*` and `/advisories*` answer
+ * 401 without an `Authorization` header. This client originally sent none, so
+ * provider verification got a 401 on every guarded route and reported it as a
+ * body mismatch: eleven interactions failing over one missing header.
+ */
+export const PACT_BEARER_TOKEN = 'pact-contract-read-token';
+
+async function get<T>(
+  baseUrl: string,
+  path: string,
+  token: string = PACT_BEARER_TOKEN,
+): Promise<T> {
+  const res = await fetch(`${baseUrl}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!res.ok) {
     throw new ApiError(res.status, await res.text());
   }
@@ -103,26 +119,37 @@ export const riskioClient = {
     return get(baseUrl, `/storms/${encodeURIComponent(atcfId)}`);
   },
 
-  listAdvisories(
+  /**
+   * One advisory of a storm, by number or `latest`.
+   *
+   * There is no `GET /storms/:atcfId/advisories` and there never was. The route
+   * is `/storms/:atcfId/advisories/:n` and the `n` is required, because which
+   * advisory you mean is ambiguous once a storm has twenty of them. The contract
+   * described the list route, which 404s.
+   */
+  getAdvisoryForStorm(
     baseUrl: string,
     atcfId: string,
-  ): Promise<AdvisorySummary[]> {
-    return get(baseUrl, `/storms/${encodeURIComponent(atcfId)}/advisories`);
+    n: string,
+  ): Promise<AdvisoryDetail> {
+    return get(
+      baseUrl,
+      `/storms/${encodeURIComponent(atcfId)}/advisories/${encodeURIComponent(n)}`,
+    );
   },
 
   getAdvisory(baseUrl: string, advisoryId: string): Promise<AdvisoryDetail> {
     return get(baseUrl, `/advisories/${encodeURIComponent(advisoryId)}`);
   },
 
-  listForecastPoints(
-    baseUrl: string,
-    advisoryId: string,
-  ): Promise<ForecastPoint[]> {
-    return get(
-      baseUrl,
-      `/advisories/${encodeURIComponent(advisoryId)}/forecast-points`,
-    );
-  },
+  /*
+   * Deliberately absent: a `listForecastPoints` method.
+   *
+   * There is no `GET /advisories/:id/forecast-points` route. Forecast points are
+   * embedded in the advisory detail, so one screen costs one round trip instead
+   * of two. The contract described the two-step shape, so it described an API
+   * nobody built.
+   */
 
   runBasinIngest(baseUrl: string, basin: string): Promise<IngestReport> {
     return post(

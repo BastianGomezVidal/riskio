@@ -1,12 +1,12 @@
 import 'reflect-metadata';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { INestApplication } from '@nestjs/common';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import pactPkg from '@pact-foundation/pact';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { createTestApp } from '../helpers/test-app.js';
+import { createTestApp, registerAndLogin } from '../helpers/test-app.js';
 import { NhcProvider } from '../../src/domain/feeds/providers/nhc/nhc.provider.js';
 import { Storm } from '../../src/domain/weather/storms/entities/storm.entity.js';
 import { Advisory } from '../../src/domain/weather/advisories/entities/advisory.entity.js';
@@ -14,7 +14,11 @@ import { ForecastPoint } from '../../src/domain/weather/advisories/entities/fore
 import { User } from '../../src/domain/auth/entities/user.entity.js';
 import { ApiToken } from '../../src/domain/auth/entities/api-token.entity.js';
 import { hashToken } from '../../src/domain/auth/auth.utils.js';
-import { riskioClient, PACT_API_KEY } from './riskio-client.js';
+import {
+  riskioClient,
+  PACT_API_KEY,
+  PACT_BEARER_TOKEN,
+} from './riskio-client.js';
 
 const { PactV4, Matchers, SpecificationVersion, Verifier } = pactPkg;
 
@@ -77,6 +81,21 @@ const pact = new PactV4({
 });
 
 describe('weather-dashboard <-> riskio-api consumer contract', () => {
+  beforeAll(() => {
+    /*
+     * Delete the pact file before writing it.
+     *
+     * @pact-foundation/pact *merges* into an existing pact file: interactions
+     * that are no longer declared are kept. So the file on disk had grown to
+     * carry both `a request for a storm advisories list` and `a request for the
+     * forecast points list` — two interactions describing routes that never
+     * existed, kept alive by the merge and re-verified on every run. Deleting
+     * first makes the file a function of the specs in this file and nothing
+     * else, which is the only way it can be trusted as a contract.
+     */
+    rmSync(PACT_FILE, { force: true });
+  });
+
   it('reads health', async () => {
     await pact
       .addInteraction()
@@ -158,16 +177,38 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
       });
   });
 
-  it('lists advisories for a storm', async () => {
+  /*
+   * The advisory-by-number route, not an advisories list.
+   *
+   * The contract used to describe `GET /storms/:atcfId/advisories`, which
+   * returns 404: the API never had that route. It is
+   * `/storms/:atcfId/advisories/:n`, with the number required, because a storm
+   * accumulates twenty advisories and "the advisory" is ambiguous. `latest` is
+   * the value the frontend actually sends, so that is what is pinned here.
+   */
+  it("gets a storm's latest advisory", async () => {
     await pact
       .addInteraction()
       .given(`storm ${STORM_ID} exists with advisory 2`)
-      .uponReceiving('a request for a storm advisories list')
-      .withRequest('GET', `/storms/${STORM_ID}/advisories`)
-      .willRespondWith(200, (b) => b.jsonBody(Matchers.eachLike(advisoryBody)))
+      .uponReceiving('a request for the latest advisory of a storm')
+      .withRequest('GET', `/storms/${STORM_ID}/advisories/latest`)
+      .willRespondWith(200, (b) =>
+        b.jsonBody({
+          ...advisoryBody,
+          forecastPoints: Matchers.eachLike(forecastPointBody),
+          warnings: Matchers.eachLike({}),
+          track: Matchers.like(null),
+          cone: Matchers.like(null),
+        }),
+      )
       .executeTest(async (mockServer) => {
-        const res = await riskioClient.listAdvisories(mockServer.url, STORM_ID);
-        expect(res[0].advisoryNumber).toBe(2);
+        const advisory = await riskioClient.getAdvisoryForStorm(
+          mockServer.url,
+          STORM_ID,
+          'latest',
+        );
+        expect(advisory.advisoryNumber).toBe(2);
+        expect(Array.isArray(advisory.forecastPoints)).toBe(true);
       });
   });
 
@@ -197,28 +238,15 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
       });
   });
 
-  it('lists forecast points for an advisory', async () => {
-    await pact
-      .addInteraction()
-      .given(`advisory ${ADVISORY_ID} has 2 forecast points`)
-      .uponReceiving('a request for the forecast points list')
-      .withRequest('GET', `/advisories/${ADVISORY_ID}/forecast-points`)
-      .willRespondWith(200, (b) =>
-        b.jsonBody(Matchers.eachLike(forecastPointBody)),
-      )
-      .executeTest(async (mockServer) => {
-        const res = await riskioClient.listForecastPoints(
-          mockServer.url,
-          ADVISORY_ID,
-        );
-        expect(res.length).toBeGreaterThanOrEqual(1);
-        expect(res[0]).toMatchObject({
-          latitude: 16.7,
-          longitude: -118.5,
-        });
-      });
-  });
-
+  /*
+   * Forecast points are part of the advisory detail, not a second call.
+   *
+   * The contract used to describe `GET /advisories/:id/forecast-points`, which
+   * returns 404 and was never implemented. The detail endpoint already embeds
+   * `forecastPoints`, so the assertion that matters — that the points arrive
+   * with the advisory — is made there instead. Splitting it into its own
+   * interaction would have pinned a route the API is better off not having.
+   */
   it('404s for an unknown advisory', async () => {
     await pact
       .addInteraction()
@@ -308,8 +336,31 @@ describe('riskio-api provider verification', () => {
       ),
   };
 
+  /*
+   * Deletes the storm graph in FK order, children first.
+   *
+   * This used to delete `storms` alone, which worked only because nothing after
+   * it ever ran: every guarded route returned 401 before a state handler was
+   * reached. Once the verifier was given credentials, the handlers started
+   * running in sequence, and the second one hit the foreign key — advisories
+   * and forecast points from the previous interaction still pointed at a storm
+   * that no longer existed.
+   *
+   * It failed as "One or more of the setup state change handlers has failed",
+   * attached to every interaction, which points at the verifier rather than at
+   * the fixture that actually broke.
+   */
   const clearAllData = async () => {
+    const points = app.get(
+      getRepositoryToken(ForecastPoint),
+    ) as Repository<ForecastPoint>;
+    const advisories = app.get(
+      getRepositoryToken(Advisory),
+    ) as Repository<Advisory>;
     const storms = app.get(getRepositoryToken(Storm)) as Repository<Storm>;
+
+    await points.createQueryBuilder().delete().execute();
+    await advisories.createQueryBuilder().delete().execute();
     await storms.createQueryBuilder().delete().execute();
   };
 
@@ -398,9 +449,24 @@ describe('riskio-api provider verification', () => {
     ]);
   };
 
+  let bearerToken: string;
+
   beforeAll(async () => {
     app = await createTestApp([{ provide: NhcProvider, useValue: nhcMock }]);
     await seedPactAdminToken();
+
+    /*
+     * A real access token, minted the way a client gets one.
+     *
+     * The verifier needs a valid JWT for the guarded read routes, and the
+     * obvious shortcuts both fail: a made-up string is rejected by the
+     * JwtAuthGuard, and reusing PACT_API_KEY does not work either because that
+     * is an API token checked against its own hash, not a JWT. Registering and
+     * logging in goes through the same path production uses, so the contract is
+     * verified against the auth that actually ships.
+     */
+    bearerToken = await registerAndLogin(app, 'pact-reader@test.local');
+
     await app.listen(0, '127.0.0.1');
     const address = app.getHttpServer().address() as { port: number };
     baseUrl = `http://127.0.0.1:${address.port}`;
@@ -422,6 +488,25 @@ describe('riskio-api provider verification', () => {
       providerBaseUrl: baseUrl,
       pactUrls: [PACT_FILE],
       logLevel: 'error' as const,
+      /*
+       * The verifier replays the recorded interactions against the running app,
+       * and a recorded interaction is only a path and a body. It carries no
+       * credentials, so every guarded route answered 401 and the mismatch was
+       * reported as a body shape error, which is a misleading way to learn that
+       * a header was missing.
+       *
+       * A contract test that cannot authenticate proves nothing about the
+       * contract. Injecting the header here is what makes the verification
+       * reach the controller at all.
+       */
+      requestFilter: (req) => ({
+        ...req,
+        headers: {
+          ...req.headers,
+          authorization: `Bearer ${bearerToken}`,
+          'x-api-key': PACT_API_KEY,
+        },
+      }),
       stateHandlers: {
         'there are storms in the database': seedStorm,
         'storm EP142026 exists with advisory 2': seedAdvisory,
