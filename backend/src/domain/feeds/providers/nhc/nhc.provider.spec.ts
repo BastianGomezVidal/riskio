@@ -224,4 +224,84 @@ describe('NhcProvider', () => {
       ).rejects.toThrow('NHC returned 500');
     });
   });
+
+  /**
+   * CodeQL flagged the fetch as js/request-forgery, and it was right to: the
+   * path segments are built from values parsed out of an NHC document, so an
+   * atcfId of `../../../evil` would walk the path and `@evil.example` would
+   * move the authority. The guard is the only thing between that and a request
+   * to somewhere the base URL does not name.
+   */
+  describe('path segments built from remote input', () => {
+    // The XML calls read `.text()` and the KMZ calls read `.arrayBuffer()`, so
+    // the mock answers both. Returning only one is how a guard test ends up
+    // failing on a missing method instead of on the guard.
+    beforeEach(() => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: async () => '<rss></rss>',
+        arrayBuffer: async () => new ArrayBuffer(0),
+      });
+    });
+
+    it('refuses to walk out of the base path', async () => {
+      await expect(
+        provider.fetchAdvisoryProduct('../../../etc/passwd', 5, 'CONE'),
+      ).rejects.toThrow('unexpected characters');
+    });
+
+    it('refuses a path that would change the authority', async () => {
+      await expect(
+        provider.fetchAdvisoryProduct('EP142026@evil.example', 5, 'CONE'),
+      ).rejects.toThrow('unexpected characters');
+    });
+
+    it('refuses a scheme, so the path cannot become an absolute URL', async () => {
+      await expect(
+        provider.fetchAdvisoryProduct('https:evil', 5, 'CONE'),
+      ).rejects.toThrow('unexpected characters');
+    });
+
+    it('refuses a segment that would inject a query string', async () => {
+      await expect(
+        provider.fetchAdvisoryProduct('EP142026?a=1', 5, 'CONE'),
+      ).rejects.toThrow('unexpected characters');
+    });
+
+    it('does not send the request at all when it refuses', async () => {
+      await expect(
+        provider.fetchAdvisoryProduct('../x', 5, 'CONE'),
+      ).rejects.toThrow();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('still allows the identifiers that are real', async () => {
+      await provider.fetchAdvisoryProduct('EP142026', 5, 'CONE');
+
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(fetchMock.mock.calls[0][0]).toBe(
+        'https://www.nhc.noaa.gov/storm_graphics/api/EP142026_005adv_CONE.kmz',
+      );
+    });
+
+    it('allows a basin name through the same guard', async () => {
+      await provider.fetchBasinSummary('ep');
+
+      expect(fetchMock.mock.calls[0][0]).toBe(
+        'https://www.nhc.noaa.gov/index-ep.xml',
+      );
+    });
+
+    it('names the rejected value in the error, without fetching it', async () => {
+      // The message is the only diagnostic, and it must not be the thing an
+      // attacker can use to see what was echoed back.
+      const attempt = provider
+        .fetchAdvisoryProduct('../secret', 5, 'CONE')
+        .catch((e: Error) => e.message);
+
+      await expect(attempt).resolves.toContain('../secret');
+    });
+  });
 });

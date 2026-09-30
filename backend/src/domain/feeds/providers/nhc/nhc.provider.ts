@@ -36,6 +36,39 @@ export class NhcProvider {
     path: string,
     accept: string,
   ): Promise<{ url: string; response: Response }> {
+    // Each segment is checked, not the whole path.
+    //
+    // The segments are built from values parsed out of an NHC document, which
+    // is remote input: an atcfId, a basin, a product kind. CodeQL flagged the
+    // fetch below as `js/request-forgery` and was right to — an atcfId
+    // containing `../` would walk the path and let the base URL point
+    // somewhere else, and `@` or a colon would let it become an authority.
+    //
+    // `/` is allowed as a separator, because two of the three call sites build
+    // a nested path (`xml/TCMEP4.xml`, `storm_graphics/api/...`) and a check
+    // that rejected those would be a check that gets weakened later. So the
+    // split happens first and each segment is validated on its own, which is
+    // also what makes `..` rejectable: a character class alone cannot tell
+    // `xml/TCMEP4.xml` from `../../../etc/passwd`, since both are made of
+    // allowed characters. `.` and `..` are rejected explicitly for the same
+    // reason, and a segment has to be non-empty, so `//` cannot smuggle one
+    // past either.
+    //
+    // This is checked once, here, rather than at each call site: a caller that
+    // forgets to validate is a bug, and a value validated twice is a value
+    // that can drift between the two checks.
+    const segments = path.split('/');
+    if (
+      segments.length === 0 ||
+      segments.some(
+        (s) => !/^[A-Za-z0-9._-]+$/.test(s) || s === '..' || s === '.',
+      )
+    ) {
+      throw new Error(
+        `Refusing to build an NHC URL from a path with unexpected characters: ${JSON.stringify(path)}`,
+      );
+    }
+
     const url = `${this.baseUrl}/${path}`;
 
     const response = await fetch(url, {

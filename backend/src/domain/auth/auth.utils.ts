@@ -65,6 +65,26 @@ export function generateApiToken(): GeneratedApiToken {
  * (`riskio_...`); the prefix is stripped before hashing so both
  * representations compare equal.
  *
+ * SHA-256 here is deliberate and is not a password hash.
+ *
+ * CodeQL reports `js/insufficient-password-hash` on this line. It is keyed on
+ * the function being named `hash*` and taking a `value`, and the concern it
+ * raises is real for a password and does not apply to this value:
+ *
+ * - A password is low entropy and chosen by a human, so the attack is to
+ *   compute SHA-256 of a wordlist. A slow hash (bcrypt, scrypt, argon2) exists
+ *   to make each guess expensive. This token is 32 bytes from
+ *   `randomBytes`, so there is no wordlist to guess and nothing to slow down.
+ * - The stored value is never used to verify a login. Nothing authenticates
+ *   by re-hashing a submitted secret and comparing, which is the operation the
+ *   rule is really about. Tokens are compared with `timingSafeEqual` against
+ *   the stored digest, so the digest cannot be attacked offline at all; the
+ *   attacker would need the digest itself, and holding it is the position.
+ *
+ * Slow hashing would also be the wrong trade: this runs on every authenticated
+ * request that presents a token, so bcrypt's cost is paid on the hot path to
+ * protect a value that is already unguessable.
+ *
  * @param value token to hash, with or without the prefix.
  * @returns SHA-256 hex digest.
  */
