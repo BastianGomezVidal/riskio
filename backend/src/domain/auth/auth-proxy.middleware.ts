@@ -36,6 +36,20 @@ import {
  *
  * So anything that is not JSON is read off the stream and forwarded as bytes.
  */
+/**
+ * Returns a header's first value, or undefined if it was not sent.
+ *
+ * Node hands back `string[]` for a header that arrived more than once, but
+ * express's type for the well-known ones is `string | undefined`. So the
+ * `Array.isArray` check that made this code correct at runtime also narrowed
+ * its true branch to `any[]` and made the result `any`, which is how an
+ * unchecked value reached the forwarded headers. Typing the parameter as the
+ * union Node actually produces makes the narrowing meaningful again.
+ */
+function firstHeader(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 @Injectable()
 export class AuthProxyMiddleware implements NestMiddleware {
   private readonly baseUrl: string;
@@ -136,16 +150,12 @@ export class AuthProxyMiddleware implements NestMiddleware {
   }
 
   async use(req: Request, res: Response, _next: NextFunction): Promise<void> {
-    // A repeated content-type arrives as an array; take the first, which is the
-    // one a body parser would have used.
-    const contentType = req.headers['content-type'];
     const headers: Record<string, string> = {
       'content-type':
-        (Array.isArray(contentType) ? contentType[0] : contentType) ??
-        'application/json',
+        firstHeader(req.headers['content-type']) ?? 'application/json',
     };
 
-    const authorization = req.headers.authorization ?? '';
+    const authorization = firstHeader(req.headers.authorization) ?? '';
     if (authorization.startsWith('Bearer ')) {
       /**
        * The token goes on to the auth service as well as being checked here.

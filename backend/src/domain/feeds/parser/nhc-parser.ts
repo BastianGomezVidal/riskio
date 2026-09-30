@@ -77,6 +77,50 @@ function toArray<T>(value: T | T[] | undefined): T[] {
   return Array.isArray(value) ? value : [value];
 }
 
+/**
+ * One node of the parsed XML tree.
+ *
+ * `XMLParser.parse` is declared as returning `any`, and letting that `any`
+ * reach the mapping below is what produced 29 unsafe-member-access findings in
+ * this file: every `raw['nhc:...']` was unchecked. The tree is genuinely
+ * untyped — namespaced keys, `#text` for mixed content, and no schema — so the
+ * honest boundary is `Record<string, unknown>` plus narrowing at each read,
+ * rather than `any` and hope.
+ */
+type XmlNode = Record<string, unknown>;
+
+/** Narrows an untyped parsed value to an object node, or undefined. */
+function asNode(value: unknown): XmlNode | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as XmlNode)
+    : undefined;
+}
+
+/**
+ * Reads a repeated element as a list of nodes. A feed may give one `<item>` or
+ * many, and may also give something that is not an element at all, which is
+ * dropped rather than passed on as `any`.
+ */
+function nodes(value: unknown): XmlNode[] {
+  return toArray(value)
+    .map(asNode)
+    .filter((node): node is XmlNode => node !== undefined);
+}
+
+/**
+ * Reads an element as text. A number or boolean becomes its string form, and
+ * anything that is not a primitive — a nested element, an array, null —
+ * becomes ''. This replaces `String(value ?? '')`, which on an `unknown` would
+ * store "[object Object]" as if it were the element's text.
+ */
+function text(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return '';
+}
+
 function parseDate(value: unknown): Date | null {
   if (typeof value !== 'string' || !value) return null;
   const d = new Date(value);
@@ -135,58 +179,65 @@ function isSentinelTitle(title: string): boolean {
  * @throws Error when the document has no `rss.channel` (not RSS).
  */
 export function parseRssFeed(xml: string): ParsedFeed {
-  const parsed = parser.parse(xml);
-  const channel = parsed?.rss?.channel;
+  const root = asNode(parser.parse(xml));
+  const rss = asNode(root?.['rss']);
+  const channel = asNode(rss?.['channel']);
   if (!channel) {
     throw new Error('Not a valid RSS document: missing rss.channel');
   }
 
-  const items = toArray<any>(channel.item).map((raw): RssItem => {
-    const nhcCyclone = raw['nhc:Cyclone'];
+  const items = nodes(channel['item']).map((raw): RssItem => {
+    const nhcCyclone = asNode(raw['nhc:Cyclone']);
     let cyclone: CycloneInfo | null = null;
 
     if (nhcCyclone) {
       const center = parseCenter(nhcCyclone['nhc:center']);
-      const atcfId = String(nhcCyclone['nhc:atcf'] ?? '');
-      const wallet = String(nhcCyclone['nhc:wallet'] ?? '');
+      const atcfId = text(nhcCyclone['nhc:atcf']);
+      const wallet = text(nhcCyclone['nhc:wallet']);
 
       // Only build a CycloneInfo if we have the two critical IDs
       if (atcfId && wallet && center) {
+        const headline = text(nhcCyclone['nhc:headline']);
         cyclone = {
           atcfId,
           wallet,
           name: normalizeName(nhcCyclone['nhc:name']),
-          stormType: String(nhcCyclone['nhc:type'] ?? ''),
+          stormType: text(nhcCyclone['nhc:type']),
           latitude: center.lat,
           longitude: center.lon,
           pressureMb: parsePressureMb(nhcCyclone['nhc:pressure']),
           windKt: parseWindKt(nhcCyclone['nhc:wind']),
-          headline: nhcCyclone['nhc:headline']
-            ? String(nhcCyclone['nhc:headline'])
-            : null,
+          headline: headline ? headline : null,
         };
       }
     }
 
+    // <guid> is either text or an element with a #text child, depending on
+    // whether the feed includes an isPermaLink attribute. An element that is
+    // present but has no #text keeps '' rather than becoming null: absent and
+    // empty are different, and the distinction is asserted.
+    const guidNode = raw['guid'];
+    const guidElement = asNode(guidNode);
+    const guid = guidElement
+      ? text(guidElement['#text'])
+      : guidNode === undefined
+        ? null
+        : text(guidNode) || null;
+
     return {
-      title: String(raw.title ?? ''),
-      description: raw.description ? String(raw.description) : null,
-      pubDate: parseDate(raw.pubDate),
-      link: raw.link ? String(raw.link) : null,
-      guid:
-        typeof raw.guid === 'object' && raw.guid !== null
-          ? String(raw.guid['#text'] ?? '')
-          : raw.guid
-            ? String(raw.guid)
-            : null,
+      title: text(raw['title']),
+      description: text(raw['description']) || null,
+      pubDate: parseDate(raw['pubDate']),
+      link: text(raw['link']) || null,
+      guid,
       cyclone,
       hasCycloneElement: Boolean(nhcCyclone),
     };
   });
 
   return {
-    channelTitle: String(channel.title ?? ''),
-    channelPubDate: parseDate(channel.pubDate),
+    channelTitle: text(channel['title']),
+    channelPubDate: parseDate(channel['pubDate']),
     items,
   };
 }

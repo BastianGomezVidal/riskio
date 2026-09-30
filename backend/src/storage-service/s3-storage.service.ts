@@ -11,6 +11,15 @@ import {
 } from '@aws-sdk/client-s3';
 import type { StorageService } from '../domain/storage/storage.service.js';
 
+/**
+ * `${err}` where `err` is `unknown` is a lint error for a good reason: an
+ * object would stringify to "[object Object]" and the actual message would be
+ * lost from the log. Errors keep their name and message; anything else is
+ * stringified deliberately rather than by accident.
+ */
+const describeError = (err: unknown): string =>
+  err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+
 @Injectable()
 export class S3StorageService
   implements StorageService, OnApplicationBootstrap
@@ -64,7 +73,7 @@ export class S3StorageService
     } catch (err) {
       if (!(err instanceof NotFound)) {
         this.logger.warn(
-          `Storage bucket check failed, will attempt to create: ${err}`,
+          `Storage bucket check failed, will attempt to create: ${describeError(err)}`,
         );
       }
     }
@@ -73,7 +82,7 @@ export class S3StorageService
       await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
       this.logger.log(`Storage bucket '${this.bucket}' created`);
     } catch (err) {
-      this.logger.warn(`Storage bucket creation failed: ${err}`);
+      this.logger.warn(`Storage bucket creation failed: ${describeError(err)}`);
       return;
     }
 
@@ -96,7 +105,7 @@ export class S3StorageService
       );
       this.logger.log(`Storage bucket '${this.bucket}' set public read`);
     } catch (err) {
-      this.logger.warn(`Storage bucket policy failed: ${err}`);
+      this.logger.warn(`Storage bucket policy failed: ${describeError(err)}`);
     }
   }
 
@@ -131,6 +140,7 @@ export class S3StorageService
    * reaches this over HTTP. Kept async so the two implementations are
    * interchangeable, which is what lets a test swap one for the other.
    */
+  // eslint-disable-next-line @typescript-eslint/require-await -- async is the point: the HTTP implementation of this port is async, and the two have to stay substitutable
   async extractKey(url: string): Promise<string | null> {
     const prefix = `${this.publicUrl}/`;
     if (!url.startsWith(prefix)) return null;

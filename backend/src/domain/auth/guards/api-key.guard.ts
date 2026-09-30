@@ -5,6 +5,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import type { AuthenticatedRequest } from '../../../common/authz/authenticated-request.js';
 import {
   API_KEY_VERIFIER,
   type ApiKeyVerifier,
@@ -25,7 +26,7 @@ export class ApiKeyGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
     const apiKey = request.headers?.['x-api-key'];
 

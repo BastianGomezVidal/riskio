@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import type { AuthenticatedRequest } from '../../../common/authz/authenticated-request.js';
 import {
   AUTH_CHECKER,
   type AuthChecker,
@@ -41,9 +42,15 @@ export class JwtAuthGuard implements CanActivate {
 
     if (isPublic) return true;
 
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
-    const authorization = request.headers?.authorization ?? '';
+    // Node types a header as `string | string[]`, and calling .split() on that
+    // without narrowing was a latent bug rather than a style complaint: only
+    // the first value is meaningful if a header ever arrives repeated.
+    const authorizationHeader = request.headers?.authorization ?? '';
+    const authorization = Array.isArray(authorizationHeader)
+      ? (authorizationHeader[0] ?? '')
+      : authorizationHeader;
     const [scheme, token] = authorization.split(' ');
 
     if (scheme !== 'Bearer' || !token) {

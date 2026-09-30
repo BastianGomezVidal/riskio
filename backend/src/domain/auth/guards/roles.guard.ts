@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator.js';
-import { Role, AuthPrincipal } from '../auth.roles.js';
+import type { AuthenticatedRequest } from '../../../common/authz/authenticated-request.js';
+import { Role } from '../auth.roles.js';
 
 /**
  * Enforces role-based access on routes decorated with `@Roles(...)`.
@@ -29,9 +30,7 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const user = context
-      .switchToHttp()
-      .getRequest<{ user?: AuthPrincipal }>().user;
+    const user = context.switchToHttp().getRequest<AuthenticatedRequest>().user;
 
     if (!user || !required.includes(user.role)) {
       throw new ForbiddenException(

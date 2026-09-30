@@ -27,8 +27,12 @@ export class TraceErrorInterceptor implements NestInterceptor {
         const span = trace.getSpan(context.active());
         if (span) {
           // Jaeger's search filters on these, so an error is findable by route
-          // and method without opening every trace.
-          const request = _context.switchToHttp().getRequest();
+          // and method without opening every trace. `route` is set by the
+          // router, so it is absent on a 404 and on anything unmatched.
+          const request = _context.switchToHttp().getRequest<{
+            method?: string;
+            route?: { path?: string };
+          }>();
           if (request?.method) {
             span.setAttribute('http.request.method', request.method);
           }

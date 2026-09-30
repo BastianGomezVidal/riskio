@@ -1,60 +1,22 @@
 import eslint from '@eslint/js';
+import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 // Type-aware linting. oxlint stays the fast gate; this is the one that needs a
 // TypeScript program and can therefore see types. Both run, neither replaces
 // the other.
 //
-// Every rule switched off below is off for a stated reason, and each was
-// looked at rather than silenced on sight. A rule nobody ever fixes is worse
-// than no rule, because it teaches you to skim past the output.
-const OFF = {
-  // 187 findings. The `any` lives where a DTO, a query builder or a
-  // third-party SDK hands back something untyped. Typing those boundaries
-  // properly is a refactor of the data layer, not a lint fix, and doing it
-  // half-way would be worse than leaving it visible.
-  '@typescript-eslint/no-unsafe-assignment': 'off',
-  '@typescript-eslint/no-unsafe-member-access': 'off',
-  '@typescript-eslint/no-unsafe-argument': 'off',
-  '@typescript-eslint/no-unsafe-call': 'off',
-  '@typescript-eslint/no-unsafe-return': 'off',
-
-  // 50 findings, all in the repository ports. A port implements an async
-  // interface and stays async for that reason even when the body is
-  // synchronous; dropping `async` would change the interface it satisfies.
-  '@typescript-eslint/require-await': 'off',
-
-  // 56 findings, 46 of them auto-fixable. These are genuinely dead `as`
-  // casts and are worth removing, but that is 56 edits across the tree and
-  // belongs in its own reviewable commit rather than inside the one that
-  // introduces the tooling. This is the immediate next step.
-  '@typescript-eslint/no-unnecessary-type-assertion': 'off',
-
-  // 3 findings, checked and found not to be defects. pino is configured
-  // with `formatters.level` in config/observability.module.ts, which makes
-  // it emit levels as the string label, so `String(record.level)` is a no-op
-  // and the SEVERITY lookup resolves. The type is only `unknown` because it
-  // came out of JSON.parse. Turning this on would be a change with no
-  // behaviour behind it.
-  '@typescript-eslint/no-base-to-string': 'off',
-
-  // 3 findings, all `${err}` in a catch block. `err` is `unknown` under
-  // useUnknownInCatchVariables, and stringifying an Error is correct at
-  // runtime. This is the rule fighting the type system, not the code.
-  '@typescript-eslint/restrict-template-expressions': 'off',
-
-  // One finding, at the XML parser boundary in nhc-parser.ts. The output of
-  // the mapping is typed as RssItem, which is the direction that matters; the
-  // input is the NHC document as the parser hands it over, with namespaced
-  // keys and no schema. Giving it a real type means narrowing at every
-  // `raw['nhc:...']` access, which is a job for whenever that document is
-  // modelled, not for a lint rule to force.
-  '@typescript-eslint/no-explicit-any': 'off',
-
-  // NestJS DI tokens and decorator arguments are `void`-returning by
-  // signature, which the rule reads as a misused promise.
-  '@typescript-eslint/no-misused-promises': 'off',
-};
+// Nothing is switched off globally. Getting here took fixing rather than
+// silencing: 56 dead type assertions removed, the XML and request boundaries
+// typed, and the unsafe-`any` family taken from 299 findings to zero in
+// production code. The only exceptions are the three rules scoped to test
+// files further down, each with the reason next to it.
+//
+// The reason for that bar is that a rule nobody ever fixes is worse than no
+// rule, because it teaches you to skim past the output. A rule that is off
+// everywhere cannot catch anything later either. So the count that matters is
+// the one in src/, and it is zero.
+const OFF = {};
 
 export default tseslint.config(
   {
@@ -89,15 +51,76 @@ export default tseslint.config(
   },
   {
     // Tests assert on malformed input on purpose and stub modules, so the
-    // type-aware rules that object to both are off here.
-    files: ['test/**/*.ts', 'src/**/*.spec.ts'],
+    // type-aware rules that object to both are off here. All three patterns are
+    // needed: `**/*-spec.ts` covers the `*-integration-spec.ts` files, which a
+    // bare `*.spec.ts` does not match because of the hyphen. Without it, 134
+    // findings in five integration specs were reported as if they were
+    // production code.
+    files: ['test/**/*.ts', '**/*.spec.ts', '**/*-spec.ts'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unsafe-enum-comparison': 'off',
+      // 60 findings, and every one is a test double: `query: async () => []`,
+      // `text: async () => ''`, `findOne: async () => null`, plus an async
+      // generator. The `async` there is the point. Those members stand in for
+      // a TypeORM QueryBuilder or an SDK client whose real methods are async,
+      // and a stub that returned a bare value instead of a Promise would no
+      // longer match the thing it stands in for. Note this is the opposite
+      // reasoning from the previous comment on this rule, which claimed the
+      // findings were in repository ports; there is exactly one in production
+      // code and it carries an inline disable with its own reason.
+      //
+      // The rule stays on everywhere else, so a genuine `async` with no await
+      // in src/ is still caught.
+      '@typescript-eslint/require-await': 'off',
+      // 10 findings, all `mockImplementation(fn)` where fn returns a Promise.
+      // These are false positives rather than tolerated defects.
+      // `ReturnType<typeof vi.fn>` resolves to `Mock<Procedure | Constructable>`,
+      // a union whose second member is a constructor signature, and the rule
+      // reads that branch and reports the Promise as a misused one. tsc
+      // accepts every one of these lines, and the double is right: a fake for
+      // `Repository.save` has to return a Promise, because the real method
+      // does. Typing the mocks properly would silence the rule, but the return
+      // types are already pinned by the assertions that follow each call.
+      // The rule stays on everywhere else; in production code it reports
+      // nothing today.
+      '@typescript-eslint/no-misused-promises': 'off',
+      // 245 findings, all in tests, and 245 of them are the same thing:
+      // supertest declares `Response.body` as `any`, so `res.body.totals` is an
+      // unchecked read on a value whose shape the test is what establishes.
+      // The families are off here and on everywhere else, which is the part
+      // that matters: they were 299 findings across src/ when this config was
+      // written, and they are now zero. Typing 245 call sites of `res.body`
+      // would mean asserting the shape a second time, in a type, next to the
+      // assertion that already checks it at runtime.
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
     },
   },
   {
-    files: ['**/*.js'],
+    // `.mjs` belongs here too, and leaving it out meant scripts/ was never
+    // linted at all: the files are not in any tsconfig, so the type-aware
+    // parser rejects them, and `files: ['**/*.js']` never matched the
+    // extension. dev-fixtures.mjs is a real 700-line script that had no lint
+    // coverage whatsoever. These get the non-type-aware rules only, which is
+    // the right trade for plain Node scripts.
+    files: ['**/*.js', '**/*.mjs'],
     ...tseslint.configs.disableTypeChecked,
+    languageOptions: {
+      // These are Node scripts, so `console` and `process` are defined.
+      // Without this, no-undef reports all 23 uses of them in dev-fixtures.mjs
+      // as undefined, which is noise that teaches you to ignore the rule.
+      globals: globals.node,
+      parserOptions: {
+        // The block above turns on projectService for every file, and these
+        // files are in no tsconfig, so the type-aware parser refuses them.
+        // Switching it off here is what makes them lintable at all.
+        projectService: false,
+        project: false,
+      },
+    },
   },
 );

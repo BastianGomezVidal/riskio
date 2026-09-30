@@ -107,17 +107,29 @@ export const envValidationSchema = Joi.object({
   SMTP_PASS: Joi.string().allow('').default(''),
   /** Envelope sender and the From header. */
   MAIL_FROM: Joi.string().email({ tlds: false }).default('riskio@example.com'),
-}).custom((value, helpers) => {
+}).custom((value: Record<string, unknown>, helpers) => {
   // Joi has no way to say "these three are required, but only when that other
   // one is set", so the conditional part is checked here. The point is that a
   // half-configured SMTP fails at boot: the alternative is discovering it when
   // a user asks to reset their password and the mail silently never arrives.
-  if (value.MAIL_TRANSPORT !== 'smtp') {
+  if (value['MAIL_TRANSPORT'] !== 'smtp') {
     return value;
   }
 
   const missing = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM'].filter(
-    (key) => !String(value[key] ?? '').trim(),
+    (key) => {
+      // Joi hands `value` over as `any`, so each entry is unknown until it is
+      // narrowed. String() on the unknown would put "[object Object]" in front
+      // of a value that was never a string in the first place.
+      const raw = value[key];
+      const asText =
+        typeof raw === 'string'
+          ? raw
+          : typeof raw === 'number' || typeof raw === 'boolean'
+            ? String(raw)
+            : '';
+      return !asText.trim();
+    },
   );
 
   if (missing.length > 0) {

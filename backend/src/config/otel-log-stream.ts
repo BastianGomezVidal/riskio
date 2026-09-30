@@ -110,7 +110,22 @@ export function createOtelLogStream(serviceName: string): Writable {
         if (!line.trim()) continue;
         try {
           const record = JSON.parse(line) as Record<string, unknown>;
-          const level = String(record.level ?? 'info');
+          /**
+           * `level` arrives as whatever pino serialised, so it is `unknown`
+           * here. `String()` on it would turn an object into "[object Object]"
+           * and quietly lose the severity, so the accepted shapes are named
+           * instead. pino is configured with `formatters.level` in
+           * observability.module.ts, which is why the string case comes first:
+           * that is the shape actually emitted. Anything else falls back to
+           * 'info' rather than logging a meaningless label.
+           */
+          const rawLevel = record.level;
+          const level =
+            typeof rawLevel === 'string'
+              ? rawLevel
+              : typeof rawLevel === 'number'
+                ? String(rawLevel)
+                : 'info';
           const { msg, level: _level, time, ...rest } = record;
 
           /**

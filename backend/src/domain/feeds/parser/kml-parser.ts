@@ -266,8 +266,17 @@ function readExtendedData(node: XmlNode): Record<string, string> {
 
     const value = data.value ?? data['#text'];
 
+    /**
+     * Only a primitive carries text. A nested object or array here would
+     * stringify to "[object Object]" and be stored as if it were the value,
+     * so anything that is not a string, number or boolean becomes ''.
+     */
     out[name.trim()] =
-      value === undefined || value === null ? '' : String(value).trim();
+      typeof value === 'string'
+        ? value.trim()
+        : typeof value === 'number' || typeof value === 'boolean'
+          ? String(value).trim()
+          : '';
   }
 
   return out;
