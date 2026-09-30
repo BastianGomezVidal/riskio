@@ -1,11 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Tag } from "antd";
 import { formatUTC } from "@/domain/datetime";
-import {
-  basinLabel,
-  stormDisplayName,
-  stormStatusLabel,
-} from "@/domain/storm";
+import { basinLabel, stormDisplayName, stormStatusLabel } from "@/domain/storm";
 import type { StormAggregate } from "@/domain/storm";
 
 interface Props {

@@ -128,27 +128,27 @@ export function ResetPasswordPage() {
         </p>
 
         <form action={formAction} noValidate className="mt-8 space-y-4">
-            <div>
-              <TextField
-                id="newPassword"
-                name="newPassword"
-                type="password"
-                label="New password"
-                autoComplete="new-password"
-                autoFocus
-              />
-            </div>
+          <div>
+            <TextField
+              id="newPassword"
+              name="newPassword"
+              type="password"
+              label="New password"
+              autoComplete="new-password"
+              autoFocus
+            />
+          </div>
 
-            <div>
-              <TextField
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                label="Confirm new password"
-                autoComplete="new-password"
-              />
-              <FieldError>{errors.password}</FieldError>
-            </div>
+          <div>
+            <TextField
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              label="Confirm new password"
+              autoComplete="new-password"
+            />
+            <FieldError>{errors.password}</FieldError>
+          </div>
 
           {errors.form && <FormError message={errors.form} />}
 

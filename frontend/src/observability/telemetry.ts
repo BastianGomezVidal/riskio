@@ -1,5 +1,11 @@
-import { trace, type Span, type Tracer, type SpanOptions, type Meter } from '@opentelemetry/api';
-import type { MeterProvider } from '@opentelemetry/sdk-metrics';
+import {
+  trace,
+  type Span,
+  type Tracer,
+  type SpanOptions,
+  type Meter,
+} from "@opentelemetry/api";
+import type { MeterProvider } from "@opentelemetry/sdk-metrics";
 
 /**
  * Browser-side tracing and metrics, loaded late on purpose.
@@ -34,8 +40,8 @@ import type { MeterProvider } from '@opentelemetry/sdk-metrics';
  * that are least interesting to trace, since the page has not been interacted
  * with yet.
  */
-const endpoint: string | undefined =
-  import.meta.env.VITE_OTEL_EXPORTER_OTLP_ENDPOINT;
+const endpoint: string | undefined = import.meta.env
+  .VITE_OTEL_EXPORTER_OTLP_ENDPOINT;
 
 /**
  * Telemetry stays off unless the collector URL was compiled in, and it must
@@ -46,7 +52,7 @@ export const telemetryReady = Boolean(endpoint);
 
 if (!telemetryReady && import.meta.env.DEV) {
   console.info(
-    '[telemetry] VITE_OTEL_EXPORTER_OTLP_ENDPOINT is not set, tracing is off',
+    "[telemetry] VITE_OTEL_EXPORTER_OTLP_ENDPOINT is not set, tracing is off",
   );
 }
 
@@ -63,8 +69,8 @@ export const NOOP_SPAN = {
   end: () => undefined,
   isRecording: () => false,
   spanContext: () => ({
-    traceId: '0'.repeat(32),
-    spanId: '0'.repeat(16),
+    traceId: "0".repeat(32),
+    spanId: "0".repeat(16),
     traceFlags: 0,
   }),
 } as unknown as Span;
@@ -79,10 +85,7 @@ let realTracer: Tracer | null = null;
  * loading, or off for good.
  */
 export const tracer = {
-  startActiveSpan<T>(
-    name: string,
-    fn: (span: Span) => Promise<T>,
-  ): Promise<T> {
+  startActiveSpan<T>(name: string, fn: (span: Span) => Promise<T>): Promise<T> {
     if (!realTracer) return fn(NOOP_SPAN);
     return realTracer.startActiveSpan(name, fn);
   },
@@ -110,14 +113,14 @@ async function buildResource() {
       ATTR_DEPLOYMENT_ENVIRONMENT_NAME,
     },
   ] = await Promise.all([
-    import('@opentelemetry/resources'),
-    import('@opentelemetry/semantic-conventions'),
+    import("@opentelemetry/resources"),
+    import("@opentelemetry/semantic-conventions"),
   ]);
 
   return resourceFromAttributes({
-    [ATTR_SERVICE_NAME]: 'riskio-web',
-    [ATTR_SERVICE_VERSION]: import.meta.env.VITE_APP_VERSION ?? '0.0.0',
-    [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: import.meta.env.MODE ?? 'development',
+    [ATTR_SERVICE_NAME]: "riskio-web",
+    [ATTR_SERVICE_VERSION]: import.meta.env.VITE_APP_VERSION ?? "0.0.0",
+    [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: import.meta.env.MODE ?? "development",
   });
 }
 
@@ -131,7 +134,7 @@ export async function initTracing(): Promise<void> {
     // fire-and-forget call is an unhandled rejection with no way to tell it from
     // a bug in the app.
     console.warn(
-      '[telemetry] tracing did not load, continuing without it',
+      "[telemetry] tracing did not load, continuing without it",
       error,
     );
   }
@@ -143,7 +146,7 @@ async function loadTracing(): Promise<void> {
   // loaded first and on its own: batched into the Promise.all below, the
   // ordering between it and context-zone would be a race, and the failure mode
   // is a ZoneContextManager that silently never propagates anything.
-  await import('zone.js');
+  await import("zone.js");
 
   const [
     { WebTracerProvider },
@@ -153,12 +156,12 @@ async function loadTracing(): Promise<void> {
     { registerInstrumentations },
     { getWebAutoInstrumentations },
   ] = await Promise.all([
-    import('@opentelemetry/sdk-trace-web'),
-    import('@opentelemetry/sdk-trace-base'),
-    import('@opentelemetry/exporter-trace-otlp-http'),
-    import('@opentelemetry/context-zone'),
-    import('@opentelemetry/instrumentation'),
-    import('@opentelemetry/auto-instrumentations-web'),
+    import("@opentelemetry/sdk-trace-web"),
+    import("@opentelemetry/sdk-trace-base"),
+    import("@opentelemetry/exporter-trace-otlp-http"),
+    import("@opentelemetry/context-zone"),
+    import("@opentelemetry/instrumentation"),
+    import("@opentelemetry/auto-instrumentations-web"),
   ]);
 
   const provider = new WebTracerProvider({
@@ -176,8 +179,8 @@ async function loadTracing(): Promise<void> {
       getWebAutoInstrumentations({
         // Left on: react-router and history instrumentation give the route
         // transitions that a SPA's trace is mostly made of.
-        '@opentelemetry/instrumentation-xml-http-request': {},
-        '@opentelemetry/instrumentation-fetch': {
+        "@opentelemetry/instrumentation-xml-http-request": {},
+        "@opentelemetry/instrumentation-fetch": {
           // request() already opens a span around every call; letting fetch be
           // instrumented too would double-count every one of them.
           enabled: false,
@@ -186,7 +189,7 @@ async function loadTracing(): Promise<void> {
     ],
   });
 
-  realTracer = trace.getTracer('riskio-web');
+  realTracer = trace.getTracer("riskio-web");
 }
 
 /**
@@ -215,7 +218,7 @@ export function flushMetrics(): Promise<void> {
 }
 
 export function getMeter(): Promise<Meter> {
-  if (!telemetryReady) return Promise.reject(new Error('telemetry is off'));
+  if (!telemetryReady) return Promise.reject(new Error("telemetry is off"));
 
   meterPromise ??= (async () => {
     // Plain MeterProvider, not WebMeterProvider: the web-specific one was
@@ -225,8 +228,8 @@ export function getMeter(): Promise<Meter> {
       { MeterProvider, PeriodicExportingMetricReader, AggregationTemporality },
       { OTLPMetricExporter },
     ] = await Promise.all([
-      import('@opentelemetry/sdk-metrics'),
-      import('@opentelemetry/exporter-metrics-otlp-http'),
+      import("@opentelemetry/sdk-metrics"),
+      import("@opentelemetry/exporter-metrics-otlp-http"),
     ]);
 
     meterProvider = new MeterProvider({
@@ -264,7 +267,7 @@ export function getMeter(): Promise<Meter> {
       ],
     });
 
-    return meterProvider.getMeter('riskio-web');
+    return meterProvider.getMeter("riskio-web");
   })();
 
   return meterPromise;

@@ -74,8 +74,14 @@ if (root) {
   // a missing metric, not a broken page.
   const loadTelemetry = () => void initTracing();
   if ("requestIdleCallback" in window) {
-    (window as Window & { requestIdleCallback: (cb: () => void, o?: { timeout: number }) => number })
-      .requestIdleCallback(loadTelemetry, { timeout: 2000 });
+    (
+      window as Window & {
+        requestIdleCallback: (
+          cb: () => void,
+          o?: { timeout: number },
+        ) => number;
+      }
+    ).requestIdleCallback(loadTelemetry, { timeout: 2000 });
   } else {
     setTimeout(loadTelemetry, 1000);
   }

@@ -9,7 +9,6 @@
  * timestamp from the API is rendered.
  */
 
-
 type DateInput = string | Date;
 
 /**

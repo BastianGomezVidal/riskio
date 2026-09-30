@@ -163,9 +163,10 @@ function buildLines(
  */
 export function GraticuleLayer() {
   const map = useMap();
-  const [view, setView] = useState<{ zoom: number; bounds: LatLngBounds } | null>(
-    null,
-  );
+  const [view, setView] = useState<{
+    zoom: number;
+    bounds: LatLngBounds;
+  } | null>(null);
 
   const sync = useCallback(() => {
     setView({ zoom: map.getZoom(), bounds: map.getBounds() });

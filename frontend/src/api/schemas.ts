@@ -87,7 +87,6 @@ export const resetPasswordResultSchema = z.object({
   message: z.string(),
 });
 
-
 /* ------------------------------------------------------------------ */
 /* API tokens                                                          */
 /* ------------------------------------------------------------------ */
@@ -219,9 +218,7 @@ export type SchemaMatchesDomain = [
   Assert<
     Exact<z.infer<typeof forgotPasswordResultSchema>, ForgotPasswordResult>
   >,
-  Assert<
-    Exact<z.infer<typeof resetPasswordResultSchema>, ResetPasswordResult>
-  >,
+  Assert<Exact<z.infer<typeof resetPasswordResultSchema>, ResetPasswordResult>>,
   Assert<Exact<z.infer<typeof stormAggregateSchema>, StormAggregate>>,
   Assert<Exact<z.infer<typeof stormsListSchema>, StormListItem[]>>,
   Assert<Exact<z.infer<typeof stormDetailSchema>, StormDetail>>,

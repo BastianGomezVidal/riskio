@@ -1,5 +1,5 @@
-import { onCLS, onINP, onLCP, type Metric } from 'web-vitals';
-import { tracer, telemetryReady, getMeter, flushMetrics } from './telemetry';
+import { onCLS, onINP, onLCP, type Metric } from "web-vitals";
+import { tracer, telemetryReady, getMeter, flushMetrics } from "./telemetry";
 
 /**
  * Core Web Vitals, from real users rather than a lab.
@@ -24,8 +24,11 @@ import { tracer, telemetryReady, getMeter, flushMetrics } from './telemetry';
  */
 function anonymiseRoute(pathname: string): string {
   return pathname
-    .replace(/\/storms\/[A-Z]{2}\d{6,}/gi, '/storms/:id')
-    .replace(/\/storms\/[A-Z]{2}\d{6,}\/advisories\/\d+/gi, '/storms/:id/advisories/:n');
+    .replace(/\/storms\/[A-Z]{2}\d{6,}/gi, "/storms/:id")
+    .replace(
+      /\/storms\/[A-Z]{2}\d{6,}\/advisories\/\d+/gi,
+      "/storms/:id/advisories/:n",
+    );
 }
 
 export function reportWebVitals(): void {
@@ -55,7 +58,7 @@ export function reportWebVitals(): void {
       route,
       rating: metric.rating,
       navigation: metric.navigationType,
-      viewport: window.innerWidth < 768 ? 'mobile' : 'desktop',
+      viewport: window.innerWidth < 768 ? "mobile" : "desktop",
     };
 
     getMeter()
@@ -64,7 +67,7 @@ export function reportWebVitals(): void {
         // CLS in a millisecond histogram would make the units a lie in the
         // dashboard.
         const histogram = meter.createHistogram(`web.vitals.${metric.name}`, {
-          unit: metric.name === 'CLS' ? '1' : 'ms',
+          unit: metric.name === "CLS" ? "1" : "ms",
           description: `${metric.name} reported by real user sessions`,
         });
         histogram.record(metric.value, attributes);
@@ -83,8 +86,8 @@ export function reportWebVitals(): void {
         // Three label values on top of the ones the histogram already carries, so
         // the cardinality is the same series with a `rating` dimension rather than
         // a new family.
-        const ratingCounter = meter.createCounter('web.vitals.rating', {
-          description: 'Core Web Vitals ratings from real user sessions',
+        const ratingCounter = meter.createCounter("web.vitals.rating", {
+          description: "Core Web Vitals ratings from real user sessions",
         });
         ratingCounter.add(1, { ...attributes, rating: metric.rating });
 
@@ -98,7 +101,7 @@ export function reportWebVitals(): void {
         // metric pipeline that never once delivered a data point looked like a
         // traffic problem rather than a bug. The page still works; that is the
         // only reason this is a warning and not a throw.
-        console.warn('[telemetry] web vitals not recorded as a metric:', err);
+        console.warn("[telemetry] web vitals not recorded as a metric:", err);
       });
   };
 

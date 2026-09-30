@@ -91,22 +91,22 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <ThemeProvider>
       <div className="flex min-h-dvh flex-col">
-      <SkipLink />
+        <SkipLink />
 
-      <AppHeader />
+        <AppHeader />
 
-      <main id="main" className="flex-1">
-        <div className="mx-auto w-full max-w-6xl px-4 py-6 pb-24 sm:px-6 md:pb-6 lg:px-8">
-          <RouteErrorBoundary>
-            <Suspense fallback={<PageFallback />}>
-              {children ?? <Outlet />}
-            </Suspense>
-          </RouteErrorBoundary>
-        </div>
-      </main>
+        <main id="main" className="flex-1">
+          <div className="mx-auto w-full max-w-6xl px-4 py-6 pb-24 sm:px-6 md:pb-6 lg:px-8">
+            <RouteErrorBoundary>
+              <Suspense fallback={<PageFallback />}>
+                {children ?? <Outlet />}
+              </Suspense>
+            </RouteErrorBoundary>
+          </div>
+        </main>
 
-      <AppFooter />
-    </div>
+        <AppFooter />
+      </div>
     </ThemeProvider>
   );
 }

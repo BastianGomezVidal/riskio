@@ -1,11 +1,11 @@
-import { Button, Empty } from 'antd';
+import { Button, Empty } from "antd";
 import {
   DisconnectOutlined,
   CloudServerOutlined,
   FileSearchOutlined,
   ReloadOutlined,
-} from '@ant-design/icons';
-import type { CSSProperties, ReactNode } from 'react';
+} from "@ant-design/icons";
+import type { CSSProperties, ReactNode } from "react";
 
 /**
  * Shared icon styling for the three status empty states. Large, muted,
@@ -13,7 +13,7 @@ import type { CSSProperties, ReactNode } from 'react';
  */
 const ICON_STYLE: CSSProperties = {
   fontSize: 60,
-  color: 'var(--ant-color-text-quaternary)',
+  color: "var(--ant-color-text-quaternary)",
 };
 
 /**
@@ -23,10 +23,10 @@ const ICON_STYLE: CSSProperties = {
  * surrounding layout to jump.
  */
 const WRAPPER_STYLE: CSSProperties = {
-  minHeight: '40vh',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
+  minHeight: "40vh",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
 };
 
 interface RetryProps {
@@ -105,7 +105,7 @@ export function ErrorEmpty({
  * filter. If omitted, only the message renders.
  */
 export function NotFoundEmpty({
-  message = 'Not found.',
+  message = "Not found.",
   action,
 }: {
   message?: string;

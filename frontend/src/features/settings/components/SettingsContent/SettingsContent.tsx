@@ -36,7 +36,6 @@ export function SettingsContent() {
         <ResetPasswordCard />
       </section>
 
-
       <section
         id="delete-account"
         tabIndex={-1}

@@ -44,7 +44,9 @@ export function StormAdvisories({
       return <OfflineEmpty onRetry={() => void refetch()} />;
     }
 
-    return <ErrorEmpty message={failure.message} onRetry={() => void refetch()} />;
+    return (
+      <ErrorEmpty message={failure.message} onRetry={() => void refetch()} />
+    );
   }
 
   const { storm, advisory } = data;

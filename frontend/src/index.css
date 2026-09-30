@@ -17,7 +17,7 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-  /*
+/*
    * The storm photo behind the sign-in card, in CSS rather than as an inline
    * style built from a JS import.
    *
@@ -39,10 +39,8 @@ body {
    * is 71 kB against the 164 kB of the JPEG it replaces.
    */
 .auth-background {
-  background-image: linear-gradient(
-      rgb(2 6 23 / 0.55),
-      rgb(2 6 23 / 0.45)
-    ),
+  background-image:
+    linear-gradient(rgb(2 6 23 / 0.55), rgb(2 6 23 / 0.45)),
     url("./assets/pictures/Kate_Storm.webp");
   background-size: cover;
   background-position: center;

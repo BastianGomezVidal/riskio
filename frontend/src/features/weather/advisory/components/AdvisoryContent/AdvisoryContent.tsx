@@ -1,5 +1,8 @@
 import { Card, Tag, Typography } from "antd";
-import { StormMap, warningColor } from "@/features/weather/storms/components/StormMap";
+import {
+  StormMap,
+  warningColor,
+} from "@/features/weather/storms/components/StormMap";
 import { AdvisoryMetrics } from "../AdvisoryMetrics/AdvisoryMetrics";
 import type { AdvisoryDetail } from "@/domain/storm";
 import { AdvisoryForecastBars } from "../AdvisoryForecastBar/AdvisoryForecastBar";
@@ -24,8 +27,6 @@ function groupWarnings(
   }
   return Array.from(counts, ([warningType, count]) => ({ warningType, count }));
 }
-
-
 
 export function AdvisoryContent({ advisory }: { advisory: AdvisoryDetail }) {
   const isMobile = useMediaQuery("(max-width: 767px)");

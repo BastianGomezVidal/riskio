@@ -6,7 +6,10 @@ const CONSENT_KEY = "riskio.cookieConsent";
 export type CookieConsent = "accepted" | "declined" | null;
 
 /** Reads and persists the cookie consent choice in localStorage. */
-export function useCookieConsent(): [CookieConsent, (next: Exclude<CookieConsent, null>) => void] {
+export function useCookieConsent(): [
+  CookieConsent,
+  (next: Exclude<CookieConsent, null>) => void,
+] {
   const [consent, setConsent] = useState<CookieConsent>(() => {
     const stored = localStorage.getItem(CONSENT_KEY);
     return stored === "accepted" || stored === "declined" ? stored : null;
@@ -53,13 +56,15 @@ export function CookieBanner({ consent, onConsent }: CookieBannerProps) {
 
       {detailsOpen && (
         <p className="mt-2 text-xs text-gray-500">
-          Riskio stores only an essential session cookie so you stay signed in. We do not
-          use third-party trackers or sell your data.
+          Riskio stores only an essential session cookie so you stay signed in.
+          We do not use third-party trackers or sell your data.
         </p>
       )}
 
       <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <ActionButton onClick={() => onConsent("declined")}>Decline</ActionButton>
+        <ActionButton onClick={() => onConsent("declined")}>
+          Decline
+        </ActionButton>
         <ActionButton variant="primary" onClick={() => onConsent("accepted")}>
           Accept
         </ActionButton>

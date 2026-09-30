@@ -66,8 +66,8 @@ async function request<S extends z.ZodTypeAny>(
       headers: buildHeaders(init),
     });
 
-    span.setAttribute('http.status_code', response.status);
-    span.setAttribute('http.route', path);
+    span.setAttribute("http.status_code", response.status);
+    span.setAttribute("http.route", path);
 
     if (!response.ok) {
       throw await toApiError(response);
@@ -100,7 +100,7 @@ async function request<S extends z.ZodTypeAny>(
 }
 
 function methodOf(init?: RequestInit): string {
-  return (init?.method ?? 'GET').toUpperCase();
+  return (init?.method ?? "GET").toUpperCase();
 }
 
 async function withSpan<T>(
@@ -121,7 +121,6 @@ async function withSpan<T>(
     }
   });
 }
-
 
 function buildHeaders(init?: RequestInit): Headers {
   const headers = new Headers(init?.headers);
@@ -299,6 +298,4 @@ export const api = {
   logout: () => requestEmpty("/auth/logout", { method: "POST" }),
 
   deleteMe: () => requestEmpty("/users/me", { method: "DELETE" }),
-
 };
-

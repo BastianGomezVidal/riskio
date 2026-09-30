@@ -84,19 +84,19 @@ export function ForgotPasswordPage() {
         </p>
 
         <form action={formAction} noValidate className="mt-8 space-y-4">
-            <div>
-              <TextField
-                id="email"
-                name="email"
-                type="email"
-                label="Email address"
-                placeholder="you@company.com"
-                autoComplete="email"
-                autoFocus
-                onChange={clearFieldError}
-              />
-              <FieldError>{errors.field}</FieldError>
-            </div>
+          <div>
+            <TextField
+              id="email"
+              name="email"
+              type="email"
+              label="Email address"
+              placeholder="you@company.com"
+              autoComplete="email"
+              autoFocus
+              onChange={clearFieldError}
+            />
+            <FieldError>{errors.field}</FieldError>
+          </div>
 
           {errors.form && <FormError message={errors.form} />}
 

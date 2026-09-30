@@ -79,7 +79,10 @@ export function StormMap({ track, cone, warnings = [], height = 340 }: Props) {
   // centre, and a line outside the bounds is simply not on screen.
   const warningPoints = warnings
     .flatMap((warning) => warning.geometry?.coordinates ?? [])
-    .filter((point): point is [number, number] => Array.isArray(point) && point.length >= 2);
+    .filter(
+      (point): point is [number, number] =>
+        Array.isArray(point) && point.length >= 2,
+    );
 
   const bounds = computeBounds([...trackPoints, ...coneRing, ...warningPoints]);
   const start = trackPoints[0];

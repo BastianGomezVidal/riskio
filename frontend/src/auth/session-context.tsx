@@ -35,9 +35,11 @@ import { useToast } from "@/design-system/toast";
  * reaches it and never has to download it.
  */
 const SessionExpiryModal = lazy(() =>
-  import("@/global_components/SessionExpiryModal/SessionExpiryModal").then((m) => ({
-    default: m.SessionExpiryModal,
-  })),
+  import("@/global_components/SessionExpiryModal/SessionExpiryModal").then(
+    (m) => ({
+      default: m.SessionExpiryModal,
+    }),
+  ),
 );
 
 interface SessionContextValue {
@@ -243,9 +245,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [warningOpen, expiresAt]);
 
   const secondsLeft =
-    expiresAt === null
-      ? 0
-      : Math.max(0, Math.ceil((expiresAt - now) / 1000));
+    expiresAt === null ? 0 : Math.max(0, Math.ceil((expiresAt - now) / 1000));
 
   const value = useMemo<SessionContextValue>(
     () => ({

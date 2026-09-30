@@ -35,8 +35,10 @@ const FIELD_BASE =
   "focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/25 " +
   "disabled:cursor-not-allowed disabled:opacity-60";
 
-interface TextFieldProps
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
+interface TextFieldProps extends Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  "size"
+> {
   label: string;
   id: string;
   error?: string;
@@ -126,7 +128,9 @@ const BUTTON_VARIANT: Record<ButtonVariant, string> = {
 };
 
 function buttonClasses(variant: ButtonVariant, className?: string) {
-  return [BUTTON_BASE, BUTTON_VARIANT[variant], className].filter(Boolean).join(" ");
+  return [BUTTON_BASE, BUTTON_VARIANT[variant], className]
+    .filter(Boolean)
+    .join(" ");
 }
 
 interface ActionLinkProps {

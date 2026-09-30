@@ -71,15 +71,18 @@ export function RouteErrorBoundary({
 }: RouteErrorBoundaryProps) {
   return (
     <ErrorBoundary
-        fallback={(error, retry) =>
-          compact ? (
-            <CompactError message={error.message || "Something went wrong."} onRetry={retry} />
-          ) : (
-            <Suspense fallback={null}>
-              <ErrorEmpty message={error.message || undefined} onRetry={retry} />
-            </Suspense>
-          )
-        }
+      fallback={(error, retry) =>
+        compact ? (
+          <CompactError
+            message={error.message || "Something went wrong."}
+            onRetry={retry}
+          />
+        ) : (
+          <Suspense fallback={null}>
+            <ErrorEmpty message={error.message || undefined} onRetry={retry} />
+          </Suspense>
+        )
+      }
     >
       {children}
     </ErrorBoundary>
