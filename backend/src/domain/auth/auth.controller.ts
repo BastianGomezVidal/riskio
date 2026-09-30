@@ -212,7 +212,10 @@ export class AuthController {
   @Get('tokens')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List the current account API tokens' })
-  @ApiOkResponse({ description: 'Active tokens (metadata only)', type: [ApiTokenDto] })
+  @ApiOkResponse({
+    description: 'Active tokens (metadata only)',
+    type: [ApiTokenDto],
+  })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT' })
   listTokens(@CurrentUser() user: AuthPrincipal): Promise<ApiTokenDto[]> {
     return this.auth.listApiTokens(user.id);

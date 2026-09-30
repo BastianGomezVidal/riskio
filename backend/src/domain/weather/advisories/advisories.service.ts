@@ -97,10 +97,6 @@ export class AdvisoriesService {
     return advisory as AdvisoryDetailDto;
   }
 
-
-
-
-
   /**
    * Fetch one advisory by storm ATCF id and advisory number, together with
    * the storm context needed to render the advisory view.
@@ -206,8 +202,4 @@ export class AdvisoriesService {
       advisory: advisory as unknown as AdvisoryDetailDto,
     };
   }
-
-
-
-
 }

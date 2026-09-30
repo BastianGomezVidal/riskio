@@ -24,7 +24,9 @@ async function bootstrap(): Promise<void> {
   await app.listen(port, '0.0.0.0');
 
   const logger = new Logger('Feeds');
-  logger.log(`feeds service listening on ${port}; NHC polling every 10 minutes`);
+  logger.log(
+    `feeds service listening on ${port}; NHC polling every 10 minutes`,
+  );
 
   const shutdown = async (signal: string): Promise<void> => {
     logger.log(`received ${signal}, shutting down`);

@@ -63,9 +63,9 @@ describe('TraceErrorInterceptor', () => {
     const [exported] = exporter.getFinishedSpans();
     expect(exported.status.code).toBe(SpanStatusCode.ERROR);
     expect(exported.status.message).toBe('database unavailable');
-    expect(
-      exported.events.filter((e) => e.name === 'exception'),
-    ).toHaveLength(1);
+    expect(exported.events.filter((e) => e.name === 'exception')).toHaveLength(
+      1,
+    );
     // Searchable in Jaeger without opening the trace.
     expect(exported.attributes['http.route']).toBe('/storms/:atcfId');
     expect(exported.attributes['http.request.method']).toBe('GET');
@@ -86,7 +86,9 @@ describe('TraceErrorInterceptor', () => {
     // HTTP response, and forcing OK here would hide a 500 raised after the
     // handler returned.
     expect(exported.status.code).toBe(SpanStatusCode.UNSET);
-    expect(exported.events.filter((e) => e.name === 'exception')).toHaveLength(0);
+    expect(exported.events.filter((e) => e.name === 'exception')).toHaveLength(
+      0,
+    );
   });
 
   it('marks a non-Error rejection too', () => {
@@ -94,7 +96,9 @@ describe('TraceErrorInterceptor', () => {
 
     context.with(trace.setSpan(context.active(), span), () => {
       new TraceErrorInterceptor()
-        .intercept(ctx, { handle: () => throwError(() => 'plain string') } as never)
+        .intercept(ctx, {
+          handle: () => throwError(() => 'plain string'),
+        } as never)
         .subscribe({ error: () => undefined });
     });
     span.end();

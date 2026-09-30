@@ -17,9 +17,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * timestamp (1700000000000) sorts *before* InitialSchema and would fail on a
  * database that has no `users` table yet.
  */
-export class AddSessionTrackingColumns1893500000000
-  implements MigrationInterface
-{
+export class AddSessionTrackingColumns1893500000000 implements MigrationInterface {
   name = 'AddSessionTrackingColumns1893500000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

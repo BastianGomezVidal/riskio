@@ -53,10 +53,10 @@ export class WeatherReadController {
    */
   @Get('latest-per-storm')
   latestPerStorm(@Query('atcfIds') atcfIds?: string): Promise<unknown> {
-    return this.cache.getOrSet(
-      `weather:latest:${atcfIds ?? ''}`,
-      30_000,
-      () => this.advisories.findLatestPerStorm((atcfIds ?? '').split(',').filter(Boolean)),
+    return this.cache.getOrSet(`weather:latest:${atcfIds ?? ''}`, 30_000, () =>
+      this.advisories.findLatestPerStorm(
+        (atcfIds ?? '').split(',').filter(Boolean),
+      ),
     );
   }
 }

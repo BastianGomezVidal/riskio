@@ -46,7 +46,13 @@ export class AuthzGuardsModule {
       // The tokens go out too, because a guard named in a consuming module's
       // @UseGuards is built in that module's context, where its dependencies
       // must be visible.
-      exports: [JwtAuthGuard, RolesGuard, ApiKeyGuard, AUTH_CHECKER, API_KEY_VERIFIER],
+      exports: [
+        JwtAuthGuard,
+        RolesGuard,
+        ApiKeyGuard,
+        AUTH_CHECKER,
+        API_KEY_VERIFIER,
+      ],
     };
   }
 }

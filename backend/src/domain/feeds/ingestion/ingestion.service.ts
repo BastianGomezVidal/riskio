@@ -234,13 +234,12 @@ export class IngestionService {
         const issuedAt = tcmItem.pubDate ?? summary.issuedAt;
         const rawText = tcmItem.description ?? null;
 
-        const { advisory, inserted } =
-          await this.advisoryWriter.upsert({
-            storm,
-            advisoryNumber,
-            issuedAt,
-            rawText,
-          });
+        const { advisory, inserted } = await this.advisoryWriter.upsert({
+          storm,
+          advisoryNumber,
+          issuedAt,
+          rawText,
+        });
 
         if (inserted) {
           report.advisoriesInserted++;

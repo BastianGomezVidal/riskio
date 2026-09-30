@@ -116,10 +116,9 @@ describe('Warning segments (integration)', () => {
     const res = await getAdvisory(withWarnings).expect(200);
 
     // The client dedupes by type for the tags but draws one line per segment.
-    expect(res.body.warnings.map((w: { warningType: string }) => w.warningType)).toEqual([
-      'Hurricane Watch',
-      'Hurricane Warning',
-    ]);
+    expect(
+      res.body.warnings.map((w: { warningType: string }) => w.warningType),
+    ).toEqual(['Hurricane Watch', 'Hurricane Warning']);
   });
 
   it('returns an empty array when the advisory has no warnings', async () => {

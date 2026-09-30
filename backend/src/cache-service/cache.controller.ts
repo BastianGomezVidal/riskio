@@ -28,7 +28,9 @@ export class CacheController {
   constructor(private readonly cache: RedisCacheService) {}
 
   @Get(':key')
-  async get(@Param('key') key: string): Promise<{ found: boolean; value: unknown }> {
+  async get(
+    @Param('key') key: string,
+  ): Promise<{ found: boolean; value: unknown }> {
     const value = await this.cache.get(key);
     return { found: value !== undefined, value: value ?? null };
   }
@@ -38,10 +40,17 @@ export class CacheController {
     @Body() body: { key?: string; value?: unknown; ttlMs?: number },
   ): Promise<{ stored: true }> {
     const { key, value, ttlMs } = body ?? {};
-    if (typeof key !== 'string' || !key || typeof ttlMs !== 'number' || !Number.isFinite(ttlMs)) {
+    if (
+      typeof key !== 'string' ||
+      !key ||
+      typeof ttlMs !== 'number' ||
+      !Number.isFinite(ttlMs)
+    ) {
       // 400 rather than a thrown Error, which Nest would turn into a 500 and
       // make a malformed call look like the cache being broken.
-      throw new BadRequestException('key and a finite numeric ttlMs are required');
+      throw new BadRequestException(
+        'key and a finite numeric ttlMs are required',
+      );
     }
     await this.cache.set(key, value, ttlMs);
     return { stored: true };
@@ -54,7 +63,9 @@ export class CacheController {
   }
 
   @Post('invalidate')
-  async invalidate(@Body() body: { pattern?: string }): Promise<{ deleted: number }> {
+  async invalidate(
+    @Body() body: { pattern?: string },
+  ): Promise<{ deleted: number }> {
     const pattern = body?.pattern;
     if (typeof pattern !== 'string' || !pattern) {
       throw new BadRequestException('pattern is required');

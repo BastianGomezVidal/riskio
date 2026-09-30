@@ -15,9 +15,7 @@ import type { CacheService } from '../domain/cache/cache.service.js';
 @Controller('health')
 @Public()
 export class DashboardHealthController {
-  constructor(
-    @Inject(CACHE_SERVICE) private readonly cache: CacheService,
-  ) {}
+  constructor(@Inject(CACHE_SERVICE) private readonly cache: CacheService) {}
 
   @Get()
   async check(): Promise<{ status: string; cache: string }> {
@@ -25,6 +23,9 @@ export class DashboardHealthController {
     // "unreachable" here instead of throwing, which is the honest report: the
     // dashboard still renders, just slower.
     const value = await this.cache.get<string>('__health__');
-    return { status: 'ok', cache: value === undefined ? 'unreachable' : 'reachable' };
+    return {
+      status: 'ok',
+      cache: value === undefined ? 'unreachable' : 'reachable',
+    };
   }
 }

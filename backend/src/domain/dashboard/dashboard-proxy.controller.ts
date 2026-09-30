@@ -70,7 +70,11 @@ export class DashboardProxyController {
     void this.forward(req, res, `${this.baseUrl}${req.originalUrl}`);
   }
 
-  private async forward(req: Request, res: Response, url: string): Promise<void> {
+  private async forward(
+    req: Request,
+    res: Response,
+    url: string,
+  ): Promise<void> {
     try {
       const upstream = await fetch(url, {
         method: req.method,

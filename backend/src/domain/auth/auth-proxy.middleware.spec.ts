@@ -9,7 +9,9 @@ const checker: AuthChecker = {
   introspect: vi.fn(),
 } as unknown as AuthChecker;
 
-function configStub(overrides: Record<string, string | number> = {}): ConfigService {
+function configStub(
+  overrides: Record<string, string | number> = {},
+): ConfigService {
   const values: Record<string, string | number> = {
     AUTH_SERVICE_URL: 'http://backend-auth:3008',
     AUTH_SERVICE_TIMEOUT_MS: 5_000,
@@ -113,7 +115,9 @@ describe('AuthProxyMiddleware', () => {
     await middleware().use(get('/auth/oauth/google/callback'), res, vi.fn());
 
     expect(state.status).toBe(302);
-    expect(state.headers.location).toBe('http://riskio.test/auth/callback?token=abc');
+    expect(state.headers.location).toBe(
+      'http://riskio.test/auth/callback?token=abc',
+    );
     expect(state.body).toBeUndefined();
 
     /**
@@ -150,24 +154,31 @@ describe('AuthProxyMiddleware', () => {
   });
 
   it('answers 503 when the auth service cannot be reached at all', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED')));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new Error('ECONNREFUSED')),
+    );
 
     const { res, state } = recorder();
     await middleware().use(get('/auth/session'), res, vi.fn());
 
     expect(state.status).toBe(503);
-    expect(state.body).toMatchObject({ message: 'the auth service is unavailable' });
+    expect(state.body).toMatchObject({
+      message: 'the auth service is unavailable',
+    });
   });
 
   it('forwards the request to the configured auth service with the original path', async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(
-      upstream({ status: 200, body: '{}' }),
-    );
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValue(upstream({ status: 200, body: '{}' }));
     vi.stubGlobal('fetch', fetchSpy);
 
     const { res } = recorder();
     await middleware().use(get('/users/me'), res, vi.fn());
 
-    expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://backend-auth:3008/users/me');
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'http://backend-auth:3008/users/me',
+    );
   });
 });

@@ -53,7 +53,9 @@ describe('HttpCacheService', () => {
     fetchMock.mockResolvedValue(ok({ found: false, value: null }));
     await service.get('storms:a b:c');
 
-    expect(fetchMock.mock.calls[0][0]).toBe('http://cache:3005/cache/storms%3Aa%20b%3Ac');
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'http://cache:3005/cache/storms%3Aa%20b%3Ac',
+    );
   });
 
   it('runs the loader on a miss and stores the result', async () => {
@@ -74,7 +76,9 @@ describe('HttpCacheService', () => {
     fetchMock.mockResolvedValue(ok({ found: true, value: { n: 1 } }));
     const loader = vi.fn();
 
-    await expect(service.getOrSet('k', 30_000, loader)).resolves.toEqual({ n: 1 });
+    await expect(service.getOrSet('k', 30_000, loader)).resolves.toEqual({
+      n: 1,
+    });
     expect(loader).not.toHaveBeenCalled();
   });
 
@@ -86,7 +90,9 @@ describe('HttpCacheService', () => {
     fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
     const loader = vi.fn().mockResolvedValue('from-database');
 
-    await expect(service.getOrSet('k', 30_000, loader)).resolves.toBe('from-database');
+    await expect(service.getOrSet('k', 30_000, loader)).resolves.toBe(
+      'from-database',
+    );
     expect(loader).toHaveBeenCalledOnce();
   });
 
@@ -127,7 +133,9 @@ describe('HttpCacheService', () => {
 
   it('reports the outage only once, not once per request', async () => {
     fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
-    const warn = vi.spyOn(service['logger'], 'warn').mockImplementation(() => undefined);
+    const warn = vi
+      .spyOn(service['logger'], 'warn')
+      .mockImplementation(() => undefined);
 
     for (let i = 0; i < 5; i++) await service.get('k');
 

@@ -207,9 +207,7 @@ describe('weather-dashboard <-> riskio-api consumer contract', () => {
   it("gets a storm's latest advisory", async () => {
     await pact
       .addInteraction()
-      .given(
-        `advisory ${ADVISORY_ID} has 2 forecast points`,
-      )
+      .given(`advisory ${ADVISORY_ID} has 2 forecast points`)
       .uponReceiving('a request for the latest advisory of a storm')
       .withRequest('GET', `/storms/${STORM_ID}/advisories/latest`)
       .willRespondWith(200, (b) =>

@@ -50,7 +50,11 @@ describe('UsersService.deleteMe', () => {
       manager: {
         transaction: async (work: (manager: unknown) => Promise<void>) => {
           if (failCommit) throw new Error('transaction rolled back');
-          await work({ remove: async () => { removed = true; } });
+          await work({
+            remove: async () => {
+              removed = true;
+            },
+          });
           commit();
         },
       },
@@ -153,7 +157,11 @@ describe('UsersService.deleteMe', () => {
             findOne: async () => user({ avatarUrl: null }),
             manager: {
               transaction: async (work: (m: unknown) => Promise<void>) =>
-                work({ remove: async () => { removed = true; } }),
+                work({
+                  remove: async () => {
+                    removed = true;
+                  },
+                }),
             },
           },
         },
@@ -184,8 +192,8 @@ describe('UsersService.deleteMe', () => {
       ],
     }).compile();
 
-    await expect(moduleRef.get(UsersService).deleteMe('nope')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      moduleRef.get(UsersService).deleteMe('nope'),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

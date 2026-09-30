@@ -11,7 +11,9 @@ import { DashboardServiceModule } from './dashboard.module.js';
  * bearer token to offer.
  */
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(DashboardServiceModule, { bufferLogs: true });
+  const app = await NestFactory.create(DashboardServiceModule, {
+    bufferLogs: true,
+  });
 
   app.useLogger(app.get(PinoLogger));
 

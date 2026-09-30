@@ -9,7 +9,10 @@ import { TestFeedsModule } from './test-feeds.module.js';
 import { FeedsClientService } from '../../src/domain/feeds/ingestion/feeds-client.service.js';
 import { IngestionService } from '../../src/domain/feeds/ingestion/ingestion.service.js';
 import { WeatherClientService } from '../../src/domain/dashboard/weather-client.service.js';
-import { AUTH_CHECKER, API_KEY_VERIFIER } from '../../src/common/authz/authz.ports.js';
+import {
+  AUTH_CHECKER,
+  API_KEY_VERIFIER,
+} from '../../src/common/authz/authz.ports.js';
 import { LocalAuthChecker } from '../../src/auth-service/local-auth-checker.service.js';
 import { LocalApiKeyVerifier } from '../../src/auth-service/local-api-key-verifier.service.js';
 import { StormsService } from '../../src/domain/weather/storms/storms.service.js';
@@ -54,10 +57,14 @@ export async function createTestApp(
     storms: () => StormsService;
     advisories: () => AdvisoriesService;
   } = () => {
-    throw new Error('the weather services were used before the container existed');
+    throw new Error(
+      'the weather services were used before the container existed',
+    );
   };
   let ingestion: () => IngestionService = () => {
-    throw new Error('the ingestion service was used before the container existed');
+    throw new Error(
+      'the ingestion service was used before the container existed',
+    );
   };
 
   const builder = Test.createTestingModule({
@@ -136,9 +143,16 @@ export async function createTestApp(
     })
     .overrideProvider(WeatherClientService)
     .useValue({
-      activeStorms: () => weather().storms().findMany({ tab: 'active' } as never) as unknown as Promise<unknown[]>,
+      activeStorms: () =>
+        weather()
+          .storms()
+          .findMany({ tab: 'active' } as never) as unknown as Promise<
+          unknown[]
+        >,
       latestAdvisoriesPerStorm: (atcfIds: string[]) =>
-        weather().advisories().findLatestPerStorm(atcfIds) as unknown as Promise<unknown[]>,
+        weather()
+          .advisories()
+          .findLatestPerStorm(atcfIds) as unknown as Promise<unknown[]>,
     })
     .overrideProvider(FeedsClientService)
     .useValue({
@@ -257,13 +271,12 @@ export async function seedStorm(
   const savedStorm = await stormWriter.upsert(storm);
 
   for (const { advisory, points } of advisories) {
-    const { advisory: savedAdvisory } =
-      await advisoryWriter.upsert({
-        storm: savedStorm,
-        advisoryNumber: advisory.advisoryNumber,
-        issuedAt: advisory.issuedAt,
-        rawText: advisory.rawText,
-      });
+    const { advisory: savedAdvisory } = await advisoryWriter.upsert({
+      storm: savedStorm,
+      advisoryNumber: advisory.advisoryNumber,
+      issuedAt: advisory.issuedAt,
+      rawText: advisory.rawText,
+    });
 
     await advisoryWriter.replaceForecastPoints(savedAdvisory, points);
 

@@ -1,6 +1,10 @@
 import { Writable } from 'node:stream';
 import { context, trace, TraceFlags } from '@opentelemetry/api';
-import { logs, SeverityNumber, type LogAttributes } from '@opentelemetry/api-logs';
+import {
+  logs,
+  SeverityNumber,
+  type LogAttributes,
+} from '@opentelemetry/api-logs';
 
 /**
  * Bridges nestjs-pino's JSON lines into the OpenTelemetry logs signal, so they
@@ -56,7 +60,11 @@ const ALLOWED_FROM_REQUEST = new Set(['method', 'url']);
 const ALLOWED_FROM_RESPONSE = new Set(['statusCode']);
 
 function primitive(value: unknown): string | number | boolean | undefined {
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
     return value;
   }
   if (value === null || value === undefined) return undefined;
@@ -127,14 +135,15 @@ export function createOtelLogStream(serviceName: string): Writable {
               : undefined;
 
           logger.emit({
-            body: typeof msg === 'string' ? msg : (JSON.stringify(msg ?? '')),
+            body: typeof msg === 'string' ? msg : JSON.stringify(msg ?? ''),
             severityText: level,
             severityNumber: SEVERITY[level] ?? SeverityNumber.INFO,
             attributes: {
               'service.name': serviceName,
               ...toAttributes(rest),
             },
-            observedTimestamp: typeof time === 'string' ? Date.parse(time) : undefined,
+            observedTimestamp:
+              typeof time === 'string' ? Date.parse(time) : undefined,
             context: recordContext,
           });
         } catch {

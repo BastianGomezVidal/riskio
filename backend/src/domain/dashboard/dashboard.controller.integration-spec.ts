@@ -3,7 +3,12 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { createTestApp, seedStorm, registerAndLogin, bearer } from '../../../test/helpers/test-app.js';
+import {
+  createTestApp,
+  seedStorm,
+  registerAndLogin,
+  bearer,
+} from '../../../test/helpers/test-app.js';
 import { Storm } from '../weather/storms/entities/storm.entity.js';
 
 describe('Dashboard summary endpoint (integration)', () => {
@@ -75,7 +80,11 @@ describe('Dashboard summary endpoint (integration)', () => {
     await seedStorm(app, { atcfId: 'CP072026', name: 'Zeta', basin: 'CP' }, []);
 
     // Storm that dropped out of the active feed: seeded then flipped inactive.
-    await seedStorm(app, { atcfId: 'CP082026', name: 'Ghost', basin: 'CP' }, []);
+    await seedStorm(
+      app,
+      { atcfId: 'CP082026', name: 'Ghost', basin: 'CP' },
+      [],
+    );
     await app
       .get<Repository<Storm>>(getRepositoryToken(Storm))
       .update({ atcfId: 'CP082026' }, { isActive: false });
@@ -90,7 +99,7 @@ describe('Dashboard summary endpoint (integration)', () => {
   it('returns season totals and per-storm latest-advisory summaries', async () => {
     const res = await request(app.getHttpServer())
       .get('/dashboard/summary')
-      .set(...bearer(token) as [string, string])
+      .set(...(bearer(token) as [string, string]))
       .expect(200);
 
     expect(res.body.generatedAt).toEqual(expect.any(String));
@@ -111,7 +120,7 @@ describe('Dashboard summary endpoint (integration)', () => {
   it('picks the newest advisory per storm', async () => {
     const res = await request(app.getHttpServer())
       .get('/dashboard/summary')
-      .set(...bearer(token) as [string, string])
+      .set(...(bearer(token) as [string, string]))
       .expect(200);
 
     const odile = res.body.storms.find(
@@ -130,7 +139,7 @@ describe('Dashboard summary endpoint (integration)', () => {
   it('exposes low-intensity points without inflating totals', async () => {
     const res = await request(app.getHttpServer())
       .get('/dashboard/summary')
-      .set(...bearer(token) as [string, string])
+      .set(...(bearer(token) as [string, string]))
       .expect(200);
 
     const al = res.body.storms.find(
@@ -146,7 +155,7 @@ describe('Dashboard summary endpoint (integration)', () => {
   it('sets latestAdvisory to null for storms without advisories', async () => {
     const res = await request(app.getHttpServer())
       .get('/dashboard/summary')
-      .set(...bearer(token) as [string, string])
+      .set(...(bearer(token) as [string, string]))
       .expect(200);
 
     const zeta = res.body.storms.find(
@@ -161,7 +170,7 @@ describe('Dashboard summary endpoint (integration)', () => {
   it('excludes storms that are no longer active', async () => {
     const res = await request(app.getHttpServer())
       .get('/dashboard/summary')
-      .set(...bearer(token) as [string, string])
+      .set(...(bearer(token) as [string, string]))
       .expect(200);
 
     const ghost = res.body.storms.find(

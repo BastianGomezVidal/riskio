@@ -79,14 +79,18 @@ describe('DashboardService', () => {
     // shape disappeared when the read moved over the network.
     const weather = {
       activeStorms: () => stormsFind(),
-      latestAdvisoriesPerStorm: (atcfIds: string[]) => findLatestPerStorm(atcfIds),
+      latestAdvisoriesPerStorm: (atcfIds: string[]) =>
+        findLatestPerStorm(atcfIds),
     } as unknown as WeatherClientService;
 
     // getSummary is served through CacheService; the stub always calls
     // through so these tests exercise the real computation.
     const cache = {
-      getOrSet: async (_key: string, _ttlMs: number, fn: () => Promise<unknown>) =>
-        fn(),
+      getOrSet: async (
+        _key: string,
+        _ttlMs: number,
+        fn: () => Promise<unknown>,
+      ) => fn(),
     } as unknown as CacheService;
 
     service = new DashboardService(weather, cache);
@@ -99,12 +103,12 @@ describe('DashboardService', () => {
 
     expect(result.storms).toEqual([]);
     expect(result.totals).toEqual({
-        events: 0,
-        named: 0,
-        hurricanes: 0,
-        ace: 0,
-        pacific: 0,
-        atlantic: 0,
+      events: 0,
+      named: 0,
+      hurricanes: 0,
+      ace: 0,
+      pacific: 0,
+      atlantic: 0,
     });
     expect(result.generatedAt).toEqual(expect.any(String));
     expect(findLatestPerStorm).not.toHaveBeenCalled();
@@ -199,136 +203,136 @@ describe('DashboardService', () => {
   });
 
   it('leaves latestAdvisory null for storms without one', async () => {
-      const storm = makeStorm({ atcfId: 'CP062026', name: null });
-      stormsFind.mockResolvedValue([storm]);
-      findLatestPerStorm.mockResolvedValue([]);
+    const storm = makeStorm({ atcfId: 'CP062026', name: null });
+    stormsFind.mockResolvedValue([storm]);
+    findLatestPerStorm.mockResolvedValue([]);
 
-      const result = await service.getSummary();
+    const result = await service.getSummary();
 
-      expect(result.storms[0].latestAdvisory).toBeNull();
-      expect(result.totals).toEqual({
-        events: 1,
-        named: 0,
-        hurricanes: 0,
-        ace: 0,
-        pacific: 1,
-        atlantic: 0,
-  });
+    expect(result.storms[0].latestAdvisory).toBeNull();
+    expect(result.totals).toEqual({
+      events: 1,
+      named: 0,
+      hurricanes: 0,
+      ace: 0,
+      pacific: 1,
+      atlantic: 0,
+    });
   });
 
   it('counts named storms using a non-null name', async () => {
-      const named = makeStorm({ atcfId: 'EP142026', name: 'Odile' });
-      const unnamed = makeStorm({ atcfId: 'AL052026', name: null });
+    const named = makeStorm({ atcfId: 'EP142026', name: 'Odile' });
+    const unnamed = makeStorm({ atcfId: 'AL052026', name: null });
 
-      stormsFind.mockResolvedValue([named, unnamed]);
-      findLatestPerStorm.mockResolvedValue([]);
+    stormsFind.mockResolvedValue([named, unnamed]);
+    findLatestPerStorm.mockResolvedValue([]);
 
-      const result = await service.getSummary();
+    const result = await service.getSummary();
 
-      expect(result.totals.named).toBe(1);
+    expect(result.totals.named).toBe(1);
   });
 
   it('counts hurricanes when the latest advisory has a category >= 1 point', async () => {
-      const storm = makeStorm();
-      const advisory = makeAdvisory(storm, {
-        forecastPoints: [makePoint({ category: 2 })],
-      });
+    const storm = makeStorm();
+    const advisory = makeAdvisory(storm, {
+      forecastPoints: [makePoint({ category: 2 })],
+    });
 
-      stormsFind.mockResolvedValue([storm]);
-      findLatestPerStorm.mockResolvedValue([advisory]);
+    stormsFind.mockResolvedValue([storm]);
+    findLatestPerStorm.mockResolvedValue([advisory]);
 
-      const result = await service.getSummary();
+    const result = await service.getSummary();
 
-      expect(result.totals.hurricanes).toBe(1);
+    expect(result.totals.hurricanes).toBe(1);
   });
 
   it('does not count a storm as hurricane without category >= 1', async () => {
-      const storm = makeStorm();
-      const advisory = makeAdvisory(storm, {
-        forecastPoints: [makePoint({ category: 0 })],
-      });
+    const storm = makeStorm();
+    const advisory = makeAdvisory(storm, {
+      forecastPoints: [makePoint({ category: 0 })],
+    });
 
-      stormsFind.mockResolvedValue([storm]);
-      findLatestPerStorm.mockResolvedValue([advisory]);
+    stormsFind.mockResolvedValue([storm]);
+    findLatestPerStorm.mockResolvedValue([advisory]);
 
-      const result = await service.getSummary();
+    const result = await service.getSummary();
 
-      expect(result.totals.hurricanes).toBe(0);
+    expect(result.totals.hurricanes).toBe(0);
   });
 
   it('accumulates ACE from tropical-storm-strength wind points', async () => {
-      const storm = makeStorm();
-      const advisory = makeAdvisory(storm, {
-        forecastPoints: [
-          makePoint({ windSpeedKt: 34 }),
-          makePoint({ windSpeedKt: 50 }),
-          makePoint({ windSpeedKt: 33 }),
-        ],
-      });
+    const storm = makeStorm();
+    const advisory = makeAdvisory(storm, {
+      forecastPoints: [
+        makePoint({ windSpeedKt: 34 }),
+        makePoint({ windSpeedKt: 50 }),
+        makePoint({ windSpeedKt: 33 }),
+      ],
+    });
 
-      stormsFind.mockResolvedValue([storm]);
-      findLatestPerStorm.mockResolvedValue([advisory]);
+    stormsFind.mockResolvedValue([storm]);
+    findLatestPerStorm.mockResolvedValue([advisory]);
 
-      const result = await service.getSummary();
+    const result = await service.getSummary();
 
-      // (34² + 50²) / 10_000 = 0.3656 → rounded to 1 decimal.
-      expect(result.totals.ace).toBe(0.4);
+    // (34² + 50²) / 10_000 = 0.3656 → rounded to 1 decimal.
+    expect(result.totals.ace).toBe(0.4);
   });
 
   it('only scores ACE from the latest advisory of each storm', async () => {
-      const stormA = makeStorm({ atcfId: 'EP142026' });
-      const stormB = makeStorm({ atcfId: 'AL052026' });
+    const stormA = makeStorm({ atcfId: 'EP142026' });
+    const stormB = makeStorm({ atcfId: 'AL052026' });
 
-      stormsFind.mockResolvedValue([stormA, stormB]);
+    stormsFind.mockResolvedValue([stormA, stormB]);
 
-      findLatestPerStorm.mockResolvedValue([
-        makeAdvisory(stormA, {
-          forecastPoints: [makePoint({ windSpeedKt: 100 })],
-        }),
-        makeAdvisory(stormB, {
-          forecastPoints: [makePoint({ windSpeedKt: 20 })],
-        }),
-      ]);
+    findLatestPerStorm.mockResolvedValue([
+      makeAdvisory(stormA, {
+        forecastPoints: [makePoint({ windSpeedKt: 100 })],
+      }),
+      makeAdvisory(stormB, {
+        forecastPoints: [makePoint({ windSpeedKt: 20 })],
+      }),
+    ]);
 
-      const result = await service.getSummary();
+    const result = await service.getSummary();
 
-      // Only storm A contributes: 100² / 10_000 = 1.0.
-      expect(result.totals.ace).toBe(1);
+    // Only storm A contributes: 100² / 10_000 = 1.0.
+    expect(result.totals.ace).toBe(1);
   });
 
   it('handles advisories without forecast points', async () => {
-      const storm = makeStorm();
-      const advisory = makeAdvisory(storm);
+    const storm = makeStorm();
+    const advisory = makeAdvisory(storm);
 
-      stormsFind.mockResolvedValue([storm]);
-      findLatestPerStorm.mockResolvedValue([advisory]);
+    stormsFind.mockResolvedValue([storm]);
+    findLatestPerStorm.mockResolvedValue([advisory]);
 
-      const result = await service.getSummary();
+    const result = await service.getSummary();
 
-      expect(result.storms[0].latestAdvisory?.forecastPoints).toEqual([]);
-      expect(result.totals).toEqual({
-        events: 1,
-        named: 1,
-        hurricanes: 0,
-        ace: 0,
-        pacific: 1,
-        atlantic: 0,
-  });
+    expect(result.storms[0].latestAdvisory?.forecastPoints).toEqual([]);
+    expect(result.totals).toEqual({
+      events: 1,
+      named: 1,
+      hurricanes: 0,
+      ace: 0,
+      pacific: 1,
+      atlantic: 0,
+    });
   });
 
   it('propagates storm repository errors', async () => {
-      const error = new Error('database unavailable');
-      stormsFind.mockRejectedValue(error);
+    const error = new Error('database unavailable');
+    stormsFind.mockRejectedValue(error);
 
-      await expect(service.getSummary()).rejects.toBe(error);
+    await expect(service.getSummary()).rejects.toBe(error);
   });
 
   it('propagates advisories service errors', async () => {
-      const error = new Error('lookup failed');
+    const error = new Error('lookup failed');
 
-      stormsFind.mockResolvedValue([makeStorm()]);
-      findLatestPerStorm.mockRejectedValue(error);
+    stormsFind.mockResolvedValue([makeStorm()]);
+    findLatestPerStorm.mockRejectedValue(error);
 
-      await expect(service.getSummary()).rejects.toBe(error);
+    await expect(service.getSummary()).rejects.toBe(error);
   });
 });

@@ -12,7 +12,9 @@ describe('generateApiToken', () => {
     const b = generateApiToken();
 
     expect(a.raw.startsWith(API_TOKEN_PREFIX)).toBe(true);
-    expect(a.prefix).toBe(a.raw.slice(API_TOKEN_PREFIX.length, API_TOKEN_PREFIX.length + 8));
+    expect(a.prefix).toBe(
+      a.raw.slice(API_TOKEN_PREFIX.length, API_TOKEN_PREFIX.length + 8),
+    );
     expect(a.hash).not.toBe(a.raw);
     expect(a.raw).not.toBe(b.raw);
   });

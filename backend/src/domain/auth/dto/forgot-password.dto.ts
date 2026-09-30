@@ -21,8 +21,10 @@ export class ForgotPasswordDto {
  */
 export class ForgotPasswordResponseDto {
   @ApiProperty({
-    description: 'Neutral message. Does not confirm or deny that the email exists.',
-    example: 'If that account exists, a link to set a new password has been sent.',
+    description:
+      'Neutral message. Does not confirm or deny that the email exists.',
+    example:
+      'If that account exists, a link to set a new password has been sent.',
   })
   message: string;
 }
@@ -51,7 +53,8 @@ export class ResetPasswordDto {
 /** Confirmation that a reset link was accepted. */
 export class ResetPasswordResponseDto {
   @ApiProperty({
-    description: 'Neutral message. Does not confirm or deny that the email exists.',
+    description:
+      'Neutral message. Does not confirm or deny that the email exists.',
     example: 'Password updated. You can sign in now.',
   })
   message: string;

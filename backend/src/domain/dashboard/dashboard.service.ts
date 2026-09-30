@@ -79,7 +79,9 @@ export class DashboardService {
           firstSeenAt: asDate(storm.firstSeenAt),
           lastSeenAt: asDate(storm.lastSeenAt),
           isActive: storm.isActive,
-          lastSeenInFeedAt: storm.lastSeenInFeedAt ? asDate(storm.lastSeenInFeedAt) : null,
+          lastSeenInFeedAt: storm.lastSeenInFeedAt
+            ? asDate(storm.lastSeenInFeedAt)
+            : null,
           advisoryCount: latestNumber ?? 0,
           latestAdvisoryNumber: latestNumber,
           latestAdvisoryIssuedAt: advisory ? asDate(advisory.issuedAt) : null,

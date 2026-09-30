@@ -106,31 +106,28 @@ export const envValidationSchema = Joi.object({
   SMTP_USER: Joi.string().allow('').default(''),
   SMTP_PASS: Joi.string().allow('').default(''),
   /** Envelope sender and the From header. */
-  MAIL_FROM: Joi.string()
-    .email({ tlds: false })
-    .default('riskio@example.com'),
-})
-  .custom((value, helpers) => {
-    // Joi has no way to say "these three are required, but only when that other
-    // one is set", so the conditional part is checked here. The point is that a
-    // half-configured SMTP fails at boot: the alternative is discovering it when
-    // a user asks to reset their password and the mail silently never arrives.
-    if (value.MAIL_TRANSPORT !== 'smtp') {
-      return value;
-    }
-
-    const missing = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM'].filter(
-      (key) => !String(value[key] ?? '').trim(),
-    );
-
-    if (missing.length > 0) {
-      return helpers.message({
-        custom: `MAIL_TRANSPORT=smtp but missing: ${missing.join(', ')}`,
-      });
-    }
-
+  MAIL_FROM: Joi.string().email({ tlds: false }).default('riskio@example.com'),
+}).custom((value, helpers) => {
+  // Joi has no way to say "these three are required, but only when that other
+  // one is set", so the conditional part is checked here. The point is that a
+  // half-configured SMTP fails at boot: the alternative is discovering it when
+  // a user asks to reset their password and the mail silently never arrives.
+  if (value.MAIL_TRANSPORT !== 'smtp') {
     return value;
-  });
+  }
+
+  const missing = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM'].filter(
+    (key) => !String(value[key] ?? '').trim(),
+  );
+
+  if (missing.length > 0) {
+    return helpers.message({
+      custom: `MAIL_TRANSPORT=smtp but missing: ${missing.join(', ')}`,
+    });
+  }
+
+  return value;
+});
 
 /**
  * Environment contract for the storage service.
@@ -238,10 +235,10 @@ export const authEnvValidationSchema = Joi.object({
   JWT_SECRET: Joi.string().min(16).required(),
   JWT_EXPIRES_IN: Joi.string().default('15m'),
 
-    ADMIN_EMAILS: Joi.string().allow('').default(''),
-    PUBLIC_BASE_URL: Joi.string().uri().default('http://localhost:3000'),
-    API_PUBLIC_BASE_URL: Joi.string().allow('').default(''),
-    FRONTEND_URL: Joi.string().uri().default('http://localhost:5173'),
+  ADMIN_EMAILS: Joi.string().allow('').default(''),
+  PUBLIC_BASE_URL: Joi.string().uri().default('http://localhost:3000'),
+  API_PUBLIC_BASE_URL: Joi.string().allow('').default(''),
+  FRONTEND_URL: Joi.string().uri().default('http://localhost:5173'),
 
   GOOGLE_CLIENT_ID: Joi.string().allow('').default(''),
   GOOGLE_CLIENT_SECRET: Joi.string().allow('').default(''),
@@ -282,17 +279,19 @@ export const apiEnvValidationSchema = Joi.object({
 
   CORS_ORIGINS: Joi.string().allow('').default(''),
 
-
-
   FEEDS_SERVICE_URL: Joi.string().uri().default('http://backend-feeds:3006'),
   FEEDS_SERVICE_TIMEOUT_MS: Joi.number().default(120_000),
 
-  WEATHER_SERVICE_URL: Joi.string().uri().default('http://backend-weather:3007'),
+  WEATHER_SERVICE_URL: Joi.string()
+    .uri()
+    .default('http://backend-weather:3007'),
   WEATHER_SERVICE_TIMEOUT_MS: Joi.number().default(5_000),
 
   AUTH_SERVICE_URL: Joi.string().uri().default('http://backend-auth:3008'),
   AUTH_SERVICE_TIMEOUT_MS: Joi.number().default(5_000),
-  DASHBOARD_SERVICE_URL: Joi.string().uri().default('http://backend-dashboard:3009'),
+  DASHBOARD_SERVICE_URL: Joi.string()
+    .uri()
+    .default('http://backend-dashboard:3009'),
   DASHBOARD_SERVICE_TIMEOUT_MS: Joi.number().default(5_000),
 });
 
@@ -309,6 +308,8 @@ export const dashboardEnvValidationSchema = Joi.object({
   CACHE_SERVICE_TIMEOUT_MS: Joi.number().default(1_000),
   CACHE_SERVICE_COOLDOWN_MS: Joi.number().default(10_000),
 
-  WEATHER_SERVICE_URL: Joi.string().uri().default('http://backend-weather:3007'),
+  WEATHER_SERVICE_URL: Joi.string()
+    .uri()
+    .default('http://backend-weather:3007'),
   WEATHER_SERVICE_TIMEOUT_MS: Joi.number().default(5_000),
 });

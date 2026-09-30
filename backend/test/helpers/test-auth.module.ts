@@ -8,7 +8,10 @@ import { ApiToken } from '../../src/domain/auth/entities/api-token.entity.js';
 import { PasswordResetToken } from '../../src/domain/auth/entities/password-reset-token.entity.js';
 import { AuthModule } from '../../src/domain/auth/auth.module.js';
 import { UsersModule } from '../../src/domain/users/users.module.js';
-import { AUTH_CHECKER, API_KEY_VERIFIER } from '../../src/common/authz/authz.ports.js';
+import {
+  AUTH_CHECKER,
+  API_KEY_VERIFIER,
+} from '../../src/common/authz/authz.ports.js';
 import { LocalAuthChecker } from '../../src/auth-service/local-auth-checker.service.js';
 import { LocalApiKeyVerifier } from '../../src/auth-service/local-api-key-verifier.service.js';
 import { parseDurationToSeconds } from '../../src/domain/auth/auth.utils.js';

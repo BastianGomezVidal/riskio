@@ -50,9 +50,15 @@ async function bootstrap(): Promise<void> {
     title: 'Riskio API (gateway)',
     tags: [
       { name: 'storms', description: 'Tropical cyclone records, filterable' },
-      { name: 'advisories', description: 'Per-storm advisories, tracks and cones' },
+      {
+        name: 'advisories',
+        description: 'Per-storm advisories, tracks and cones',
+      },
       { name: 'dashboard', description: 'Aggregated dashboard payload' },
-      { name: 'ingestion', description: 'Manual NHC ingestion triggers (admin)' },
+      {
+        name: 'ingestion',
+        description: 'Manual NHC ingestion triggers (admin)',
+      },
       { name: 'health', description: 'Liveness and readiness probes' },
     ],
     description:

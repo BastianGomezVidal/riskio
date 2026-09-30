@@ -23,13 +23,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
  * testing a client against a hostname that does not exist.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Storm, Advisory, ForecastPoint, Warning])],
-  providers: [
-    NhcProvider,
-    IngestionService,
-    StormWriter,
-    AdvisoryWriter,
+  imports: [
+    TypeOrmModule.forFeature([Storm, Advisory, ForecastPoint, Warning]),
   ],
+  providers: [NhcProvider, IngestionService, StormWriter, AdvisoryWriter],
   exports: [IngestionService, StormWriter, AdvisoryWriter],
 })
 export class TestFeedsModule {}

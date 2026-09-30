@@ -24,7 +24,9 @@ export function parseDurationToSeconds(value: string): number {
     throw new Error(`Invalid duration "${value}" (expected e.g. 15m, 6h, 7d)`);
   }
 
-  return Number(match[1]) * DURATION_MULTIPLIERS[match[2] as 's' | 'm' | 'h' | 'd'];
+  return (
+    Number(match[1]) * DURATION_MULTIPLIERS[match[2] as 's' | 'm' | 'h' | 'd']
+  );
 }
 
 /** Randomly generated API token plus its stored hash and display prefix. */

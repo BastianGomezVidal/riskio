@@ -228,10 +228,4 @@ export class StormsService {
       latestAdvisoryIssuedAt: row.latestAdvisoryIssuedAt ?? null,
     }));
   }
-
-
-
-
-
-
 }

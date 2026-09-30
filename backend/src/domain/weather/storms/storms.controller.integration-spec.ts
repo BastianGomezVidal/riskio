@@ -3,7 +3,12 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { createTestApp, seedStorm, registerAndLogin, bearer } from '../../../../test/helpers/test-app.js';
+import {
+  createTestApp,
+  seedStorm,
+  registerAndLogin,
+  bearer,
+} from '../../../../test/helpers/test-app.js';
 import { NhcProvider } from '../../feeds/providers/nhc/nhc.provider.js';
 import { Storm } from './entities/storm.entity.js';
 
@@ -41,9 +46,17 @@ describe('Storms endpoints (integration)', () => {
 
     await seedStorm(app, { atcfId: ACTIVE_NEW, name: 'Nora', basin: 'EP' }, []);
     await seedStorm(app, { atcfId: ACTIVE_OLD, name: 'Karl', basin: 'AL' }, []);
-    await seedStorm(app, { atcfId: INACTIVE_NEW, name: 'Blas', basin: 'CP' }, []);
+    await seedStorm(
+      app,
+      { atcfId: INACTIVE_NEW, name: 'Blas', basin: 'CP' },
+      [],
+    );
     await seedStorm(app, { atcfId: INACTIVE_MID, name: null, basin: 'CP' }, []);
-    await seedStorm(app, { atcfId: INACTIVE_OLD, name: 'Celia', basin: 'CP' }, []);
+    await seedStorm(
+      app,
+      { atcfId: INACTIVE_OLD, name: 'Celia', basin: 'CP' },
+      [],
+    );
 
     const storms = app.get<Repository<Storm>>(getRepositoryToken(Storm));
 
@@ -77,8 +90,9 @@ describe('Storms endpoints (integration)', () => {
 
   it('GET /storms returns only the active set, newest feed appearance first', async () => {
     const res = await request(app.getHttpServer())
-      .get('/storms').expect(200)
-      .set(...bearer(token) as [string, string]);
+      .get('/storms')
+      .expect(200)
+      .set(...(bearer(token) as [string, string]));
 
     const ids = res.body.map((s: { atcfId: string }) => s.atcfId);
 
@@ -98,7 +112,7 @@ describe('Storms endpoints (integration)', () => {
   it('GET /storms/:atcfId exposes the activity flags', async () => {
     const res = await request(app.getHttpServer())
       .get(`/storms/${INACTIVE_NEW}`)
-      .set(...bearer(token) as [string, string])
+      .set(...(bearer(token) as [string, string]))
       .expect(200);
 
     expect(res.body).toMatchObject({
@@ -111,7 +125,8 @@ describe('Storms endpoints (integration)', () => {
 
   it('returns 404 for an unknown storm', async () => {
     await request(app.getHttpServer())
-      .get('/storms/ZZ999999').expect(404)
-      .set(...bearer(token) as [string, string]);
+      .get('/storms/ZZ999999')
+      .expect(404)
+      .set(...(bearer(token) as [string, string]));
   });
 });

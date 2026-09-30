@@ -6,7 +6,10 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { AUTH_CHECKER, type AuthChecker } from '../../../common/authz/authz.ports.js';
+import {
+  AUTH_CHECKER,
+  type AuthChecker,
+} from '../../../common/authz/authz.ports.js';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 
 /**

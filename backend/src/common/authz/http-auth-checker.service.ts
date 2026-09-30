@@ -5,7 +5,11 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { ApiKeyVerifier, AuthChecker, AuthPrincipal } from './authz.ports.js';
+import type {
+  ApiKeyVerifier,
+  AuthChecker,
+  AuthPrincipal,
+} from './authz.ports.js';
 
 /**
  * Asks the auth service whether a credential is good.
@@ -40,7 +44,9 @@ export class HttpAuthChecker implements AuthChecker, ApiKeyVerifier {
   }
 
   check(bearerToken: string): Promise<AuthPrincipal> {
-    return this.post<AuthPrincipal>('/internal/auth/check', { token: bearerToken });
+    return this.post<AuthPrincipal>('/internal/auth/check', {
+      token: bearerToken,
+    });
   }
 
   verify(apiKey: string): Promise<AuthPrincipal> {
@@ -69,7 +75,9 @@ export class HttpAuthChecker implements AuthChecker, ApiKeyVerifier {
           error instanceof Error ? error.message : String(error)
         }`,
       );
-      throw new ServiceUnavailableException('Authentication service unavailable');
+      throw new ServiceUnavailableException(
+        'Authentication service unavailable',
+      );
     }
 
     if (!response.ok) {

@@ -5,7 +5,10 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { API_KEY_VERIFIER, type ApiKeyVerifier } from '../../../common/authz/authz.ports.js';
+import {
+  API_KEY_VERIFIER,
+  type ApiKeyVerifier,
+} from '../../../common/authz/authz.ports.js';
 
 /**
  * Authenticates requests carrying a machine API key in `x-api-key`.

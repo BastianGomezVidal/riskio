@@ -1,7 +1,10 @@
 import { Inject, Injectable, NestMiddleware } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { NextFunction, Request, Response } from 'express';
-import { AUTH_CHECKER, type AuthChecker } from '../../common/authz/authz.ports.js';
+import {
+  AUTH_CHECKER,
+  type AuthChecker,
+} from '../../common/authz/authz.ports.js';
 
 /**
  * Forwards `/auth/*` and `/users/*` to the auth service.
@@ -137,7 +140,9 @@ export class AuthProxyMiddleware implements NestMiddleware {
     // one a body parser would have used.
     const contentType = req.headers['content-type'];
     const headers: Record<string, string> = {
-      'content-type': (Array.isArray(contentType) ? contentType[0] : contentType) ?? 'application/json',
+      'content-type':
+        (Array.isArray(contentType) ? contentType[0] : contentType) ??
+        'application/json',
     };
 
     const authorization = req.headers.authorization ?? '';
@@ -182,81 +187,75 @@ export class AuthProxyMiddleware implements NestMiddleware {
       // closed because the request body was never read to the end, and the
       // client is most likely still uploading.
       const status = (error as { status?: number }).status ?? 413;
-      res
-        .setHeader('connection', 'close')
-        .status(status)
-        .json({
-          statusCode: status,
-          error: 'Payload Too Large',
-          message: 'the request body is too large',
-        });
+      res.setHeader('connection', 'close').status(status).json({
+        statusCode: status,
+        error: 'Payload Too Large',
+        message: 'the request body is too large',
+      });
       return;
     }
 
-      try {
-        const upstream = await fetch(
-          `${this.baseUrl}${req.originalUrl}`,
-          {
-            method: req.method,
-            headers,
-            /**
-             * A GET has no body and that is fine; forwarding `undefined` is what
-             * a real GET looks like. An earlier version skipped the whole
-             * request when `req.body` was undefined, which is every GET and
-             * every DELETE, so `/users/me` and `/auth/tokens` fell through to
-             * Nest's own 404 and looked like missing endpoints.
-             */
-            body,
-            /**
-             * `manual`, and it matters for the OAuth callback.
-             *
-             * `/auth/oauth/:provider/callback` answers with a 302 to
-             * `FRONTEND_URL`, because that is how the user gets back to the SPA
-             * with their token. Left on the default, this `fetch` followed that
-             * 302 itself and tried to resolve `FRONTEND_URL` from inside the
-             * container network. A dev host that only exists in the host's
-             * `/etc/hosts` resolves there to the container's own loopback,
-             * where nothing is listening, so the fetch threw and every OAuth
-             * callback — including a fully successful one — surfaced as
-             * "the auth service is unavailable".
-             *
-             * The redirect is not this proxy's to follow. It is addressed to the
-             * browser, which is the only party that can resolve it, so it is
-             * passed straight through with its `Location`.
-             */
-            redirect: 'manual',
-            signal: AbortSignal.timeout(this.timeoutMs),
-          },
-        );
-
+    try {
+      const upstream = await fetch(`${this.baseUrl}${req.originalUrl}`, {
+        method: req.method,
+        headers,
         /**
-         * A redirect has no body worth forwarding, and `text()` on one can only
-         * ever be the framework's "moved permanently" page. Send the status and
-         * the `Location` and let the browser go.
-         *
-         * The `end()` is load-bearing. Setting a status and a header does not
-         * finish a response, and returning without sending one left the socket
-         * open until nginx's `proxy_read_timeout` killed the request 60 seconds
-         * later: the redirect was correct in the logs and the browser still saw
-         * a gateway timeout.
+         * A GET has no body and that is fine; forwarding `undefined` is what
+         * a real GET looks like. An earlier version skipped the whole
+         * request when `req.body` was undefined, which is every GET and
+         * every DELETE, so `/users/me` and `/auth/tokens` fell through to
+         * Nest's own 404 and looked like missing endpoints.
          */
-        if (upstream.status >= 300 && upstream.status < 400) {
-          const location = upstream.headers.get('location');
-          if (location) {
-            res.setHeader('location', location);
-          }
-          res.status(upstream.status).end();
-          return;
-        }
+        body,
+        /**
+         * `manual`, and it matters for the OAuth callback.
+         *
+         * `/auth/oauth/:provider/callback` answers with a 302 to
+         * `FRONTEND_URL`, because that is how the user gets back to the SPA
+         * with their token. Left on the default, this `fetch` followed that
+         * 302 itself and tried to resolve `FRONTEND_URL` from inside the
+         * container network. A dev host that only exists in the host's
+         * `/etc/hosts` resolves there to the container's own loopback,
+         * where nothing is listening, so the fetch threw and every OAuth
+         * callback — including a fully successful one — surfaced as
+         * "the auth service is unavailable".
+         *
+         * The redirect is not this proxy's to follow. It is addressed to the
+         * browser, which is the only party that can resolve it, so it is
+         * passed straight through with its `Location`.
+         */
+        redirect: 'manual',
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
 
-        const text = await upstream.text();
-        res
-          .status(upstream.status)
-          .setHeader(
-            'content-type',
-            upstream.headers.get('content-type') ?? 'application/json',
-          )
-          .send(text);
+      /**
+       * A redirect has no body worth forwarding, and `text()` on one can only
+       * ever be the framework's "moved permanently" page. Send the status and
+       * the `Location` and let the browser go.
+       *
+       * The `end()` is load-bearing. Setting a status and a header does not
+       * finish a response, and returning without sending one left the socket
+       * open until nginx's `proxy_read_timeout` killed the request 60 seconds
+       * later: the redirect was correct in the logs and the browser still saw
+       * a gateway timeout.
+       */
+      if (upstream.status >= 300 && upstream.status < 400) {
+        const location = upstream.headers.get('location');
+        if (location) {
+          res.setHeader('location', location);
+        }
+        res.status(upstream.status).end();
+        return;
+      }
+
+      const text = await upstream.text();
+      res
+        .status(upstream.status)
+        .setHeader(
+          'content-type',
+          upstream.headers.get('content-type') ?? 'application/json',
+        )
+        .send(text);
     } catch {
       /**
        * 503 rather than 401: the caller is probably fine and what is down is

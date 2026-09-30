@@ -39,7 +39,9 @@ export class FeedsClientService {
   }
 
   async ingestBasin(basin: BasinName): Promise<IngestReportDto> {
-    return this.post<IngestReportDto>(`/ingest/run/${encodeURIComponent(basin)}`);
+    return this.post<IngestReportDto>(
+      `/ingest/run/${encodeURIComponent(basin)}`,
+    );
   }
 
   private async post<T>(path: string): Promise<T> {

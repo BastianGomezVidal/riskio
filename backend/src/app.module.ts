@@ -70,6 +70,4 @@ export class AppModule implements NestModule {
       .apply(AuthProxyMiddleware)
       .forRoutes('/auth', '/auth/*splat', '/users', '/users/*splat');
   }
-
-
 }

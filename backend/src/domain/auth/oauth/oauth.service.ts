@@ -36,7 +36,8 @@ const PROVIDERS: Record<OAuthProviderName, ProviderDefinition> = {
     scope: 'openid email profile',
   },
   [OAuthProviderName.Outlook]: {
-    authorizeUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+    authorizeUrl:
+      'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
     tokenUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
     userInfoUrl: 'https://graph.microsoft.com/oidc/userinfo',
     scope: 'openid email profile',
@@ -62,11 +63,20 @@ export class OAuthService {
   constructor(config: ConfigService) {
     this.clientIds = {
       [OAuthProviderName.Google]: config.get<string>('GOOGLE_CLIENT_ID', ''),
-      [OAuthProviderName.Outlook]: config.get<string>('MICROSOFT_CLIENT_ID', ''),
+      [OAuthProviderName.Outlook]: config.get<string>(
+        'MICROSOFT_CLIENT_ID',
+        '',
+      ),
     };
     this.clientSecrets = {
-      [OAuthProviderName.Google]: config.get<string>('GOOGLE_CLIENT_SECRET', ''),
-      [OAuthProviderName.Outlook]: config.get<string>('MICROSOFT_CLIENT_SECRET', ''),
+      [OAuthProviderName.Google]: config.get<string>(
+        'GOOGLE_CLIENT_SECRET',
+        '',
+      ),
+      [OAuthProviderName.Outlook]: config.get<string>(
+        'MICROSOFT_CLIENT_SECRET',
+        '',
+      ),
     };
 
     // The callback has to be the URL the provider will actually reach, which is
@@ -136,7 +146,11 @@ export class OAuthService {
   ): Promise<OAuthProfile> {
     const pending = this.pendingStates.get(state);
 
-    if (!pending || pending.provider !== provider || pending.expiresAt < Date.now()) {
+    if (
+      !pending ||
+      pending.provider !== provider ||
+      pending.expiresAt < Date.now()
+    ) {
       throw new Error('Invalid or expired OAuth state');
     }
 

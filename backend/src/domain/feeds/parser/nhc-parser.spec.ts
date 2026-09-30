@@ -8,7 +8,15 @@ import {
 } from './nhc-parser.js';
 import { categoryFromWindKt } from '../../weather/storms/storm-category.js';
 
-const FIXTURES_DIR = join(__dirname, '..', '..', '..', '..', 'test', 'fixtures');
+const FIXTURES_DIR = join(
+  __dirname,
+  '..',
+  '..',
+  '..',
+  '..',
+  'test',
+  'fixtures',
+);
 const fixture = (name: string) =>
   readFileSync(join(FIXTURES_DIR, name), 'utf8');
 

@@ -85,7 +85,9 @@ describe('HttpStorageService', () => {
     );
 
     fetchMock.mockResolvedValueOnce(ok({ key: null }));
-    await expect(service.extractKey('http://otro/cdn/x.png')).resolves.toBeNull();
+    await expect(
+      service.extractKey('http://otro/cdn/x.png'),
+    ).resolves.toBeNull();
   });
 
   it('passes the url through encoded in the query', async () => {

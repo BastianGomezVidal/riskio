@@ -32,7 +32,12 @@ export class StorageController {
 
   @Post()
   async upload(
-    @Body() body: { key?: string; contentBase64?: string; contentType?: string },
+    @Body()
+    body: {
+      key?: string;
+      contentBase64?: string;
+      contentType?: string;
+    },
   ): Promise<{ url: string }> {
     const { key, contentBase64, contentType } = body ?? {};
 
@@ -47,7 +52,9 @@ export class StorageController {
     // an empty file, and storing a zero-byte object would look like a
     // successful upload.
     if (buffer.length === 0) {
-      throw new BadRequestException('contentBase64 did not decode to any bytes');
+      throw new BadRequestException(
+        'contentBase64 did not decode to any bytes',
+      );
     }
 
     const url = await this.storage.upload(key, buffer, contentType);

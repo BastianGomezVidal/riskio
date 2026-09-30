@@ -82,7 +82,9 @@ const sdk = new NodeSDK({
       exporter: new OTLPLogExporter({ url: `${endpoint}/v1/logs` }),
     }),
   ],
-  sampler: new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(sampleRatio) }),
+  sampler: new ParentBasedSampler({
+    root: new TraceIdRatioBasedSampler(sampleRatio),
+  }),
   instrumentations: [
     getNodeAutoInstrumentations({
       // The filesystem instrumentation is chatty and rarely useful here.

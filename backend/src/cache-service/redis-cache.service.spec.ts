@@ -116,7 +116,12 @@ describe('RedisCacheService', () => {
   it('reports reachability honestly', async () => {
     await expect(service.isReachable()).resolves.toBe(true);
 
-    const broken = { ...store, get: async () => { throw new Error('down'); } };
+    const broken = {
+      ...store,
+      get: async () => {
+        throw new Error('down');
+      },
+    };
     const down = new RedisCacheService(broken as unknown as KeyvLike);
     await expect(down.isReachable()).resolves.toBe(false);
   });

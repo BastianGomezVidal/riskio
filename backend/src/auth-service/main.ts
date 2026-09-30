@@ -56,8 +56,14 @@ async function bootstrap(): Promise<void> {
   const document = buildOpenApi(app, {
     title: 'Riskio API (auth)',
     tags: [
-      { name: 'auth', description: 'Registration, login, password reset, OAuth entry' },
-      { name: 'users', description: 'The signed-in profile, including the avatar' },
+      {
+        name: 'auth',
+        description: 'Registration, login, password reset, OAuth entry',
+      },
+      {
+        name: 'users',
+        description: 'The signed-in profile, including the avatar',
+      },
       { name: 'health', description: 'Liveness and readiness probes' },
     ],
     /**

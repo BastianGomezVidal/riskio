@@ -239,7 +239,11 @@ describe('StormsService', () => {
       getRawMany.mockResolvedValue([]);
 
       await service.findMany({ tab: StormTab.Active } as never);
-      expect(orderBy).toHaveBeenCalledWith('s.lastSeenInFeedAt', 'DESC', 'NULLS LAST');
+      expect(orderBy).toHaveBeenCalledWith(
+        's.lastSeenInFeedAt',
+        'DESC',
+        'NULLS LAST',
+      );
 
       orderBy.mockClear();
       await service.findMany({
@@ -253,7 +257,11 @@ describe('StormsService', () => {
         tab: StormTab.Active,
         sort: StormSort.Oldest,
       } as never);
-      expect(orderBy).toHaveBeenCalledWith('s.lastSeenInFeedAt', 'ASC', 'NULLS LAST');
+      expect(orderBy).toHaveBeenCalledWith(
+        's.lastSeenInFeedAt',
+        'ASC',
+        'NULLS LAST',
+      );
     });
 
     it('converts the advisory count from a string, as Postgres returns it', async () => {
@@ -339,6 +347,4 @@ describe('StormsService', () => {
       );
     });
   });
-
-
 });

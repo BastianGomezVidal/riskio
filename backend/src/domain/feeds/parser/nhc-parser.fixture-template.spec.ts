@@ -22,8 +22,13 @@ const templates = join(fixtures, 'templates');
  */
 describe('plantilla del fixture de ingestión', () => {
   it('cambia el número de advisory y su fecha, que es lo que la ingesta lee', async () => {
-    const original = parseRssFeed(await readFile(join(fixtures, 'tcm-ep4.xml'), 'utf8'));
-    const plantilla = await readFile(join(templates, 'tcm-ep4.xml.tmpl'), 'utf8');
+    const original = parseRssFeed(
+      await readFile(join(fixtures, 'tcm-ep4.xml'), 'utf8'),
+    );
+    const plantilla = await readFile(
+      join(templates, 'tcm-ep4.xml.tmpl'),
+      'utf8',
+    );
     const renderizado = plantilla
       .replace(/\{\{ADVISORY_NUMBER\}\}/g, '7')
       .replace(/\{\{ISSUED_RFC822\}\}/g, 'Fri, 02 Jan 2032 11:22:33 +0000')
@@ -43,7 +48,10 @@ describe('plantilla del fixture de ingestión', () => {
   });
 
   it('deja el XML válido tras el render', async () => {
-    const plantilla = await readFile(join(templates, 'tcm-ep4.xml.tmpl'), 'utf8');
+    const plantilla = await readFile(
+      join(templates, 'tcm-ep4.xml.tmpl'),
+      'utf8',
+    );
     const renderizado = plantilla
       .replace(/\{\{ADVISORY_NUMBER\}\}/g, '9')
       .replace(/\{\{ISSUED_RFC822\}\}/g, 'Sat, 03 Jan 2032 00:00:00 +0000')
@@ -55,12 +63,16 @@ describe('plantilla del fixture de ingestión', () => {
   });
 
   it('no deja ningún placeholder sin resolver', async () => {
-    const archivos = (await readdir(templates)).filter((f) => f.endsWith('.tmpl'));
+    const archivos = (await readdir(templates)).filter((f) =>
+      f.endsWith('.tmpl'),
+    );
     expect(archivos.length).toBeGreaterThan(0);
 
     for (const archivo of archivos) {
       const texto = await readFile(join(templates, archivo), 'utf8');
-      const usados = new Set([...texto.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]));
+      const usados = new Set(
+        [...texto.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]),
+      );
 
       // The renderer's variables, kept in sync by hand. If a placeholder is
       // added to a template and not here, the render throws at runtime instead
@@ -73,7 +85,10 @@ describe('plantilla del fixture de ingestión', () => {
       ]);
 
       for (const usado of usados) {
-        expect(conocidas.has(usado), `${archivo} usa {{${usado}}}, que el render no conoce`).toBe(true);
+        expect(
+          conocidas.has(usado),
+          `${archivo} usa {{${usado}}}, que el render no conoce`,
+        ).toBe(true);
       }
     }
   });
@@ -103,12 +118,19 @@ describe('plantilla del fixture de ingestión', () => {
       );
 
       expect(stdout).toContain('42');
-      const estado = JSON.parse(await readFile(join(temporal, 'state.json'), 'utf8'));
+      const estado = JSON.parse(
+        await readFile(join(temporal, 'state.json'), 'utf8'),
+      );
       expect(estado.lastAdvisoryNumber).toBe(42);
 
       // The provider asks for these paths; the fixtures are stored under other
       // names, so getting this wrong yields a 404 that looks like empty basins.
-      for (const ruta of ['index-at.xml', 'index-ep.xml', 'index-cp.xml', 'xml/TCMEP4.xml']) {
+      for (const ruta of [
+        'index-at.xml',
+        'index-ep.xml',
+        'index-cp.xml',
+        'xml/TCMEP4.xml',
+      ]) {
         expect(existsSync(join(temporal, ruta)), `falta ${ruta}`).toBe(true);
       }
     } finally {

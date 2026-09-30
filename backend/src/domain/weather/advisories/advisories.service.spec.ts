@@ -146,15 +146,15 @@ describe('AdvisoriesService', () => {
 
   let service: AdvisoriesService;
 
-    beforeEach(() => {
-      const built = makeRepository();
+  beforeEach(() => {
+    const built = makeRepository();
 
-      repo = built.repo;
-      insert = built.insert;
-      findOne = built.findOne;
+    repo = built.repo;
+    insert = built.insert;
+    findOne = built.findOne;
 
-      service = new AdvisoriesService(repo);
-    });
+    service = new AdvisoriesService(repo);
+  });
 
   describe('findOne', () => {
     it('returns a single advisory with forecast points and warnings', async () => {
@@ -220,14 +220,6 @@ describe('AdvisoriesService', () => {
       await expect(service.findOne('adv-1')).rejects.toBe(error);
     });
   });
-
-
-
-
-
-
-
-
 
   describe('findLatestPerStorm', () => {
     function makeAdvisoryWithStorm(

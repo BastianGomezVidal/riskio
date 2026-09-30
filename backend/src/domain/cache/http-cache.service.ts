@@ -64,12 +64,18 @@ export class HttpCacheService implements CacheService {
   }
 
   async invalidate(pattern: string): Promise<number> {
-    const result = await this.call<{ deleted: number }>('/cache/invalidate', 'POST', {
-      pattern,
-    });
+    const result = await this.call<{ deleted: number }>(
+      '/cache/invalidate',
+      'POST',
+      {
+        pattern,
+      },
+    );
     if (!result) return 0;
     if (result.deleted) {
-      this.logger.log(`Invalidated ${result.deleted} keys for pattern ${pattern}`);
+      this.logger.log(
+        `Invalidated ${result.deleted} keys for pattern ${pattern}`,
+      );
     }
     return result.deleted;
   }
@@ -117,7 +123,10 @@ export class HttpCacheService implements CacheService {
         signal: AbortSignal.timeout(this.timeoutMs),
         ...(body === undefined
           ? {}
-          : { body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }),
+          : {
+              body: JSON.stringify(body),
+              headers: { 'Content-Type': 'application/json' },
+            }),
       });
 
       if (!response.ok) {

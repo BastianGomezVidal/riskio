@@ -3,7 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { ApiToken } from '../domain/auth/entities/api-token.entity.js';
 import { hashToken } from '../domain/auth/auth.utils.js';
-import type { ApiKeyVerifier, AuthPrincipal } from '../common/authz/authz.ports.js';
+import type {
+  ApiKeyVerifier,
+  AuthPrincipal,
+} from '../common/authz/authz.ports.js';
 
 /**
  * Resolves a machine API key against its stored SHA-256 hash.

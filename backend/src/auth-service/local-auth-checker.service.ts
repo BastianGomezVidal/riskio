@@ -4,7 +4,10 @@ import { UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../domain/auth/entities/user.entity.js';
-import type { AuthChecker, AuthPrincipal } from '../common/authz/authz.ports.js';
+import type {
+  AuthChecker,
+  AuthPrincipal,
+} from '../common/authz/authz.ports.js';
 
 /**
  * The real thing: verifies the signature and the session against the database.

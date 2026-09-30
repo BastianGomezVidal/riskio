@@ -34,7 +34,11 @@ export class HttpStorageService implements StorageService {
     this.timeoutMs = Number(config.get('STORAGE_API_TIMEOUT_MS', 5_000));
   }
 
-  async upload(key: string, buffer: Buffer, contentType: string): Promise<string> {
+  async upload(
+    key: string,
+    buffer: Buffer,
+    contentType: string,
+  ): Promise<string> {
     const { url } = await this.request<{ url: string }>('/files', {
       method: 'POST',
       body: JSON.stringify({
@@ -50,7 +54,9 @@ export class HttpStorageService implements StorageService {
     // The key is a path segment. Encoding it matters: avatar keys contain a
     // user id, and an unencoded '/' or '..' would address a different object
     // than the one being deleted.
-    await this.request(`/files/${encodeURIComponent(key)}`, { method: 'DELETE' });
+    await this.request(`/files/${encodeURIComponent(key)}`, {
+      method: 'DELETE',
+    });
   }
 
   async extractKey(url: string): Promise<string | null> {

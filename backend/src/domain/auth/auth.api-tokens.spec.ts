@@ -184,7 +184,7 @@ describe('AuthService API tokens', () => {
      * between the read and the write, and `affected` answers "was it yours and
      * still live" in the same round trip.
      */
-    it("scopes the update to the caller, inside the where clause", async () => {
+    it('scopes the update to the caller, inside the where clause', async () => {
       tokens.update.mockResolvedValue({ affected: 1 });
 
       await service.revokeApiToken(userId, 'mine');
@@ -195,7 +195,7 @@ describe('AuthService API tokens', () => {
       });
     });
 
-    it("404s for a token belonging to somebody else, without writing", async () => {
+    it('404s for a token belonging to somebody else, without writing', async () => {
       // affected: 0 is what a foreign id produces, because the where clause
       // never matches it.
       tokens.update.mockResolvedValue({ affected: 0 });

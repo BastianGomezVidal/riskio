@@ -825,9 +825,7 @@ describe('AdvisoryWriter', () => {
 
       findOneOrFail.mockRejectedValue(new Error('lookup failed'));
 
-      await expect(writer.upsert(input)).rejects.toThrow(
-        'lookup failed',
-      );
+      await expect(writer.upsert(input)).rejects.toThrow('lookup failed');
 
       expect(insert.execute).toHaveBeenCalledTimes(1);
     });

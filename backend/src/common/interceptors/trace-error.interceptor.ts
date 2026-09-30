@@ -18,7 +18,10 @@ import { catchError } from 'rxjs/operators';
  */
 @Injectable()
 export class TraceErrorInterceptor implements NestInterceptor {
-  intercept(_context: ExecutionContext, next: CallHandler): Observable<unknown> {
+  intercept(
+    _context: ExecutionContext,
+    next: CallHandler,
+  ): Observable<unknown> {
     return next.handle().pipe(
       catchError((error: unknown) => {
         const span = trace.getSpan(context.active());
