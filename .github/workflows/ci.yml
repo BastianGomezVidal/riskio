@@ -52,60 +52,52 @@ jobs:
           retention-days: 14
 
       # The numbers on the commit, readable without opening an artifact.
-      # First-party `github-script` rather than a coverage-report action: the
-      # popular ones expect a Vite config, and this project's coverage comes
-      # from a NestJS/Vitest run that has no vite.config at all.
+      #
+      # Done with `gh api` rather than a coverage-report action: the popular
+      # ones expect a Vite frontend and this coverage comes from a NestJS
+      # Vitest run that has no vite.config. `gh api` also takes literal REST
+      # paths, so there are no route templates or generated method names to
+      # depend on. Both routes below were exercised against the real API.
       - name: Comment coverage on the commit
         if: github.event_name == 'push'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const t = JSON.parse(
-              fs.readFileSync('backend/coverage/coverage-summary.json', 'utf8')
-            ).total;
-            const marker = '<!-- backend-coverage -->';
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          body="$(node -e '
+            const t = require("./backend/coverage/coverage-summary.json").total;
             const row = (k, v) => `| ${k} | ${v} |`;
-            const body = [
-              marker,
-              '## Backend coverage',
-              '',
-              '| Metric | % |',
-              '| --- | --- |',
-              row('Lines', t.lines.pct),
-              row('Statements', t.statements.pct),
-              row('Functions', t.functions.pct),
-              row('Branches', t.branches.pct),
-              '',
+            process.stdout.write([
+              "<!-- backend-coverage -->",
+              "## Backend coverage",
+              "",
+              "| Metric | % |",
+              "| --- | --- |",
+              row("Lines", t.lines.pct),
+              row("Statements", t.statements.pct),
+              row("Functions", t.functions.pct),
+              row("Branches", t.branches.pct),
+              "",
               `_${t.lines.covered} of ${t.lines.total} lines. Thresholds live in \`backend/vitest.config.ts\`._`,
-            ].join('\n');
+            ].join("\n"));
+          ')"
 
-            const { owner, repo, sha } = context;
-            // Commit comments live under the commits API: the issues route
-            // (issues/{sha}/comments) 404s for a commit SHA even with a
-            // token that can read the commit itself.
-            //
-            // The routes are spelled out through github.request rather than
-            // github.rest.repos.* on purpose: the generated method names
-            // differ between Octokit versions (listCommitComments does not
-            // exist in the one github-script v7 ships), and these paths are
-            // part of the REST API itself, so they do not move.
-            const { data: comments } = await github.request(
-              'GET /repos/{owner}/{repo}/commits/{commit_sha}/comments',
-              { owner, repo, commit_sha: sha }
-            );
-            const existing = comments.find((c) => c.body && c.body.includes(marker));
-            if (existing) {
-              await github.request(
-                'PATCH /repos/{owner}/{repo}/comments/{comment_id}',
-                { owner, repo, comment_id: existing.id, body }
-              );
-            } else {
-              await github.request(
-                'POST /repos/{owner}/{repo}/commits/{commit_sha}/comments',
-                { owner, repo, commit_sha: sha, body }
-              );
-            }
+          # Commit comments are a resource of their own: the issues route
+          # (issues/{sha}/comments) 404s for a commit SHA. Reuse the previous
+          # comment by its marker so a re-run does not add another one.
+          existing="$(gh api "repos/$REPO/commits/$SHA/comments" \
+            --jq 'map(select(.body | contains("<!-- backend-coverage -->"))) | first | .id // empty')"
+
+          if [ -n "$existing" ]; then
+            gh api --method PATCH "repos/$REPO/comments/$existing" \
+              -f body="$body" >/dev/null
+            echo "updated commit comment $existing"
+          else
+            gh api --method POST "repos/$REPO/commits/$SHA/comments" \
+              -f body="$body" >/dev/null
+            echo "created commit comment"
+          fi
 
   # A committed snapshot, so the README and the repository always carry the
   # measured numbers rather than a claim someone has to re-verify by hand.
