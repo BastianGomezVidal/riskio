@@ -1,0 +1,62 @@
+# CodeQL. The last static axis in the security plan that had no runner.
+#
+# The other five were local executables, and the two that were blocked on the
+# remote are unblocked now: this repository is public and CI exists, so CodeQL
+# runs here on a schedule as well as on the pull request.
+#
+# `javascript-typescript` is the only language configured. The backend is
+# TypeScript and the frontend is TypeScript, so a `compiled` matrix entry for
+# TypeScript would do the same analysis over the compiled output; there is no
+# other language in the tree to add.
+#
+# A schedule as well as the pull request, on purpose. The pull request scan
+# answers "did this change introduce a query match", which is the question that
+# matters day to day. The schedule answers "is there a match that has been
+# sitting there since before anyone was looking", which is the other half of
+# what a security scan is for, and no pull request ever surfaces that.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Sunday 04:17 UTC. An off-the-hour minute is not superstition, it is that
+    # every scheduled workflow in the world fires at :00 and GitHub queues them
+    # behind each other.
+    - cron: '17 4 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze ${{ matrix.language }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          language: ${{ matrix.language }}
+          # No build-mode override. javascript-typescript is an interpreted
+          # language, so CodeQL builds its own extractor invocation and does not
+          # need the project compiled first. That is also why this job does not
+          # call ./check.sh: it analyses source, and the gate already proved the
+          # source builds.
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
