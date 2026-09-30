@@ -74,6 +74,12 @@ run "frontend typecheck"  bash -c 'cd frontend && npx tsc --noEmit'
 run "frontend knip"       bash -c 'cd frontend && npx knip'
 run "frontend build"      bash -c 'cd frontend && npx vite build'
 
+# Last, because it is the only check that needs a container engine and the only
+# one that looks at a built image rather than at the source. It is what stops
+# the hardening from silently regressing: a Dockerfile change that put
+# `COPY . .` back would still build fine and still pass every step above.
+run "image hardening"     bash -c 'SKIP_IMAGE_CHECK=0 ./scripts/assert-hardened-image.sh'
+
 printf '\n=== summary ===\n'
 if [ ${#FAILED[@]} -eq 0 ]; then
   printf '\033[32mall checks passed\033[0m\n'
