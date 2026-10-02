@@ -93,10 +93,12 @@ export function hashToken(value: string): string {
     ? value.slice(API_TOKEN_PREFIX.length)
     : value;
 
-  // Suppressed with the reasoning in the doc comment above. This hashes a
-  // 32-byte random API token so it can be compared with timingSafeEqual; it is
-  // not a password, there is no wordlist to guess against it, and nothing ever
-  // verifies a login by re-hashing submitted input.
+  // The alert for this line was reviewed and dismissed in the Security tab as a
+  // false positive; the doc comment above is the record, and the reasoning there
+  // is also the commit message. This hashes a 32-byte random API token so it can
+  // be compared with timingSafeEqual; it is not a password, there is no wordlist
+  // to guess against it, and nothing verifies a login by re-hashing submitted
+  // input.
   // codeql[js/insufficient-password-hash] random token digest for comparison, not a password
   return createHash('sha256').update(raw).digest('hex');
 }

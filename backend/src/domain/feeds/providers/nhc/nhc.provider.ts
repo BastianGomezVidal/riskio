@@ -76,12 +76,13 @@ export class NhcProvider {
 
     const url = `${this.baseUrl}/${safePath}`;
 
-    // Suppressed, with the reasoning above and in the commit: the taint model
-    // for js/request-forgery does not recognise a split-and-check guard as a
-    // sanitizer, so it keeps reporting a flow that is validated. Six tests
-    // cover the shapes the query is worried about — `..` walking out of the
-    // base path, `@` moving the authority, an absolute scheme, a query string —
-    // and they fail if this guard is removed.
+    // The alert for this line was reviewed and dismissed in the Security tab
+    // as a false positive, with this reasoning and the commit that added the
+    // guard as the record: the taint model for js/request-forgery does not
+    // recognise a split-and-check guard as a sanitizer, so it reports a flow
+    // that is validated. Six tests cover the shapes the query is worried about
+    // — `..` walking out of the base path, `@` moving the authority, an absolute
+    // scheme, a query string — and they fail if this guard is removed.
     // codeql[js/request-forgery] path segments are validated above, segment by segment
     const response = await fetch(url, {
       signal: AbortSignal.timeout(this.timeoutMs),
