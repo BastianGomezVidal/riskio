@@ -44,7 +44,7 @@ fi
 
 IMAGE="docker.io/semgrep/semgrep:1.178.0"
 RULES="backend/semgrep/rules.yml"
-TARGET="backend/src"
+TARGETS=("backend/src" "frontend/src")
 PROBE_DIR="$ROOT/semgrep-probe"
 
 # stderr de los contenedores a fichero, para poder enseñarlo cuando el informe
@@ -198,31 +198,58 @@ echo "    control positivo ok ($probe_result detecciones sobre $expected_detecti
 
 # --- Codigo real ------------------------------------------------------------
 
-real_status=0
-real_raw="$(run_semgrep "$TARGET")" || real_status=$?
+# Cada destino se escanea por separado y el recuento se acumula. Un unico
+# informe sobre los dos a la vez diria cuantos hay en total, no donde, y un gate
+# que dice "8 en algun sitio" hace que se mire el fichero equivocado primero.
+findings=0
 
-if (( real_status != 0 )); then
-  echo "    el contenedor de semgrep fallo con codigo $real_status" >&2
-  dump_stderr
+for target in "${TARGETS[@]}"; do
+  real_status=0
+  real_raw="$(run_semgrep "$target")" || real_status=$?
+
+  if (( real_status != 0 )); then
+    echo "    el contenedor de semgrep fallo con codigo $real_status en $target" >&2
+    dump_stderr
+    exit 1
+  fi
+
+  target_findings="$(printf '%s' "$real_raw" | count_findings)"
+
+  if [[ "$target_findings" == "PARSE_ERROR" || "$target_findings" == ERRORS:* ]]; then
+    echo "    semgrep no produjo un informe utilizable para $target ($target_findings)" >&2
+    echo "    un escaner que no se puede leer no puede aprobar ni suspender nada" >&2
+    printf '%s' "$real_raw" | head -c 1500 >&2
+    dump_stderr
+    exit 1
+  fi
+
+  if (( target_findings > 0 )); then
+    findings=$(( findings + target_findings ))
+    echo "    ${target_findings} hallazgo(s) en ${target}:" >&2
+    printf '%s' "$real_raw" | node -e '
+      let raw = "";
+      process.stdin.on("data", (c) => (raw += c)).on("end", () => {
+        JSON.parse(raw).results.forEach((r) => {
+          const short = r.check_id.split(".").pop();
+          const where = r.path.replace("/w/", "") + ":" + r.start.line;
+          console.error("      " + short + "  " + where);
+          const note = (r.extra && r.extra.message ? r.extra.message : "")
+            .split("\n")[0]
+            .trim();
+          if (note) console.error("        " + note);
+        });
+      });
+    ' >&2
+  else
+    echo "    0 hallazgos en ${target}"
+  fi
+done
+
+if (( findings > 0 )); then
   exit 1
 fi
 
-findings="$(printf '%s' "$real_raw" | count_findings)"
-
-if [[ "$findings" == "PARSE_ERROR" || "$findings" == ERRORS:* ]]; then
-  echo "    semgrep no produjo un informe utilizable ($findings)" >&2
-  echo "    un escaner que no se puede leer no puede aprobar ni suspender nada" >&2
-  printf '%s' "$real_raw" | head -c 1500 >&2
-  dump_stderr
-  exit 1
-fi
-
-if (( findings == 0 )); then
-  echo "    0 hallazgos en ${TARGET}"
-  exit 0
-fi
-
-echo "    ${findings} hallazgo(s) en ${TARGET}:" >&2
+exit 0
 printf '%s' "$real_raw" | node -e '
   let raw = "";
   process.stdin.on("data", (c) => (raw += c)).on("end", () => {

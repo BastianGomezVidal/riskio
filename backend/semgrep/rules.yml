@@ -102,10 +102,23 @@ rules:
       Evaluacion dinamica de codigo. Si lo que llega aqui viene de una
       peticion, es ejecucion remota de verdad. Si es constante, es una constante
       y no necesita estar dentro de una cadena.
+    # pattern-either envuelve las DOS ramas a proposito. Poner los evaluadores en
+    # su propio `patterns` las convertiria en una condicion AND con la de
+    # setTimeout, y un eval(...) sin setTimeout dejaria de detectarse: el control
+    # positivo Bajaba de 3 detecciones a 2 sin que nada fallara, porque el gate
+    # solo exige "al menos 3".
     pattern-either:
       - pattern: eval(...)
       - pattern: new Function(...)
-      - pattern: setTimeout($STR, ...)
+      # setTimeout solo cuenta cuando el primer argumento es una CADENA: el
+      # navegador la compila y la ejecuta como codigo. Con una funcion es el uso
+      # normal y corriente, y sin esta restriccion la regla marcaba seis
+      # ficheros del frontend que solo hacen setTimeout(() => ..., ms).
+      - patterns:
+          - pattern: setTimeout($STR, ...)
+          - metavariable-regex:
+              metavariable: $STR
+              regex: ^(['"]).*\1$
   # ------------------------------------------------------------------
   # Red y TLS
   # ------------------------------------------------------------------

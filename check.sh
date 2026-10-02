@@ -49,6 +49,7 @@ run "backend lint fast"   bash -c 'cd backend && npm run --silent lint:fast'
 run "backend typecheck"   bash -c 'cd backend && npx tsc --noEmit -p tsconfig.json'
 run "backend lint typed"  bash -c 'cd backend && npm run --silent lint:types'
 run "backend duplication" bash -c 'cd backend && npm run --silent dupes'
+run "backend knip"        bash -c 'cd backend && npm run --silent knip'
 run "backend tests"       bash -c 'cd backend && npx vitest run'
 
 # The contract test needs a live Postgres, unlike everything above it. Skipped
@@ -70,7 +71,9 @@ if [ "$FAST" -eq 0 ]; then
 fi
 
 run "frontend format"     bash -c 'cd frontend && npm run --silent format:check'
+run "frontend lint fast"  bash -c 'cd frontend && npm run --silent lint:fast'
 run "frontend typecheck"  bash -c 'cd frontend && npx tsc --noEmit'
+run "frontend duplication" bash -c 'cd frontend && npm run --silent dupes'
 run "frontend knip"       bash -c 'cd frontend && npx knip'
 run "frontend build"      bash -c 'cd frontend && npx vite build'
 
