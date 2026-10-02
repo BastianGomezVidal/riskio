@@ -2,12 +2,12 @@
 #
 # Gate de analisis estatico con semgrep.
 #
-# Existe por una reason concreta, no por gusto de tener mas herramientas. Al
+# Existe por una razon concreta, no por gusto de tener mas herramientas. Al
 # anadir el primer eje de seguridad a este repositorio aparecio un patron que
 # conviene no repetir: cuatro de las seis herramientas de la fase de seguridad
 # estaban marcadas como "ya funcionando" y ninguna daba un numero. Dos no
 # existian. Una fallaba en silencio contra un mirror. Y una cuarta, npm audit,
-#aba cero sin haberse ejecutado nunca.
+# informaba cero sin haberse ejecutado nunca.
 #
 # Un escaner que devuelve cero ha dicho exactamente lo mismo que un escaner
 # roto: cero. La unica forma de que "cero" signifique algo es demostrar antes
@@ -24,7 +24,7 @@
 # ajeno no es una propiedad de este repositorio, asi que un gate que dependa
 # de ello cambia de veredicto sin que cambie una linea de codigo.
 #
-#   ./scripts/scan-semgrep.sh          analyze
+#   ./scripts/scan-semgrep.sh          analiza
 #   SKIP_SEMGREP_CHECK=1 ./check.sh    omitir (sin semgrep, sin podman)
 
 set -euo pipefail
@@ -45,14 +45,46 @@ fi
 IMAGE="docker.io/semgrep/semgrep:1.178.0"
 RULES="backend/semgrep/rules.yml"
 TARGET="backend/src"
+PROBE_DIR="$ROOT/semgrep-probe"
+
+# stderr de los contenedores a fichero, para poder enseñarlo cuando el informe
+# no se puede leer. Un `2>/dev/null` convierte cualquier fallo de arranque en
+# salida vacia, y la salida vacia se lee como "cero hallazgos". Ese falso verde
+# es justo lo que este script existe para impedir, asi que no se permite que
+# ocurra en su propia salida.
+STDERR_LOG="$(mktemp)"
+trap 'rm -rf "$PROBE_DIR" "$STDERR_LOG"' EXIT
+
+dump_stderr() {
+  if [[ -s "$STDERR_LOG" ]]; then
+    echo "    --- stderr del contenedor ---" >&2
+    head -c 2000 "$STDERR_LOG" | sed 's/^/      /' >&2
+  fi
+}
 
 # El contenedor corre como el usuario del host, no como root: sin esto deja
 # ficheros propiedad de root en el arbol de trabajo. `:z` relabela el volumen,
 # que es necesario porque SELinux esta en modo Enforcing y sin el el montaje
 # falla con Permission denied en silencio aparente.
+#
+# HOME se fija a proposito, y no es un detalle. La imagen declara un unico
+# usuario, semgrep con uid 1000. Al ejecutar con `--user $(id -u)`, HOME solo
+# cae en un directorio escribible si el uid del host coincide con ese 1000, y
+# entonces el contenedor usa /home/semgrep. En un runner de GitHub el usuario
+# es el 1001: no hay entrada en /etc/passwd, HOME degenera a /root, que es mode
+# 700, y semgrep revienta con un traceback de Python al escribir su cache, sin
+# JSON. En local el uid es 1000 y por eso siempre habia funcionado. Fijar HOME
+# en /tmp, que es 1777 dentro de la imagen, hace que el gate se comporte igual
+# en un sitio y en el otro en vez de depender de un uid que nadie eligio.
+#
+# La cache va a /tmp y no a $HOME dentro de /w a proposito: si semgrep escribiese
+# en el repositorio dejaria ficheros con el uid del runner en el arbol de
+# trabajo, que es la clase de ruido que hace que la gente ignore git status.
 run_semgrep() {
   podman run --rm \
     --user "$(id -u):$(id -g)" \
+    -e HOME=/tmp \
+    -e XDG_CACHE_HOME=/tmp/.cache \
     -v "$ROOT:/w:z" \
     -w /w \
     "$IMAGE" \
@@ -62,7 +94,7 @@ run_semgrep() {
       --exclude '*.spec.ts' \
       --metrics=off \
       --quiet \
-      --json "$@" 2>/dev/null || true
+      --json "$@" 2>>"$STDERR_LOG"
 }
 
 count_findings() {
@@ -94,10 +126,7 @@ count_findings() {
 # escaneo fallara antes de borrarlo, el resto del gate veria codigo de prueba.
 # Aqui se escanea solo, en un directorio propio.
 
-PROBE_DIR="$ROOT/semgrep-probe"
-rm -rf "$PROBE_DIR"
 mkdir -p "$PROBE_DIR"
-trap 'rm -rf "$PROBE_DIR"' EXIT
 
 cat >"$PROBE_DIR/probe.ts" <<'PROBE'
 import { createHash } from 'crypto';
@@ -114,13 +143,28 @@ export function evaluated(input: string): unknown {
 PROBE
 
 expected_detections=3
-probe_raw="$(run_semgrep "/w/semgrep-probe/probe.ts")"
+
+# El codigo de salida del contenedor se captura a mano. Con `set -e`, una
+# asignacion que falla aborta el script entero en esa linea, antes de que ningun
+# diagnostico pueda ejecutarse, y el trap se lleva el log de stderr sin llegar a
+# imprimirlo. Probado con una imagen inexistente: salida 125 y cero bytes, que es
+# el peor modo de fallo posible porque ni siquiera parece un fallo.
+probe_status=0
+probe_raw="$(run_semgrep "/w/semgrep-probe/probe.ts")" || probe_status=$?
+
+if (( probe_status != 0 )); then
+  echo "    el contenedor de semgrep fallo con codigo $probe_status" >&2
+  dump_stderr
+  exit 1
+fi
+
 probe_result="$(printf '%s' "$probe_raw" | count_findings)"
 
 case "$probe_result" in
   PARSE_ERROR)
     echo "    control positivo ilegible: semgrep no devolvio JSON" >&2
     printf '%s' "$probe_raw" | head -c 1500 >&2
+    dump_stderr
     exit 1
     ;;
   ERRORS:*)
@@ -137,6 +181,7 @@ case "$probe_result" in
         }
       });
     '
+    dump_stderr
     exit 1
     ;;
 esac
@@ -153,13 +198,22 @@ echo "    control positivo ok ($probe_result detecciones sobre $expected_detecti
 
 # --- Codigo real ------------------------------------------------------------
 
-real_raw="$(run_semgrep "$TARGET")"
+real_status=0
+real_raw="$(run_semgrep "$TARGET")" || real_status=$?
+
+if (( real_status != 0 )); then
+  echo "    el contenedor de semgrep fallo con codigo $real_status" >&2
+  dump_stderr
+  exit 1
+fi
+
 findings="$(printf '%s' "$real_raw" | count_findings)"
 
 if [[ "$findings" == "PARSE_ERROR" || "$findings" == ERRORS:* ]]; then
   echo "    semgrep no produjo un informe utilizable ($findings)" >&2
   echo "    un escaner que no se puede leer no puede aprobar ni suspender nada" >&2
   printf '%s' "$real_raw" | head -c 1500 >&2
+  dump_stderr
   exit 1
 fi
 
