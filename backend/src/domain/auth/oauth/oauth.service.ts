@@ -58,9 +58,11 @@ export class OAuthService {
   private readonly clientIds: Record<OAuthProviderName, string>;
   private readonly clientSecrets: Record<OAuthProviderName, string>;
   private readonly apiPublicBase: string;
+  private readonly timeoutMs: number;
   private readonly pendingStates = new Map<string, PendingState>();
 
   constructor(config: ConfigService) {
+    this.timeoutMs = Number(config.get('OAUTH_TIMEOUT_MS', 10_000));
     this.clientIds = {
       [OAuthProviderName.Google]: config.get<string>('GOOGLE_CLIENT_ID', ''),
       [OAuthProviderName.Outlook]: config.get<string>(
@@ -191,6 +193,7 @@ export class OAuthService {
         redirect_uri: this.redirectUri(provider),
         grant_type: 'authorization_code',
       }),
+      signal: AbortSignal.timeout(this.timeoutMs),
     });
 
     if (!response.ok) {
@@ -220,6 +223,7 @@ export class OAuthService {
         Authorization: `Bearer ${accessToken}`,
         Accept: 'application/json',
       },
+      signal: AbortSignal.timeout(this.timeoutMs),
     });
 
     if (!response.ok) {

@@ -76,3 +76,6 @@ ARCHITECTURE-*.md
 # jscpd writes its report here by default
 report/
 backend/report/
+
+# transient, created and removed by scripts/scan-semgrep.sh
+semgrep-probe/

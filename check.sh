@@ -74,6 +74,15 @@ run "frontend typecheck"  bash -c 'cd frontend && npx tsc --noEmit'
 run "frontend knip"       bash -c 'cd frontend && npx knip'
 run "frontend build"      bash -c 'cd frontend && npx vite build'
 
+# Static analysis over the source, with a ruleset that lives in the repo instead
+# of being fetched at run time. This one is unusual: before analysing anything it
+# checks that it can still detect what it claims to detect, using a throwaway
+# file with three known-bad patterns. A gate that returns 0 because it silently
+# scanned nothing is indistinguishable from a clean tree, and that ambiguity is
+# how the six security axes in the plan came to be marked done while three of
+# them did not exist. Needs podman, like the image check.
+run "semgrep rules"       bash -c 'SKIP_SEMGREP_CHECK=0 ./scripts/scan-semgrep.sh'
+
 # Last, because it is the only check that needs a container engine and the only
 # one that looks at a built image rather than at the source. It is what stops
 # the hardening from silently regressing: a Dockerfile change that put

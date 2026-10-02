@@ -53,6 +53,15 @@ export const envValidationSchema = Joi.object({
   /** Optional Microsoft identity client credentials (enables Outlook sign-in). */
   MICROSOFT_CLIENT_ID: Joi.string().allow('').default(''),
   MICROSOFT_CLIENT_SECRET: Joi.string().allow('').default(''),
+  /**
+   * Budget for each OAuth call to the provider: the code exchange and the
+   * profile request. Without it these two fetches inherit the runtime's
+   * lifetime limit, so a provider that accepts the connection and then stalls
+   * holds an inbound request open until the client gives up. The attacker who
+   * benefits is not the one who controls the provider, which is the part that
+   * makes this worth a bound rather than a retry.
+   */
+  OAUTH_TIMEOUT_MS: Joi.number().default(10_000),
 
   /**
    * Object storage. STORAGE_ENDPOINT is empty when using the real AWS S3
@@ -256,6 +265,7 @@ export const authEnvValidationSchema = Joi.object({
   GOOGLE_CLIENT_SECRET: Joi.string().allow('').default(''),
   MICROSOFT_CLIENT_ID: Joi.string().allow('').default(''),
   MICROSOFT_CLIENT_SECRET: Joi.string().allow('').default(''),
+  OAUTH_TIMEOUT_MS: Joi.number().default(10_000),
 
   MAIL_TRANSPORT: Joi.string().valid('log', 'smtp').default('log'),
   MAIL_FROM: Joi.string().default('Riskio <no-reply@riskio.local>'),

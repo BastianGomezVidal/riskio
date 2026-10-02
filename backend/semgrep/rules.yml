@@ -1,0 +1,166 @@
+# Reglas propias de semgrep para este repositorio.
+#
+# Existen por dos razones, y las dos son culpa de una misma sorpresa.
+#
+# La primera: sin `semgrep login`, el registro público de semgrep solo sirve
+# una decena de reglas. `p/ci` promete el ruleset completo y en la práctica ejecuta
+# 18 sobre 166 ficheros — comprobado, no supuesto. Un gate que depende de
+# cuántas reglas decida servir un servidor remoto cambia de veredicto sin que
+# cambie el código, y eso no es un gate: es un rumor.
+#
+# La segunda: las reglas genéricas miran patrones. Estas miran este proyecto.
+# `riskio` maneja tokens de API, sesiones y subidas de ficheros; lo que merece
+# una regla aqui no es "un hash debil" en abstracto, es un hash debil en la ruta
+# que decide si una peticion esta autenticada.
+#
+# Todo lo de aqui es deliberadamente estrecho. Una regla que marca codigo
+# correcto cuesta mas que la que encuentra, porque entrena a ignorar el resto.
+
+rules:
+  # ------------------------------------------------------------------
+  # Credenciales
+  # ------------------------------------------------------------------
+
+  - id: riskio-weak-hash-for-credentials
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Hash debil en una ruta de credenciales. Este servicio autentica con tokens
+      de API y sesiones: un digest MD5 o SHA1 se rompe por preimagen y no
+      sirve. Para comparar un token usa SHA-256 con timingSafeEqual
+      (auth.utils.ts). Para una contrasena, argon2 o scrypt.
+    patterns:
+      - pattern-either:
+          - pattern: createHash("$HASH", ...)
+          - pattern: createHmac("$HASH", ...)
+      - metavariable-regex:
+          metavariable: $HASH
+          regex: ^(md5|sha1)$
+  - id: riskio-password-check-without-constant-time-compare
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Comparacion de secreto con === o ==. La comparacion de tiempo constante
+      filtra informacion por los tiempos de retorno; usa timingSafeEqual de
+      node:crypto para cualquier valor que venga de un hash o un token.
+    patterns:
+      - pattern-either:
+          - pattern: $SECRET === $OTHER
+          - pattern: $SECRET == $OTHER
+          - pattern: $OTHER === $SECRET
+          - pattern: $OTHER == $SECRET
+      # Ambos lados tienen que ser secretos. Si $OTHER es null lo que se
+      # comprueba es que la columna exista, no el valor, y exigir constante
+      # ahi produce ruido que ensea a ignorar la regla entera.
+      - metavariable-pattern:
+          metavariable: $SECRET
+          pattern-either:
+            - pattern: $X.token
+            - pattern: $X.tokenHash
+            - pattern: $X.password
+            - pattern: $X.passwordHash
+            - pattern: $X.digest
+            - pattern: $X.apiKey
+      - metavariable-pattern:
+          metavariable: $OTHER
+          pattern-either:
+            - pattern: $X.token
+            - pattern: $X.tokenHash
+            - pattern: $X.password
+            - pattern: $X.passwordHash
+            - pattern: $X.digest
+            - pattern: $X.apiKey
+  # ------------------------------------------------------------------
+  # Inyeccion
+  # ------------------------------------------------------------------
+
+  - id: riskio-shell-command-with-non-literal
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Shell con un argumento que no es literal. exec/spawn con shell:true o con
+      interpolacion expone a whoever controla ese valor. No hay reason legitima
+      para esto en un servicio HTTP: usa una API.
+    patterns:
+      - pattern-either:
+          - pattern: exec($CMD, ...)
+          - pattern: execSync($CMD, ...)
+          - pattern: spawn($CMD, ...)
+          - pattern: execFile($CMD, ...)
+      - pattern-not: exec("...", ...)
+      - pattern-not: execSync("...", ...)
+      - metavariable-pattern:
+          metavariable: $CMD
+          pattern-either:
+            - pattern: $A + $B
+            - pattern: "`$A$B`"
+            - pattern: $OBJ.command
+  - id: riskio-dynamic-code-evaluation
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Evaluacion dinamica de codigo. Si lo que llega aqui viene de una
+      peticion, es ejecucion remota de verdad. Si es constante, es una constante
+      y no necesita estar dentro de una cadena.
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+      - pattern: setTimeout($STR, ...)
+  # ------------------------------------------------------------------
+  # Red y TLS
+  # ------------------------------------------------------------------
+
+  - id: riskio-tls-verification-disabled
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Verificacion TLS desactivada. Con esto el canal deja de estar autenticado
+      y cualquier proxy de la red puede leer y modificar el trafico, tokens
+      incluidos. No hay un caso en produccion donde esto sea la respuesta.
+    pattern-either:
+      - pattern: $X.rejectUnauthorized = false
+      - pattern: "rejectUnauthorized: false"
+      - pattern-regex: NODE_TLS_REJECT_UNAUTHORIZED\s*[:=]\s*['"]?0['"]?
+  # ------------------------------------------------------------------
+  # Datos no confiables hacia una consulta
+  # ------------------------------------------------------------------
+
+  - id: riskio-sql-built-by-concatenation
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      SQL construido por concatenacion o interpolacion. Usa parametros
+      prepareados: el motor los envia separados de la sentencia, que es
+      justamente lo que impide que un valor cambie el significado de la
+      consulta.
+    patterns:
+      - pattern-either:
+          - pattern: $DB.query(`...${$ARG}...`, ...)
+          - pattern: $DB.execute(`...${$ARG}...`, ...)
+          - pattern: $DB.raw(`...${$ARG}...`)
+          - pattern: $Q.raw("..." + $ARG)
+  # ------------------------------------------------------------------
+  # Fetch sin timeout
+  # ------------------------------------------------------------------
+
+  - id: riskio-fetch-without-timeout
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      fetch sin timeout ni signal. Cada peticion HTTP saliente hereda el limite
+      de por vida del runtime, lo que significa que un endpoint lento agota los
+      sockets y se lleva por delante el pool entero. Usa AbortSignal.timeout().
+    patterns:
+      - pattern: fetch($URL, ...)
+      - pattern-not: "fetch($URL, { ..., signal: $S, ... }, ...)"
+      - pattern-not: "fetch($URL, { ..., timeout: $T, ... }, ...)"
+      - pattern-not: "fetch($URL, undefined)"
+# Nota sobre el alcance: estas reglas llevan el filtro `paths` de semgrep
+# durante un rato y por eso el control positivo del gate daba 0. El filtro
+# limitaba a `src/**`, y el fichero de prueba que el gate usa para comprobar
+# que el escaner funciona vive fuera de ahi, asi que semgrep lo ignoraba sin
+# avisar. Un 0 que significa "no mire" es indistinguible de un 0 real.
+#
+# El alcance lo decide el objetivo que se le pasa al escaner, no un filtro dentro
+# de la regla: scan-semgrep.sh apunta a backend/src. Asi la regla dice que es
+# mala y el gate dice donde mirar, que es la division que no se rompe sola.
