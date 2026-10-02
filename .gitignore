@@ -79,3 +79,6 @@ backend/report/
 
 # transient, created and removed by scripts/scan-semgrep.sh
 semgrep-probe/
+
+# transient, created and removed by scripts/scan-secrets.sh
+secrets-probe/

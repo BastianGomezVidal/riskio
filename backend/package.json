@@ -121,7 +121,8 @@
     "tsconfck": {
       "typescript": "$typescript"
     },
-    "multer": "2.4.0"
+    "multer": "2.4.0",
+    "glob": "10.5.0"
   },
   "allowScripts": {
     "@scarf/scarf@1.4.0": true

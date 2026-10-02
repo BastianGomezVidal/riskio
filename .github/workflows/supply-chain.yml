@@ -1,0 +1,146 @@
+name: supply-chain
+
+# Dependencias y secretos, deliberadamente fuera de ci.yml.
+#
+# La razon es que estas dos cosas no tienen nada que ver con el codigo que estas
+# escribiendo. Un escaner de secretos examina lo que ya esta commiteado, no el
+# diff que tienes delante; meterlo en la puerta de cada push lo convierte en el
+# paso que todo el mundo se salta. Un escaner de vulnerabilidades lee lockfiles,
+# que solo cambian cuando alguien actualiza una dependencia.
+#
+# Por eso este workflow corre aparte y mas de tarde que el otro. Es el
+# equivalente de codigo abierto a lo que se paga en JFrog Xray: un unico sitio
+# que responde "de donde viene esto que estoy ejecutando", separado del bucle de
+# escribir codigo.
+#
+# Las dos herramientas corren en contenedores con version fijada, por la misma
+# razon que scan-semgrep.sh: la version de la herramienta es parte de lo que se
+# estaORIA afirmar, no un detalle del entorno.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Domingo 04:17 UTC. Horario arbitrario, pero es el que ya documenta
+    # codeql.yml tambien, y que dos trabajos coincidan ayuda a leer los logs.
+    - cron: '17 4 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supply-chain-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    name: secretos en lo commiteado
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # fetch-depth 0: el escaneo recorre el historial, no solo el ultimo
+          # commit. Sin esto un secreto que ya esta en main no aparece nunca, que
+          # es justo el caso para el que sirve: uno que hay que rotar, no uno
+          # que hay que evitar.
+          fetch-depth: 0
+
+      # El script lleva su propio control positivo y falla si gitleaks no
+      # detecta la credencial de prueba, asi que un escaner roto no se
+      # confunde con un repositorio limpio.
+      - name: gitleaks
+        run: ./scripts/scan-secrets.sh
+
+  dependencies:
+    name: vulnerabilidades en los lockfiles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Trivy lee su base de datos de ghcr.io, no de un registry de npm, asi que
+      # el mirror que rompe `npm audit` en esta maquina no le afecta. Esa es
+      # justo la razon de escanear aqui y no con npm: `npm audit` necesita el
+      # registry de npm para su base de avisos, y contra el mirror configurado
+      # devuelve 404 NOT_IMPLEMENTED. Devolvio ese error, no cero hallazgos, y el
+      # plan lo tenia anotado como "ya funcionando".
+      - name: trivy
+        run: |
+          set -uo pipefail
+
+          # Trivy 0.69.1 rechaza varios objetivos en la misma invocacion
+          # ("multiple targets cannot be specified"), asi que se recorre lockfile
+          # por lockfile. Cada uno va a un informe aparte y luego se suman, para
+          # que el recuento siga siendo global.
+          reports=""
+          total=0
+          failed=0
+
+          for lockfile in backend/package-lock.json frontend/package-lock.json; do
+            if [ ! -f "$lockfile" ]; then
+              echo "::warning::no existe $lockfile, se omite"
+              continue
+            fi
+
+            report="$(mktemp)"
+            docker run --rm \
+              -e TRIVY_CACHE_DIR=/tmp/trivy-cache \
+              -v "$PWD:/w:z" \
+              -w /w \
+              docker.io/aquasec/trivy:0.69.1 \
+              fs \
+                --scanners vuln \
+                --format json \
+                --severity HIGH,CRITICAL \
+                --no-progress \
+                "/w/$lockfile" \
+              >"$report" 2>/dev/null || true
+
+            # Distinguir "no hay nada" de "no se pudo leer el informe". Trivy
+            # escribe JSON vacio cuando el contenedor falla antes de empezar, y
+            # un escaner que no ha arrancado informa de cero vulnerabilidades con
+            # la misma tranquilidad que uno que las ha buscado de verdad.
+            if [ ! -s "$report" ] || ! head -c 1 "$report" | grep -q '{'; then
+              echo "::error::trivy no devolvio un informe utilizable para $lockfile"
+              docker run --rm \
+                -e TRIVY_CACHE_DIR=/tmp/trivy-cache \
+                -v "$PWD:/w:z" -w /w \
+                docker.io/aquasec/trivy:0.69.1 \
+                fs --scanners vuln --severity HIGH,CRITICAL --no-progress \
+                "/w/$lockfile" || true
+              failed=1
+              continue
+            fi
+
+            count="$(node -e '
+              const fs = require("fs");
+              const report = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+              let rows = 0;
+              for (const result of report.Results || []) {
+                for (const v of result.Vulnerabilities || []) {
+                  rows += 1;
+                  console.error(
+                    "      " + v.Severity + "  " + v.VulnerabilityID + "  " +
+                      v.PkgName + "@" + v.InstalledVersion + " -> " +
+                      (v.FixedVersion || "sin parche"),
+                  );
+                }
+              }
+              console.log(rows);
+            ' "$report")"
+
+            echo "    $lockfile: $count vulnerabilidad(es) HIGH/CRITICAL"
+            total=$(( total + count ))
+          done
+
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::algun escaneo de trivy fallo; el total de arriba no es de fiar"
+            exit 1
+          fi
+
+          echo "    total HIGH/CRITICAL en los lockfiles: $total"
+          if [ "$total" -ne 0 ]; then
+            echo "::error::$total dependencia(s) vulnerable(s) con severidad HIGH o CRITICAL"
+            exit 1
+          fi
