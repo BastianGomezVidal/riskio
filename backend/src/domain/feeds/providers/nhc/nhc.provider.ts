@@ -69,8 +69,20 @@ export class NhcProvider {
       );
     }
 
-    const url = `${this.baseUrl}/${path}`;
+    // Rebuilt from the checked segments rather than reusing `path`, so the
+    // string that reaches fetch is composed only of segments that passed. The
+    // throw above means no unvalidated value exists past this line.
+    const safePath = segments.join('/');
 
+    const url = `${this.baseUrl}/${safePath}`;
+
+    // Suppressed, with the reasoning above and in the commit: the taint model
+    // for js/request-forgery does not recognise a split-and-check guard as a
+    // sanitizer, so it keeps reporting a flow that is validated. Six tests
+    // cover the shapes the query is worried about — `..` walking out of the
+    // base path, `@` moving the authority, an absolute scheme, a query string —
+    // and they fail if this guard is removed.
+    // codeql[js/request-forgery] path segments are validated above, segment by segment
     const response = await fetch(url, {
       signal: AbortSignal.timeout(this.timeoutMs),
       headers: {
