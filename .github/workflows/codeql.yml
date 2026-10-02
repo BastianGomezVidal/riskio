@@ -50,10 +50,16 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           language: ${{ matrix.language }}
-          # No build-mode override. javascript-typescript is an interpreted
-          # language, so CodeQL builds its own extractor invocation and does not
-          # need the project compiled first. That is also why this job does not
-          # call ./check.sh: it analyses source, and the gate already proved the
+          # `none` rather than letting the autobuilder trace a build. For an
+          # interpreted language this is what the docs prescribe, and the default
+          # was actively wrong here: tracing extraction ran the project's own
+          # build to decide what to analyse, which meant inline `codeql[...]`
+          # suppressions in the source stopped being honoured at the reported
+          # location. Both suppressions in this repository are in source, so the
+          # analysis has to be reading source.
+          build-mode: none
+          # No project build step follows, deliberately. This job analyses
+          # source, and ./check.sh in the other workflow already proved the
           # source builds.
 
       - name: Perform CodeQL analysis
