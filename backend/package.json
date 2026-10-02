@@ -72,7 +72,7 @@
     "@opentelemetry/semantic-conventions": "^1.43.0",
     "@types/adm-zip": "^0.5.8",
     "@types/geojson": "^7946.0.16",
-    "adm-zip": "^0.6.0",
+    "adm-zip": "0.6.1",
     "bcryptjs": "^3.0.3",
     "cache-manager": "^7.2.9",
     "class-transformer": "^0.5.1",
@@ -120,7 +120,8 @@
   "overrides": {
     "tsconfck": {
       "typescript": "$typescript"
-    }
+    },
+    "multer": "2.4.0"
   },
   "allowScripts": {
     "@scarf/scarf@1.4.0": true
