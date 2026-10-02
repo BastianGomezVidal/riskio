@@ -21,6 +21,34 @@ import {
 
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
+/**
+ * Cada peticion tiene un limite de tiempo. Sin el, un fetch hereda el limite de
+ * por vida del runtime: una peticion colgada no se abandona nunca, y en el
+ * navegador eso significa que el socket sigue abierto indefinidamente. Con seis
+ * a ocho peticiones simultaneas al montar la pagina, un backend lento se lleva
+ * por delante el pool entero y la interfaz se queda esperando en silencio, sin
+ * error y sin加载.
+ *
+ * El valor es un techo, no una medida: una peticion que responde en 200 ms no
+ * nota que existe. Solo paga el coste quien se queda colgado, que es
+ * precisamente el caso que necesita un limite.
+ */
+const REQUEST_TIMEOUT_MS = 15_000;
+
+/**
+ * `AbortSignal.timeout` solo, sin `AbortSignal.any`, a proposito. Si el llamante
+ * pasa su propio signal,abortar el suyo tambien debe abortar nuestra peticion:
+ * quien navega a otra pagina mientras una consulta sigue en vuelo quiere que
+ * esa consulta muera, no que llegue y actualice estado de una vista que ya no
+ * existe. Solo uno de los dos signals decide, y el mas rapido gana.
+ */
+function withTimeout(signal?: AbortSignal | null): AbortSignal {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  if (!signal) return timeout;
+  if (signal.aborted) return signal;
+  return AbortSignal.any([signal, timeout]);
+}
+
 let onUnauthorized: (() => void) | null = null;
 
 export function setUnauthorizedHandler(fn: () => void): void {
@@ -64,6 +92,7 @@ async function request<S extends z.ZodTypeAny>(
     const response = await fetch(`${API_URL}${path}`, {
       ...init,
       headers: buildHeaders(init),
+      signal: withTimeout(init?.signal),
     });
 
     span.setAttribute("http.status_code", response.status);
@@ -167,6 +196,7 @@ async function requestEmpty(path: string, init?: RequestInit): Promise<void> {
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: buildHeaders(init),
+    signal: withTimeout(init?.signal),
   });
 
   if (!response.ok) {

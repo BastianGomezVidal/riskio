@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/crates/oxc_linter/src/rules.rs",
+  "env": {
+    "browser": true
+  },
+  "plugins": ["react"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "rules": {
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "no-unused-vars": "error",
+    "no-explicit-any": "off",
+    "react-in-jsx-scope": "off",
+
+    "set-state-in-effect": "warn",
+    "purity": "warn",
+    "react-hooks/exhaustive-deps": "warn"
+  },
+  "ignorePatterns": ["dist/**", "node_modules/**"]
+}
