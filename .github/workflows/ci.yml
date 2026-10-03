@@ -19,6 +19,37 @@ jobs:
     name: Quality gate
     runs-on: ubuntu-latest
 
+    # The contract and integration suites boot the real Nest app against a real
+    # Postgres: `test/setup-integration.ts` drops and recreates `riskio_test`
+    # and lets the app's migrations run. There was no service here, so both
+    # suites were skipped on every run this workflow had ever produced and the
+    # job still went green. Seven files, 31 integration tests and 12 contract
+    # tests, verified by nobody.
+    #
+    # This must be `postgis`, not `postgres`. Migration
+    # 1888240000000-AddStormGeometry runs `CREATE EXTENSION postgis` and creates
+    # a `geography(LineString,4326)` column; plain Postgres has neither, so the
+    # migration fails and every suite that migrates fails behind it. Same image
+    # and tag as `db:` in docker-compose.yml, for the same reason.
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: riskio
+          POSTGRES_PASSWORD: riskio_dev_password
+          POSTGRES_DB: riskio
+        ports:
+          - 5432:5432
+        # --wait semantics: without a health check the first suite to connect
+        # races the database and fails intermittently. A test that fails
+        # sometimes is worse than one that fails always, because it teaches
+        # people to re-run instead of to fix.
+        options: >-
+          --health-cmd "pg_isready -U riskio -d riskio"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
     steps:
       - uses: actions/checkout@v7
 
@@ -38,8 +69,10 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      # Typecheck, oxlint, tests, coverage, knip, build. Coverage thresholds live
-      # in backend/vitest.config.ts, so a drop below them fails this step.
+      # Typecheck, oxlint, tests, coverage, knip, build, and the two suites that
+      # need the Postgres service above: contract and integration. Coverage
+      # thresholds live in backend/vitest.config.ts, so a drop below them fails
+      # this step.
       - name: Typecheck, lint, tests, coverage, dead code, build
         run: ./check.sh
 
