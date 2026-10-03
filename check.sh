@@ -11,6 +11,12 @@
 #   ./check.sh          run everything
 #   ./check.sh --fast   skip coverage, which is the slow part
 #
+# Needs podman and a container engine, for three stages: the semgrep ruleset, the
+# image hardening check, and the Postgres that the contract and integration
+# suites boot the app against. The database stage starts the `db` service itself
+# if it is not up, so `./check.sh` on a fresh laptop brings up what it needs
+# rather than skipping what it cannot find.
+#
 # The same script is the CI gate. `./check.sh` is the only list of commands that
 # decides whether this code is good; the workflow calls it rather than repeating
 # it, so a green laptop run and a green run on the remote cannot disagree.
@@ -52,19 +58,20 @@ run "backend duplication" bash -c 'cd backend && npm run --silent dupes'
 run "backend knip"        bash -c 'cd backend && npm run --silent knip'
 run "backend tests"       bash -c 'cd backend && npx vitest run'
 
-# The contract test needs a live Postgres, unlike everything above it. Skipped
-# rather than failed when the database is not up, so a laptop without the stack
-# running still gets the other four checks; CI runs it against a service
-# container and there it is not optional.
-if bash -c 'cd backend && node -e "
-  const {Client} = require(\"pg\");
-  const c = new Client({connectionString: \"postgresql://riskio:riskio_dev_password@localhost:5432/riskio\"});
-  c.connect().then(()=>c.end()).then(()=>process.exit(0)).catch(()=>process.exit(1));
-"' 2>/dev/null; then
-  run "contract test" bash -c 'cd backend && npx vitest run --config ./vitest.config.pact.ts --testTimeout=300000'
-else
-  printf '\n\033[33m    SKIPPED contract test — no Postgres on localhost:5432\033[0m\n'
-fi
+# The contract and integration suites are the only ones that need a real
+# Postgres, and they are no longer allowed to be absent. This used to probe for
+# the database, print `SKIPPED contract test` when there was none, and still end
+# with `all checks passed`. CI defines no database service, so both suites were
+# skipped on every run the remote has ever produced: 7 files and 31 integration
+# tests, plus 12 contract tests pinning every response shape, verified by nobody.
+#
+# A skip that reads as a pass is the same defect as a linter that scans nothing
+# and exits 0. So the gate brings the database up itself rather than tolerating
+# its absence, and the two suites run unconditionally below. `./check.sh` already
+# required podman for the semgrep and image stages.
+run "test database"       ./scripts/ensure-test-database.sh
+run "contract test"       bash -c 'cd backend && npm run --silent test:pact'
+run "integration tests"   bash -c 'cd backend && npm run --silent test:integration'
 
 if [ "$FAST" -eq 0 ]; then
   run "backend coverage" bash -c 'cd backend && npx vitest run --coverage'
