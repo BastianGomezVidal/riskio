@@ -14,7 +14,7 @@
     "coverage:summary": "vitest run --coverage --coverage.reporter=text-summary",
     "deploy": "nest deploy",
     "dev:fixtures": "node scripts/dev-fixtures.mjs",
-    "dupes": "jscpd --config .jscpd.json",
+    "dupes": "jscpd --config .jscpd.json --similarity 0.85",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.mjs\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.mjs\"",
     "lint": "npm run lint:fast && npm run lint:types",

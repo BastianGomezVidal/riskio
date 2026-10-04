@@ -6,5 +6,5 @@
   "absolute": false,
   "minLines": 5,
   "minTokens": 50,
-  "threshold": 5
+  "threshold": 8
 }

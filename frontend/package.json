@@ -14,7 +14,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "lint:fast": "oxlint src/",
-    "dupes": "jscpd --config .jscpd.json"
+    "dupes": "jscpd --config .jscpd.json --similarity 0.85"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.4",
