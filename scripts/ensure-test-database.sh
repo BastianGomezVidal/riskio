@@ -15,7 +15,7 @@
 # A skip that reads as a pass is the same defect as a linter that scans nothing
 # and exits 0, which is what the semgrep control check and the gitleaks positive
 # test exist to rule out. So the gate now brings the database up itself instead
-# of tolerating its absence. `./check.sh` already requires podman for the semgrep
+# of tolerating its absence. `./scripts/check.sh` already requires podman for the semgrep
 # and image stages; needing it for the database as well is the same requirement,
 # not a new one.
 #

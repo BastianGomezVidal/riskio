@@ -7,8 +7,8 @@
 // With it, the run says so, because an audit that quietly covered two public
 // pages out of eight is not the audit anyone thinks they ran.
 //
-//   node .audit/axe-audit.mjs http://localhost/
-//   AUDIT_TOKEN=ey... node .audit/axe-audit.mjs http://localhost/
+//   node scripts/audit/axe-audit.mjs http://localhost/
+//   AUDIT_TOKEN=ey... node scripts/audit/axe-audit.mjs http://localhost/
 
 import puppeteer from "puppeteer-core";
 import { AxePuppeteer } from "@axe-core/puppeteer";
@@ -106,9 +106,9 @@ for (const route of routes) {
 
 await browser.close();
 
-mkdirSync(".audit/out", { recursive: true });
+mkdirSync("scripts/audit/out", { recursive: true });
 writeFileSync(
-  ".audit/out/axe.json",
+  "scripts/audit/out/axe.json",
   JSON.stringify({ base: BASE, token: Boolean(TOKEN), findings }, null, 2),
 );
 
@@ -148,5 +148,5 @@ console.log(
     : "  axe: sin critical ni serious. Pasa, aunque moderate y minor siguen listados arriba.",
 );
 
-writeFileSync(".audit/out/axe.exit", String(criticalOrSerious > 0 ? 1 : 0));
+writeFileSync("scripts/audit/out/axe.exit", String(criticalOrSerious > 0 ? 1 : 0));
 process.exit(criticalOrSerious > 0 ? 1 : 0);

@@ -6,11 +6,15 @@
   "scripts": {
     "prepare": "husky",
     "setup": "npm --prefix backend ci && npm --prefix frontend ci",
-    "check": "./check.sh"
+    "check": "./scripts/check.sh",
+    "dev": "./scripts/dev.sh",
+    "audit:web": "./scripts/audit-web.sh"
   },
   "devDependencies": {
+    "@axe-core/puppeteer": "^4.10.1",
     "husky": "^9.1.7",
-    "lint-staged": "^15.5.2"
+    "lint-staged": "^15.5.2",
+    "puppeteer-core": "^23.11.1"
   },
   "lint-staged": {
     "backend/src/**/*.ts": [

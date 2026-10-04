@@ -32,7 +32,7 @@
 // fiction. If you ever need a connectivity probe, use a separate name like
 // test_app_latency_seconds, never a production series.
 //
-//   node .audit/rum-check.mjs [baseUrl] [prometheusUrl]
+//   node scripts/audit/rum-check.mjs [baseUrl] [prometheusUrl]
 
 import puppeteer from "puppeteer-core";
 

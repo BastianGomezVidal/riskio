@@ -40,13 +40,13 @@
 #
 # MODOS DE USO
 #
-#   ./dev.sh              infra + servicios + API + web     (lo normal)
-#   ./dev.sh infra        solo Postgres, Redis y SeaweedFS
-#   ./dev.sh services     los seis servicios backend
-#   ./dev.sh api          solo la API, en watch
-#   ./dev.sh web          solo la SPA
-#   ./dev.sh status       que hay levantado
-#   ./dev.sh stop         pararcontainers (deja caer tambien los de compose)
+#   ./scripts/dev.sh          infra + servicios + API + web     (lo normal)
+#   ./scripts/dev.sh infra    solo Postgres, Redis y SeaweedFS
+#   ./scripts/dev.sh services los seis servicios backend
+#   ./scripts/dev.sh api      solo la API, en watch
+#   ./scripts/dev.sh web      solo la SPA
+#   ./scripts/dev.sh status   que hay levantado
+#   ./scripts/dev.sh stop     pararcontainers (deja caer tambien los de compose)
 #
 #   tail -f .dev-logs/api.log      ver la API mientras recompila
 #   tail -f .dev-logs/web.log      ver vite
@@ -69,19 +69,19 @@
 #
 # NOTAS PRACTICAS
 #
-# - Ctrl-C para la API y la SPA; los containers se quedan levantados. `./dev.sh stop`
+# - Ctrl-C para la API y la SPA; los containers se quedan levantados. `./scripts/dev.sh stop`
 #   para todo. Es deliberado: tardar 30 s en levantar la base de datos cada vez
 #   que se para a tomar un cafe es peor que dejar un postgres en memoria.
 # - La primera compilacion de nest tarda (~15-20 s). El script lo dice mientras
 #   espera, y comprueba que el PID siga vivo: un proceso muerto y un build lento
 #   se ven igual, y esperar 115 s a algo que ya no existe no es tener paciencia.
 # - Los containers se construyen una vez. Si tocas codigo de un servicio backend
-#   hay que reconstruirlo: `./dev.sh services` no lo hace por ti, porque rehacer
+#   hay que reconstruirlo: `./scripts/dev.sh services` no lo hace por ti, porque rehacer
 #   las seis imagenes en cada arranque cuesta mas que lo que ahorra.
 #
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 # --------------------------------------------------------------------------
@@ -292,7 +292,7 @@ cleanup() {
   step "stopping"
   [[ -n "${API_PID:-}" ]] && kill "$API_PID" 2>/dev/null || true
   [[ -n "${WEB_PID:-}" ]] && kill "$WEB_PID" 2>/dev/null || true
-  ok "api and web stopped; containers left running (./dev.sh stop for those)"
+  ok "api and web stopped; containers left running (./scripts/dev.sh stop for those)"
 }
 
 status() {

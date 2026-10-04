@@ -2,7 +2,7 @@
  * Captures the HTTP calls a real signed-in session makes.
  *
  * Usage:
- *   AUDIT_EMAIL=... AUDIT_PASSWORD=... node .audit/session-capture.mjs [baseUrl]
+ *   AUDIT_EMAIL=... AUDIT_PASSWORD=... node scripts/audit/session-capture.mjs [baseUrl]
  *
  * Credentials come from the environment and are never written to disk, echoed,
  * or committed. Nothing here reads .env, on purpose: the audit must be
@@ -37,7 +37,7 @@ const PASSWORD = process.env.AUDIT_PASSWORD;
 
 if (!EMAIL || !PASSWORD) {
   console.error(
-    "uso: AUDIT_EMAIL=... AUDIT_PASSWORD=... node .audit/session-capture.mjs [baseUrl]",
+    "uso: AUDIT_EMAIL=... AUDIT_PASSWORD=... node scripts/audit/session-capture.mjs [baseUrl]",
   );
   process.exit(1);
 }

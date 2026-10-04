@@ -225,7 +225,7 @@
     },
     {
       "type": "row",
-      "title": "Auditoria de laboratorio (audit-web.sh)",
+      "title": "Auditoria de laboratorio (scripts/audit-web.sh)",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 }
     },
     {

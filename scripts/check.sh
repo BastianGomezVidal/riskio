@@ -8,16 +8,16 @@
 # rather than a GitHub Actions workflow so it also runs locally, on a laptop,
 # before anything is pushed.
 #
-#   ./check.sh          run everything
-#   ./check.sh --fast   skip coverage, which is the slow part
+#   ./scripts/check.sh          run everything
+#   ./scripts/check.sh --fast   skip coverage, which is the slow part
 #
 # Needs podman and a container engine, for three stages: the semgrep ruleset, the
 # image hardening check, and the Postgres that the contract and integration
 # suites boot the app against. The database stage starts the `db` service itself
-# if it is not up, so `./check.sh` on a fresh laptop brings up what it needs
+# if it is not up, so `./scripts/check.sh` on a fresh laptop brings up what it needs
 # rather than skipping what it cannot find.
 #
-# The same script is the CI gate. `./check.sh` is the only list of commands that
+# The same script is the CI gate. `./scripts/check.sh` is the only list of commands that
 # decides whether this code is good; the workflow calls it rather than repeating
 # it, so a green laptop run and a green run on the remote cannot disagree.
 #
@@ -27,7 +27,7 @@
 
 set -uo pipefail
 
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 FAST=0
 [ "${1:-}" = "--fast" ] && FAST=1
@@ -67,7 +67,7 @@ run "backend tests"       bash -c 'cd backend && npx vitest run'
 #
 # A skip that reads as a pass is the same defect as a linter that scans nothing
 # and exits 0. So the gate brings the database up itself rather than tolerating
-# its absence, and the two suites run unconditionally below. `./check.sh` already
+# its absence, and the two suites run unconditionally below. `./scripts/check.sh` already
 # required podman for the semgrep and image stages.
 run "test database"       ./scripts/ensure-test-database.sh
 run "contract test"       bash -c 'cd backend && npm run --silent test:pact'
@@ -91,13 +91,13 @@ run "frontend build"      bash -c 'cd frontend && npx vite build'
 # scanned nothing is indistinguishable from a clean tree, and that ambiguity is
 # how the six security axes in the plan came to be marked done while three of
 # them did not exist. Needs podman, like the image check.
-run "semgrep rules"       bash -c 'SKIP_SEMGREP_CHECK=0 ./scripts/scan-semgrep.sh'
+run "semgrep rules"       bash -c 'SKIP_SEMGREP_CHECK=0 ./scripts/security/scan-semgrep.sh'
 
 # Last, because it is the only check that needs a container engine and the only
 # one that looks at a built image rather than at the source. It is what stops
 # the hardening from silently regressing: a Dockerfile change that put
 # `COPY . .` back would still build fine and still pass every step above.
-run "image hardening"     bash -c 'SKIP_IMAGE_CHECK=0 ./scripts/assert-hardened-image.sh'
+run "image hardening"     bash -c 'SKIP_IMAGE_CHECK=0 ./scripts/security/assert-hardened-image.sh'
 
 printf '\n=== summary ===\n'
 if [ ${#FAILED[@]} -eq 0 ]; then

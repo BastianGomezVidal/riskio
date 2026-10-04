@@ -24,12 +24,12 @@
 # ajeno no es una propiedad de este repositorio, asi que un gate que dependa
 # de ello cambia de veredicto sin que cambie una linea de codigo.
 #
-#   ./scripts/scan-semgrep.sh          analiza
-#   SKIP_SEMGREP_CHECK=1 ./check.sh    omitir (sin semgrep, sin podman)
+#   ./scripts/security/scan-semgrep.sh          analiza
+#   SKIP_SEMGREP_CHECK=1 ./scripts/check.sh    omitir (sin semgrep, sin podman)
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
 if [[ "${SKIP_SEMGREP_CHECK:-1}" == "1" ]]; then

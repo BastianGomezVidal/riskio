@@ -12,14 +12,14 @@
 # Cheap enough to run in the gate: the second npm ci is a cache hit, so this is
 # a build of two thin layers over the builder rather than a full compile.
 #
-#   ./scripts/assert-hardened-image.sh            uses localhost/riskio_backend:latest
-#   IMAGE=mi-imagen:tag ./scripts/assert-hardened-image.sh
+#   ./scripts/security/assert-hardened-image.sh            uses localhost/riskio_backend:latest
+#   IMAGE=mi-imagen:tag ./scripts/security/assert-hardened-image.sh
 #
 # To skip it when iterating on the Dockerfile, SKIP_IMAGE_CHECK=1.
 
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
 IMAGE="${IMAGE:-localhost/riskio_backend:latest}"
 

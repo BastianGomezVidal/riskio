@@ -15,7 +15,7 @@
 // "how bad was the last audit", not "how did the audits trend". Turning the
 // second group on means a group per run, and then owning the cleanup.
 //
-//   node .audit/report-metrics.mjs [pushgateway]
+//   node scripts/audit/report-metrics.mjs [pushgateway]
 
 import { readFileSync } from "node:fs";
 
@@ -35,7 +35,7 @@ const gauge = (name, unit, value, labels = {}) => {
 };
 
 // --- Lighthouse -------------------------------------------------------------
-const lh = readJson(".audit/out/lighthouse.json");
+const lh = readJson("scripts/audit/out/lighthouse.json");
 
 if (lh) {
   const a = lh.audits;
@@ -71,7 +71,7 @@ if (lh) {
 }
 
 // --- axe --------------------------------------------------------------------
-const axe = readJson(".audit/out/axe.json");
+const axe = readJson("scripts/audit/out/axe.json");
 
 if (axe) {
   for (const f of axe.findings) {

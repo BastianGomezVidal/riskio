@@ -51,7 +51,7 @@ jobs:
       # detecta la credencial de prueba, asi que un escaner roto no se
       # confunde con un repositorio limpio.
       - name: gitleaks
-        run: ./scripts/scan-secrets.sh
+        run: ./scripts/security/scan-secrets.sh
 
   dependencies:
     name: vulnerabilidades en los lockfiles

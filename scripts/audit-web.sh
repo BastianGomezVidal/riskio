@@ -15,21 +15,21 @@
 # spans actually reach Jaeger there is no honest INP figure to check. The script
 # says so instead of printing a dash that looks like a pass.
 #
-#   ./audit-web.sh                          # against http://localhost/
-#   ./audit-web.sh http://riskio.test       # against the built app
-#   AUDIT_TOKEN=ey... ./audit-web.sh        # also audits the protected routes
+#   ./scripts/audit-web.sh                          # against http://localhost/
+#   ./scripts/audit-web.sh http://riskio.test       # against the built app
+#   AUDIT_TOKEN=ey... ./scripts/audit-web.sh        # also audits the protected routes
 #
 # Exits non-zero if a threshold is breached, so it can gate a deploy.
 #
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 TARGET="${1:-http://localhost/}"
 CHROME_PATH="${CHROME_PATH:-/usr/bin/google-chrome}"
 COLLECTOR="${COLLECTOR:-http://localhost:4318}"   # receptor OTLP del collector
-OUT="$ROOT/.audit/out"
+OUT="$ROOT/scripts/audit/out"
 
 # "good" thresholds at the 75th percentile, which is the bar Google publishes.
 # TBT is the stand-in for responsiveness in a lab run, for the reason above.
@@ -200,11 +200,11 @@ fi
 # axe-core
 # --------------------------------------------------------------------------
 step "axe-core sobre $TARGET"
-if [[ ! -d .audit/node_modules ]]; then
-  info "instalando deps de auditoria en .audit/ (fuera del bundle del frontend)"
-  (cd .audit && npm install --silent --no-fund --no-audit)
-fi
-node .audit/axe-audit.mjs "$TARGET" || rc=1
+if [[ ! -d node_modules/puppeteer-core ]]; then
+    info "instalando deps de auditoria en la raiz (fuera del bundle del frontend)"
+    npm install --silent --no-fund --no-audit
+  fi
+node scripts/audit/axe-audit.mjs "$TARGET" || rc=1
 
 step "Publicando el resultado como metricas"
 # Para que el tablero de Grafana conserve el ultimo resultado y no solo el
@@ -212,7 +212,7 @@ step "Publicando el resultado como metricas"
 # hay nada que lo empuje periodicamente; ahora va a pushgateway, que lo retiene
 # hasta la proxima auditoria. Si pushgateway no esta, el script NO falla: la
 # auditoria local ya ha servido para decidir, y las metricas son una copia extra.
-node .audit/report-metrics.mjs "${PUSHGATEWAY:-http://localhost:9091}" || true
+node scripts/audit/report-metrics.mjs "${PUSHGATEWAY:-http://localhost:9091}" || true
 
 # --------------------------------------------------------------------------
 # Saltos HTTP de una sesion autenticada (opcional)
@@ -226,7 +226,7 @@ node .audit/report-metrics.mjs "${PUSHGATEWAY:-http://localhost:9091}" || true
 # la cache de React Query; los detalles estan en ARCHITECTURE-FRONTEND.md.
 if [[ -n "${AUDIT_EMAIL:-}" && -n "${AUDIT_PASSWORD:-}" ]]; then
   step "Saltos HTTP con sesion autenticada"
-  node .audit/session-capture.mjs "$TARGET" || warn "la captura de sesion fallo"
+  node scripts/audit/session-capture.mjs "$TARGET" || warn "la captura de sesion fallo"
 else
   info "sin AUDIT_EMAIL/AUDIT_PASSWORD: se omite la captura de sesion autenticada"
 fi

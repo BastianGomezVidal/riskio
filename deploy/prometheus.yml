@@ -3,7 +3,7 @@
 # them on :8889 after converting OTel resource attributes into labels.
 #
 # The audit metrics are the exception and the reason pushgateway is here. They
-# are pushed by .audit/report-metrics.mjs and only exist for as long as someone
+# are pushed by scripts/audit/report-metrics.mjs and only exist for as long as someone
 # runs the audit, which is not on a timer. Through the collector they reach
 # Prometheus as a normal scrape sample and go stale five minutes later, so the
 # dashboard shows the last run for five minutes and then nothing at all.

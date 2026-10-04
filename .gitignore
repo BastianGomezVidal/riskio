@@ -36,23 +36,20 @@ coverage/
 # NestJS
 backend/.env
 backend/.eslintrc.js
-# Personal notes
-contexto.txt
 
 # Rendered by backend/scripts/dev-fixtures.mjs. Its state.json carries the
 # advisory counter, and a committed one would make the next advisory number
 # depend on who cloned the repo last.
 backend/.dev-fixtures/
 
-# Salidas de dev.sh
+# Salidas de scripts/dev.sh
 .dev-logs/
 
-# Deps e informes de audit-web.sh
-.audit/node_modules/
-.audit/out/
+# Informes de scripts/audit-web.sh
+scripts/audit/out/
 # Los informes Lighthouse son artefactos locales y pueden pesar bastante.
-# El historico de runs esta en .audit/lighthouse-run-*.json.
-.audit/*.json
+# El historico de runs esta en scripts/audit/out/lighthouse-run-*.json.
+scripts/audit/out/*.json
 
 # Documentacion local, no compartida.
 #
@@ -63,7 +60,6 @@ backend/.dev-fixtures/
 # subirlos, `git add -f <archivo>`.
 AGENTS.md
 PLAN-ACCION.md
-contexto.txt
 backend/README.md
 
 # Los ARCHITECTURE-*.md se fusionaron en el README y se borraron del repo. Las
@@ -77,8 +73,8 @@ ARCHITECTURE-*.md
 report/
 backend/report/
 
-# transient, created and removed by scripts/scan-semgrep.sh
+# transient, created and removed by scripts/security/scan-semgrep.sh
 semgrep-probe/
 
-# transient, created and removed by scripts/scan-secrets.sh
+# transient, created and removed by scripts/security/scan-secrets.sh
 secrets-probe/

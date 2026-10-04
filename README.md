@@ -82,8 +82,8 @@ Outlook need §6 first.
 | Backend lint | `cd backend && npm run lint` |
 | Frontend build (typechecks) | `cd frontend && npm run build` |
 | Frontend dev server | `cd frontend && npm run dev` |
-| Web performance audit | `./audit-web.sh` |
-| Everything that can fail | `./check.sh` |
+| Web performance audit | `./scripts/audit-web.sh` |
+| Everything that can fail | `./scripts/check.sh` |
 
 ### After changing backend code
 
@@ -258,6 +258,26 @@ password hash.
 ## 5. Layout
 
 ```
+backend/              the NestJS API. Seven services, one image, entrypoints in src/*-service/main.ts
+frontend/             the React SPA
+deploy/               compose overlays and the observability configs (grafana, loki, prometheus, jaeger, otel)
+scripts/              everything executable
+  check.sh            the gate. The same script CI runs; see section 8
+  dev.sh              the fast edit loop
+  audit-web.sh        Lighthouse and axe-core, thresholds that fail
+  ensure-test-database.sh   starts Postgres for the contract and integration suites
+  security/           the scanners the workflows call
+  audit/              the axe-core, Lighthouse and RUM scripts audit-web.sh drives
+
+docker-compose.yml    the whole stack
+.husky/               git hooks. Stays at the root because husky looks for it there
+```
+
+Three things cannot move, because the tools that read them resolve from the root:
+`.husky/`, `.prettierrc.json` and `package.json`. Everything else that is a script
+lives under `scripts/`.
+
+```
 backend/src/
   <name>-service/main.ts     seven entrypoints, one per process
   domain/                    auth, users, weather, feeds, dashboard, storage, cache
@@ -356,8 +376,8 @@ a log is a working credential. The API says so at boot while it is active.
 One command runs everything that can fail:
 
 ```bash
-./check.sh          # typecheck, lint, tests, coverage, dead code, build
-./check.sh --fast   # same, minus coverage
+./scripts/check.sh          # typecheck, lint, tests, coverage, dead code, build
+./scripts/check.sh --fast   # same, minus coverage
 ```
 
 It exits non-zero if any step failed. The GitHub Actions workflow calls this exact
@@ -401,7 +421,7 @@ silently move the number. The `exclude` list holds entrypoints, modules, DTOs,
 entities, migrations and DI tokens — files with no unit-testable behaviour.
 
 The frontend has no unit test suite. Its gate is typecheck, `knip` and a successful
-build, plus `audit-web.sh` for what users actually experience.
+build, plus `scripts/audit-web.sh` for what users actually experience.
 
 ### Where the gaps are
 
@@ -425,7 +445,7 @@ next.
 | `pushgateway_data` | the **last** audit result only, not a history |
 | `jaeger_data` | traces in Badger |
 
-All survive `--force-recreate`. For audit history, `audit-web.sh` keeps the reports.
+All survive `--force-recreate`. For audit history, `scripts/audit-web.sh` keeps the reports.
 
 ---
 
@@ -443,5 +463,5 @@ being true, replace it rather than deleting it.
 values.
 
 **A number nobody reproduces is a rumour.** Coverage figures, bundle sizes and
-latency claims in this file were measured, and `check.sh` is how you re-measure
+latency claims in this file were measured, and `scripts/check.sh` is how you re-measure
 them. If one goes stale, replace it.

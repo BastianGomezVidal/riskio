@@ -1,6 +1,6 @@
 name: CI
 
-# Runs on the remote as well as locally. The gate is the same one `./check.sh`
+# Runs on the remote as well as locally. The gate is the same one `./scripts/check.sh`
 # runs, so a green local run means a green run here; there is no second list of
 # commands to keep in sync.
 
@@ -74,7 +74,7 @@ jobs:
       # thresholds live in backend/vitest.config.ts, so a drop below them fails
       # this step.
       - name: Typecheck, lint, tests, coverage, dead code, build
-        run: ./check.sh
+        run: ./scripts/check.sh
 
       - name: Upload coverage report
         if: always()

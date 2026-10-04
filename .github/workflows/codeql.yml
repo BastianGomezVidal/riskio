@@ -59,7 +59,7 @@ jobs:
           # analysis has to be reading source.
           build-mode: none
           # No project build step follows, deliberately. This job analyses
-          # source, and ./check.sh in the other workflow already proved the
+          # source, and ./scripts/check.sh in the other workflow already proved the
           # source builds.
 
       - name: Perform CodeQL analysis

@@ -22,12 +22,12 @@
 # el escaneo real. Si se invirtiera el orden, ese fallo habria pasado por
 # "repositorio limpio" y nadie lo habria vuelto a mirar.
 #
-#   ./scripts/scan-secrets.sh
+#   ./scripts/security/scan-secrets.sh
 #   SKIP_SECRETS_CHECK=1 ...   omitir
 
 set -uo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
 if [[ "${SKIP_SECRETS_CHECK:-0}" == "1" ]]; then
