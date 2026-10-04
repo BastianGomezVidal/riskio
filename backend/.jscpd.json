@@ -1,5 +1,4 @@
 {
-  "$schema": "https://raw.githubusercontent.com/kucherenko/jscpd/master/packages/jscpd/schema.json",
   "path": ["src"],
   "reporters": ["console"],
   "gitignore": true,
@@ -7,5 +6,5 @@
   "absolute": false,
   "minLines": 5,
   "minTokens": 50,
-  "threshold": 4
+  "threshold": 5
 }

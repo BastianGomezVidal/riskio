@@ -48,7 +48,7 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.5.0",
-    "jscpd": "^4.3.0",
+    "jscpd": "^5.4.0",
     "knip": "^6.38.0",
     "oxlint": "^1.86.0",
     "prettier": "^3.9.9",
