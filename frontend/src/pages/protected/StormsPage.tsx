@@ -8,7 +8,7 @@
  * /storms pays for it. The dashboard already avoids this, because its barrel
  * only exports DashboardContent.
  */
-import { StormsDirectory } from "@/features/weather/storms/components/StormsDirectory/StormsDirectory";
+import { StormsDirectory } from "@/components/features/weather/storms/StormsDirectory/StormsDirectory";
 
 export function StormsPage() {
   return <StormsDirectory />;

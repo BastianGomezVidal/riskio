@@ -1,11 +1,11 @@
 import { useActionState, useState } from "react";
 import { Link } from "react-router-dom";
-import { ActionButton, TextField } from "@/design-system/controls";
+import { ActionButton, TextField } from "@/components/shared/controls";
 import { api, authErrorMessage } from "@/api/client";
 import type { ForgotPasswordResult } from "@/domain/auth";
 import { EMAIL_PATTERN } from "@/auth/validation";
-import { FieldError, FormError } from "@/layout/public/AuthError/AuthError";
-import { AuthLayout } from "@/layout/public/AuthLayout";
+import { FieldError, FormError } from "@/components/layout/AuthError/AuthError";
+import { AuthLayout } from "@/components/layout/AuthLayout";
 
 interface ForgotErrors {
   form: string | null;

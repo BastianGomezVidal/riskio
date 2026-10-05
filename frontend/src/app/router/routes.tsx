@@ -6,7 +6,7 @@ import { lazyPage } from "./lazyPage";
 // keeps leaflet and the per-page component trees out of the initial chunk: the
 // sign-in screen should not pay for the storm map.
 const AppLayout = lazyPage(
-  () => import("@/global_components/AppLayout/AppLayout"),
+  () => import("@/components/layout/AppLayout/AppLayout"),
   "AppLayout",
 );
 const SignInPage = lazyPage(

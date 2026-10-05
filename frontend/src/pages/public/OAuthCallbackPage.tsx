@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSession } from "@/auth/session-context";
+import { useSession } from "@/components/providers/session-context";
 import { storeAccessToken } from "@/auth/session";
 
 export default function OAuthCallbackPage() {

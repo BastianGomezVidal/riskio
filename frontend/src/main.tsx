@@ -4,12 +4,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import "@fontsource-variable/sora/wght.css";
 import App from "./app/App";
 import { BrowserRouter } from "react-router-dom";
-import { SessionProvider } from "./auth/session-context";
-import { ToastProvider } from "./design-system/toast";
-import { QueryProvider } from "./data/QueryProvider";
+import { SessionProvider } from "@/components/providers/session-context";
+import { ToastProvider } from "@/components/shared/toast";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 import "./index.css";
-import { ErrorBoundary } from "./global_components/ErrorBoundary/ErrorBoundary";
-import { PageFallback } from "./global_components/PageFallBack/PageFallBack";
+import { ErrorBoundary } from "@/components/layout/ErrorBoundary/ErrorBoundary";
+import { PageFallback } from "@/components/layout/PageFallBack/PageFallBack";
 import { initTracing } from "./observability/telemetry";
 import { reportWebVitals } from "./observability/web-vitals";
 

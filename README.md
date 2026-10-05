@@ -287,21 +287,27 @@ backend/src/
   instrumentation.ts         OpenTelemetry bootstrap, loaded via --import
 
 frontend/src/
-  app/router/                route table, one lazy() per route, guards
-  pages/                     public/ and protected/ route components
-  layout/public/             the signed-out shell
-  global_components/         header, footer, layout, error boundaries
-  features/                  weather, settings — feature-scoped components
-  domain/                    types and pure logic, no React
-  api/                       fetch client and Zod schemas
-  design-system/             tokens, antd theme, public-page controls
-  auth/                      session context
-  observability/             web telemetry
-```
-
-The rule the frontend follows: `domain/` holds types and pure functions and imports
-nothing from React; `features/` and `pages/` hold components. A change to a type
-should not require touching a component.
+    app/router/                route table, one lazy() per route, guards
+    pages/                     public/ and protected/ route components
+    components/
+      features/                weather, settings — feature-scoped components
+      layout/                  shell, header, footer, error boundaries, auth screens
+      shared/                  controls, toast, design tokens, antd theme
+      providers/               session context, react-query provider
+    domain/                    types and pure logic, no React
+    api/                       fetch client and Zod schemas
+    auth/                      session logic and form validation
+    hooks/                     reusable React hooks
+    helpers/                   genuinely shared logic, no domain of its own
+    observability/             web telemetry
+  ```
+  
+  The rule the frontend follows: `domain/` holds types and pure functions and imports
+  nothing from React; `components/` and `pages/` hold components. A change to a type
+  should not require touching a component. Every component lives under
+  `components/`; `pages/` stays at the root because it is the lazy-chunk boundary,
+  not a presentational concern. Helpers only earn a place in `helpers/` when they
+  have no domain of their own — code that belongs to a feature stays next to it.
 
 ---
 

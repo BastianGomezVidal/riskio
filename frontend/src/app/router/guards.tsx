@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import type { Location } from "react-router-dom";
-import { useSession } from "@/auth/session-context";
+import { useSession } from "@/components/providers/session-context";
 
 /**
  * Guards routes that require authentication.

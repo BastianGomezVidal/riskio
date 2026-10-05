@@ -1,4 +1,4 @@
-import { DashboardContent } from "@/features/weather/dashboard";
+import { DashboardContent } from "@/components/features/weather/dashboard";
 
 export function DashboardPage() {
   // No <main> here — AppLayout owns the main landmark.

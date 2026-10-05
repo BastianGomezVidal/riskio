@@ -9,7 +9,7 @@ ARG VITE_OTEL_EXPORTER_OTLP_ENDPOINT
 ENV VITE_OTEL_EXPORTER_OTLP_ENDPOINT=$VITE_OTEL_EXPORTER_OTLP_ENDPOINT
 
 # Inactivity timeout and the warning that fires before it. These are read at
-# build time by src/auth/session-context.tsx, so they are compile-time values
+# build time by src/components/providers/session-context.tsx, so they are compile-time values
 # and not runtime environment: changing them needs a rebuild, which is why they
 # live here rather than in the nginx stage. Without this pair a container
 # cannot change them and the built-in defaults apply to every deployment.

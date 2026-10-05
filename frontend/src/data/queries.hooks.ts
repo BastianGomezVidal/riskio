@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
-import { useSession } from "@/auth/session-context";
+import { useSession } from "@/components/providers/session-context";
 import type { StormsQuery } from "@/domain/storm";
 import type { User } from "@/domain/users";
 import {

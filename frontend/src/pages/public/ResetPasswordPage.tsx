@@ -1,9 +1,9 @@
 import { useActionState, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ActionButton, TextField } from "@/design-system/controls";
+import { ActionButton, TextField } from "@/components/shared/controls";
 import { api, authErrorMessage } from "@/api/client";
-import { FieldError, FormError } from "@/layout/public/AuthError/AuthError";
-import { AuthLayout } from "@/layout/public/AuthLayout";
+import { FieldError, FormError } from "@/components/layout/AuthError/AuthError";
+import { AuthLayout } from "@/components/layout/AuthLayout";
 
 interface ResetErrors {
   form: string | null;

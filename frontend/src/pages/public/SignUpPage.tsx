@@ -1,6 +1,6 @@
-import { AuthLayout } from "@/layout/public/AuthLayout";
-import { AuthHeader } from "@/layout/public/AuthContent/AuthHeader/AuthHeader";
-import { AuthContent } from "@/layout/public/AuthContent/AuthContent";
+import { AuthLayout } from "@/components/layout/AuthLayout";
+import { AuthHeader } from "@/components/layout/AuthContent/AuthHeader/AuthHeader";
+import { AuthContent } from "@/components/layout/AuthContent/AuthContent";
 
 export function SignUpPage() {
   return (
