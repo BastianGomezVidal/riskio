@@ -80,7 +80,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "fast-xml-parser": "^5.11.1",
-    "joi": "^18.2.8",
+    "joi": "^18.3.1",
     "keyv": "^5.6.0",
     "nestjs-pino": "^5.2.1",
     "nodemailer": "^10.0.11",
